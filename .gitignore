@@ -1,0 +1,15 @@
+# offline directories
+GIS/
+inventory/
+Stand*/
+
+# QGIS, RStudio, and other user data
+McDonald-Dunn.qgz
+McDonald-Dunn.Rproj
+.Rhistory
+.Rproj.user/
+**/*.jpg
+**/*.jpeg
+**/*.png
+**/*.Rds
+**/*.svg
