@@ -1,8 +1,8 @@
 # load libraries, functions, and acma2022 from setup.R
 
-acmaOptions = tibble(fitHeight = TRUE, 
-                     fitHeightMixed = TRUE,
-                     fitDbh = TRUE,
+acmaOptions = tibble(fitHeight = FALSE,
+                     fitHeightMixed = FALSE,
+                     fitDbh = FALSE,
                      fitDbhMixed = TRUE)
 
 ## bigleaf maple height regressions
@@ -39,29 +39,35 @@ if (acmaOptions$fitHeight)
   acmaHeightFromDiameter$sharmaZhangBal = fit_gsl_nls("Sharma-Zhang BA+L", height ~ 1.37 + a1*standBasalAreaPerHectare^b1 * (1 - exp((b2 + b2ba * standBasalAreaPerHectare)*standTreesPerHectare^b3*dbh))^b4, acma2022, start = list(a1 = 10, b1 = 0.3, b2 = -0.06, b2ba = 0.0005, b3 = 0.04, b4 = 1.1)) # a2, b1bal, b2bal, b3ba, b3bal, b4ba, b4bal not significant, { a3, b1ba, b2ba } all significant
   acmaHeightFromDiameter$sibbesen = fit_gsl_nls("Sibbesen", height ~ 1.37 + a1*dbh^(b1*dbh^b2), acma2022, start = list(a1 = 0.7, b1 = 1.5, b2 = -0.16)) # a1p, b1p, b2p not significant
   acmaHeightFromDiameter$weibull = fit_gsl_nls("Weibull", height ~ 1.37 + (a1)*(1 - exp(b1*dbh^b2)), acma2022, start = list(a1 = 27, b1 = -0.04, b2 = 1.0)) # a1p, b1p, b2p not significant
-  acmaHeightFromDiameter$weibullBal = fit_gsl_nls("Weibull BA+L", height ~ 1.37 + (a1) * (1 - exp(b1*dbh^(b2 + b2bal * basalAreaLarger))), acma2022, start = list(a1 = 27, b1 = -0.04, b2 = 1.0, b2bal = 0.002)) # a2, b1ba, b1bal, b2ba not significant, a3 also significant
+  acmaHeightFromDiameter$weibullBal = fit_gsl_nls("Weibull BA+L", height ~ 1.37 + (a1) * (1 - exp(b1*dbh^(b2 + b2bal * basalAreaLarger))), acma2022, start = list(a1 = 27, b1 = -0.04, b2 = 1.0, b2bal = 0.002)) # a2, b1ba, b1bal, b2ba not significant, a3 also significant but typically less accurate
+  #acmaHeightFromDiameter$weibullBalA3 = fit_gsl_nls("Weibull BA+L", height ~ 1.37 + (a1 + a3 * basalAreaLarger) * (1 - exp(b1*dbh^(b2))), acma2022, start = list(a1 = 26, a3 = 0.05, b1 = -0.04, b2 = 1.0))
   #acmaHeightFromDiameter$weibullBal = fit_gsl_nls("Weibull BA+L", height ~ 1.37 + (a1 + a2 * basalAreaLarger) * (1 - exp(b1*dbh^(b2))), acma2022, start = list(a1 = 26, a2 = 0.08, b1 = -0.04, b2 = 1.0)) # overlaps at 10x10 blocked cross validation but tends to be less accurate
   #print(to_parameter_confidence_intervals(acmaHeightFromDiameter$weibullBal), n = 12)
   #to_fixed_coeffficients(acmaHeightFromDiameter$weibullBal)
+  #acmaHeightFromDiameter$weibullBalA3$validation %>% summarize(maeMin = min(mae), maeMedian = median(mae), maeMean = mean(mae), maeMax = max(mae), aicMin = min(aic), aicMedian = median(aic), aicMean = mean(aic), aicMax = max(aic))
   
   # all significant GAM forms NaN with Γ link
-  acmaHeightFromDiameter$gam = fit_gam("REML GAM", height ~ I(dbh^0.666) + s(dbh, bs = "ts", by = as.factor(isPlantation), k = 7), data = acma2022) # 10x10 MAE 2.52, AIC 1193, gamma NaN
-  #acmaHeightFromDiameter$gamBa = fit_gam("REML GAM BA", height ~ I(dbh^0.666) + s(dbh, standBasalAreaPerHectare, bs = "ts", by = as.factor(isPlantation), k = 9), data = acma2022) # 10x10 AIC 1264
-  acmaHeightFromDiameter$gamBal = fit_gam("REML GAM BA+L", height ~ I(dbh^0.666) + s(dbh, basalAreaLarger, bs = "ts", by = as.factor(isPlantation), k = 10), data = acma2022) # 10x10 AIC 1249
-  #acmaHeightFromDiameter$gamBaBal = fit_gam("REML GAM BA+L", height ~ I(dbh^0.666) + s(dbh, standBasalAreaPerHectare, basalAreaLarger, bs = "ts", by = as.factor(isPlantation), k = 11), data = acma2022, significant = FALSE) # k = 11 minimum, 10x10 AIC 1270
-  acmaHeightFromDiameter$gamBalPhysio = fit_gam("REML GAM BA+L physio", height ~ I(dbh^0.666) + s(dbh, basalAreaLarger, slope, terrainRoughness, bs = "ts", by = as.factor(isPlantation), k = 16), data = acma2022, significant = FALSE) # k = 16 minimum > ~10
-  acmaHeightFromDiameter$gamBalPhysioRelDbh = fit_gam("REML GAM BA+L RelDbh physio", height ~ I(dbh^0.666) + s(dbh, basalAreaLarger, slope, sin(3.14159/180 * aspect), cos(3.14159/180 * aspect), relativeDiameter, bs = "ts", by = as.factor(isPlantation), k = 16), data = acma2022, significant = FALSE) # k = 16 minimum > ~10, also by propagation
-  acmaHeightFromDiameter$gamBalRelDbh = fit_gam("REML GAM BA+L RelDbh", height ~ I(dbh^0.666) + s(dbh, standBasalAreaPerHectare, basalAreaLarger, relativeDiameter, bs = "ts", by = as.factor(isPlantation), k = 16), data = acma2022, significant = FALSE) # k = 16 minimum > ~10
+  # Slight increases in accuracy from power to Hossfeld IV and Michaelis-Menten bases, the two of which are mathematically identical for the regression coefficients reached in this case.
+  # Fit with Hossfeld IV as it's slightly simpler.
+  acmaHeightFromDiameter$gam = fit_gam("REML GAM", height ~ I(1.9315 * dbh^0.666) + s(dbh, bs = "ts", by = as.factor(isPlantation), k = 7), data = acma2022) # 10x10 MAE 2.52, AIC 1238, gamma NaN
+  #acmaHeightFromDiameter$gamHossfeld = fit_gam("REML GAM", height ~ I(32.450/(1 + 30.977 * dbh^-1.169)) + s(dbh, bs = "ts", by = as.factor(isPlantation), k = 7), data = acma2022) # 10x10 MAE 2.48, AIC 1197 with Hossfeld IV
+  #acmaHeightFromDiameter$gamMichaelis = fit_gam("REML GAM", height ~ I(32.450 * dbh^1.169/(30.977 + dbh^1.169)) + s(dbh, bs = "ts", by = as.factor(isPlantation), k = 7), data = acma2022) # 10x10 MAE 2,46, AIC 1236 with Michaelis-Menten
+  #acmaHeightFromDiameter$gamBa = fit_gam("REML GAM BA", height ~ I(1.9315 * dbh^0.666) + s(dbh, standBasalAreaPerHectare, bs = "ts", by = as.factor(isPlantation), k = 9), data = acma2022) # 10x10 AIC 1264
+  acmaHeightFromDiameter$gamBal = fit_gam("REML GAM BA+L", height ~ I(1.9315 * dbh^0.666) + s(dbh, basalAreaLarger, bs = "ts", by = as.factor(isPlantation), k = 10), data = acma2022) # 10x10 AIC 1249
+  #acmaHeightFromDiameter$gamBaBal = fit_gam("REML GAM BA+L", height ~ I(1.9315 * dbh^0.666) + s(dbh, standBasalAreaPerHectare, basalAreaLarger, bs = "ts", by = as.factor(isPlantation), k = 11), data = acma2022, significant = FALSE) # k = 11 minimum, 10x10 AIC 1270
+  acmaHeightFromDiameter$gamBalPhysio = fit_gam("REML GAM BA+L physio", height ~ I(1.9315 * dbh^0.666) + s(dbh, basalAreaLarger, slope, terrainRoughness, bs = "ts", by = as.factor(isPlantation), k = 16), data = acma2022, significant = FALSE) # k = 16 minimum > ~10
+  acmaHeightFromDiameter$gamBalPhysioRelDbh = fit_gam("REML GAM BA+L RelDbh physio", height ~ I(1.9315 * dbh^0.666) + s(dbh, basalAreaLarger, slope, sin(3.14159/180 * aspect), cos(3.14159/180 * aspect), relativeDiameter, bs = "ts", by = as.factor(isPlantation), k = 16), data = acma2022, significant = FALSE) # k = 16 minimum > ~10, also by propagation
+  acmaHeightFromDiameter$gamBalRelDbh = fit_gam("REML GAM BA+L RelDbh", height ~ I(1.9315 * dbh^0.666) + s(dbh, standBasalAreaPerHectare, basalAreaLarger, relativeDiameter, bs = "ts", by = as.factor(isPlantation), k = 16), data = acma2022, significant = FALSE) # k = 16 minimum > ~10
   # slight MAE reductions with slope, sin(aspect), roughness, and FD8f, AIC neutral -> drop sin(aspect) on highest AIC + k = 57 > ~30 -> drop wetness on AIC + k = 16 > 10
-  #acmaHeightFromDiameter$gamElevation = fit_gam("REML GAM elevation", height ~ I(dbh^0.666) + s(dbh, bs = "ts", by = as.factor(isPlantation), k = 8), data = acma2022) # 10x10 AIC 1242 (781-1912)
-  #acmaHeightFromDiameter$gamSlope = fit_gam("REML GAM slope", height ~ I(dbh^0.666) + s(dbh, slope, bs = "ts", by = as.factor(isPlantation), k = 9), data = acma2022) # 10x10 AIC 1268 (814-1938)
-  #acmaHeightFromDiameter$gamSinAspect = fit_gam("REML GAM sin(aspect)", height ~ I(dbh^0.666) + s(dbh, sin(3.14159/180 * aspect), bs = "ts", by = as.factor(isPlantation), k = 10), data = acma2022) # 10x10 AIC 1263 (806-1880)
-  #acmaHeightFromDiameter$gamCosAspect = fit_gam("REML GAM cos(aspect)", height ~ I(dbh^0.666) + s(dbh, cos(3.14159/180 * aspect), bs = "ts", by = as.factor(isPlantation), k = 9), data = acma2022) # 10x10 AIC 1273 (753-2007)
-  #acmaHeightFromDiameter$gamRoughness = fit_gam("REML GAM roughness", height ~ I(dbh^0.666) + s(dbh, terrainRoughness, bs = "ts", by = as.factor(isPlantation), k = 9), data = acma2022) # 10x10 AIC 1264 (742-1984)
-  #acmaHeightFromDiameter$gamWetness = fit_gam("REML GAM wetness", height ~ I(dbh^0.666) + s(dbh, topographicWetnessFD8f, bs = "ts", by = as.factor(isPlantation), k = 9), data = acma2022) # 10x10 AIC 1264 (799-1985)
-  acmaHeightFromDiameter$gamPhysio = fit_gam("REML GAM physio", height ~ I(dbh^0.666) + s(dbh, slope, terrainRoughness, bs = "ts", by = as.factor(isPlantation), k = 11), data = acma2022) # k = 11 minimum
-  acmaHeightFromDiameter$gamRelDbh = fit_gam("REML GAM RelDbh", height ~ I(dbh^0.666) + s(dbh, relativeDiameter, bs = "ts", by = as.factor(isPlantation), k = 8), data = acma2022) # 10x10 AIC 1258 (785-2087)
-  acmaHeightFromDiameter$gamRelDbhPhysio = fit_gam("REML GAM RelDbh physio", height ~ I(dbh^0.666) + s(dbh, elevation, slope, sin(3.14159/180 * aspect), cos(3.14159/180 * aspect), relativeDiameter, bs = "ts", k = 16, by = as.factor(isPlantation)), data = acma2022, significant = FALSE) # k = 16 minimum, 10x10 AIC 1485 (1028-2767)
+  #acmaHeightFromDiameter$gamElevation = fit_gam("REML GAM elevation", height ~ I(1.9315 * dbh^0.666) + s(dbh, bs = "ts", by = as.factor(isPlantation), k = 8), data = acma2022) # 10x10 AIC 1242 (781-1912)
+  #acmaHeightFromDiameter$gamSlope = fit_gam("REML GAM slope", height ~ I(1.9315 * dbh^0.666) + s(dbh, slope, bs = "ts", by = as.factor(isPlantation), k = 9), data = acma2022) # 10x10 AIC 1268 (814-1938)
+  #acmaHeightFromDiameter$gamSinAspect = fit_gam("REML GAM sin(aspect)", height ~ I(1.9315 * dbh^0.666) + s(dbh, sin(3.14159/180 * aspect), bs = "ts", by = as.factor(isPlantation), k = 10), data = acma2022) # 10x10 AIC 1263 (806-1880)
+  #acmaHeightFromDiameter$gamCosAspect = fit_gam("REML GAM cos(aspect)", height ~ I(1.9315 * dbh^0.666) + s(dbh, cos(3.14159/180 * aspect), bs = "ts", by = as.factor(isPlantation), k = 9), data = acma2022) # 10x10 AIC 1273 (753-2007)
+  #acmaHeightFromDiameter$gamRoughness = fit_gam("REML GAM roughness", height ~ I(1.9315 * dbh^0.666) + s(dbh, terrainRoughness, bs = "ts", by = as.factor(isPlantation), k = 9), data = acma2022) # 10x10 AIC 1264 (742-1984)
+  #acmaHeightFromDiameter$gamWetness = fit_gam("REML GAM wetness", height ~ I(1.9315 * dbh^0.666) + s(dbh, topographicWetnessFD8f, bs = "ts", by = as.factor(isPlantation), k = 9), data = acma2022) # 10x10 AIC 1264 (799-1985)
+  acmaHeightFromDiameter$gamPhysio = fit_gam("REML GAM physio", height ~ I(1.9315 * dbh^0.666) + s(dbh, slope, terrainRoughness, bs = "ts", by = as.factor(isPlantation), k = 11), data = acma2022) # k = 11 minimum
+  acmaHeightFromDiameter$gamRelDbh = fit_gam("REML GAM RelDbh", height ~ I(1.9315 * dbh^0.666) + s(dbh, relativeDiameter, bs = "ts", by = as.factor(isPlantation), k = 8), data = acma2022) # 10x10 AIC 1258 (785-2087)
+  acmaHeightFromDiameter$gamRelDbhPhysio = fit_gam("REML GAM RelDbh physio", height ~ I(1.9315 * dbh^0.666) + s(dbh, elevation, slope, sin(3.14159/180 * aspect), cos(3.14159/180 * aspect), relativeDiameter, bs = "ts", k = 16, by = as.factor(isPlantation)), data = acma2022, significant = FALSE) # k = 16 minimum, 10x10 AIC 1485 (1028-2767)
   #lapply(acmaHeightFromDiameter$gamRelDbhPhysio$fit, k.check)
   #lapply(acmaHeightFromDiameter$gamRelDbhPhysio$fit, summary)
   #acmaHeightFromDiameter$gamRelDbhPhysio$validation %>% summarize(maeMin = min(mae), maeMedian = median(mae), maeMean = mean(mae), maeMax = max(mae), aicMin = min(aic), aicMedian = median(aic), aicMean = mean(aic), aicMax = max(aic))
@@ -160,6 +166,17 @@ if (acmaOptions$fitHeightMixed)
                                                     start = list(fixed = c(a1 = 24, b1 = -0.05, b2 = 1.0, b2bal = 0.001)))
   #to_fixed_coeffficients(acmaHeightFromDiameterMixed$weibullBal)
   #print(to_parameter_confidence_intervals(acmaHeightFromDiameterMixed$weibullBal), n = 16)
+
+  acmaHeightFromDiameterMixed$gam = fit_gam("REML GAM", height ~ I(1.9315 * dbh^0.666) + s(dbh, bs = "ts", by = as.factor(isPlantation), k = 7), random = list(uniquePlotID = ~1), data = acma2022)
+  acmaHeightFromDiameterMixed$gamBal = fit_gam("REML GAM BA+L", height ~ I(1.9315 * dbh^0.666) + s(dbh, basalAreaLarger, bs = "ts", by = as.factor(isPlantation), k = 10), random = list(uniquePlotID = ~1), data = acma2022)
+  acmaHeightFromDiameterMixed$gamBalPhysio = fit_gam("REML GAM BA+L physio", height ~ I(1.9315 * dbh^0.666) + s(dbh, basalAreaLarger, slope, terrainRoughness, bs = "ts", by = as.factor(isPlantation), k = 16), random = list(uniquePlotID = ~1), data = acma2022, significant = FALSE)
+  acmaHeightFromDiameterMixed$gamBalPhysioRelDbh = fit_gam("REML GAM BA+L RelDbh physio", height ~ I(1.9315 * dbh^0.666) + s(dbh, basalAreaLarger, slope, sin(3.14159/180 * aspect), cos(3.14159/180 * aspect), relativeDiameter, bs = "ts", by = as.factor(isPlantation), k = 16), random = list(uniquePlotID = ~1), data = acma2022, significant = FALSE)
+  acmaHeightFromDiameterMixed$gamBalRelDbh = fit_gam("REML GAM BA+L RelDbh", height ~ I(1.9315 * dbh^0.666) + s(dbh, standBasalAreaPerHectare, basalAreaLarger, relativeDiameter, bs = "ts", by = as.factor(isPlantation), k = 16), random = list(uniquePlotID = ~1), data = acma2022, significant = FALSE)
+  acmaHeightFromDiameterMixed$gamPhysio = fit_gam("REML GAM physio", height ~ I(1.9315 * dbh^0.666) + s(dbh, slope, terrainRoughness, bs = "ts", by = as.factor(isPlantation), k = 11), random = list(uniquePlotID = ~1), data = acma2022, significant = FALSE) # k = 11 minimum > ~6
+  acmaHeightFromDiameterMixed$gamRelDbh = fit_gam("REML GAM RelDbh", height ~ I(1.9315 * dbh^0.666) + s(dbh, relativeDiameter, bs = "ts", by = as.factor(isPlantation), k = 8), random = list(uniquePlotID = ~1), data = acma2022)
+  acmaHeightFromDiameterMixed$gamRelDbhPhysio = fit_gam("REML GAM RelDbh physio", height ~ I(1.9315 * dbh^0.666) + s(dbh, elevation, slope, sin(3.14159/180 * aspect), cos(3.14159/180 * aspect), relativeDiameter, bs = "ts", k = 16, by = as.factor(isPlantation)), random = list(uniquePlotID = ~1), data = acma2022, significant = FALSE)
+  #lapply(acmaHeightFromDiameterMixed$gamRelDbhPhysio$fit, function(fit) { return(k.check(fit$gam)) })
+  #lapply(acmaHeightFromDiameterMixed$gamRelDbhPhysio$fit, function(fit) { return(summary(fit$gam)) })
   
   saveRDS(acmaHeightFromDiameterMixed, paste0("trees/height-diameter/data/ACMA3 height mixed ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds"))
 }
@@ -193,7 +210,7 @@ if (acmaOptions$fitDbh)
   acmaDiameterFromHeight$ruarkPhysio = fit_gsl_nls("Ruark physio", dbh ~ a1*(height - 1.37)^b1 * exp((b2 + b2e * elevation) * (height - 1.37)), acma2022, start = list(a1 = 0.9, b1 = 1.3, b2 = 0, b2e = 0), significant = FALSE) # { a5, b1 } x { e, s, a, tr, tw }, b2 not significant
   acmaDiameterFromHeight$ruarkRelHt = fit_gsl_nls("Ruark RelHt", dbh ~ a1*(height - 1.37)^b1 * exp((b2 + b2rh * relativeHeight) * (height - 1.37)), acma2022, start = list(a1 = 0.9, b1 = 1.3, b2 = 0, b2rh = 0), significant = FALSE) # a4, b1rh, b2rh not significant
   acmaDiameterFromHeight$ruarkRelHtPhysio = fit_gsl_nls("Ruark RelHt physio", dbh ~ a1*(height - 1.37)^b1 * exp((b2 + b2e * elevation + b2rh * relativeHeight) * (height - 1.37)), acma2022, start = list(a1 = 0.9, a4 = 0, b1 = 1.3, b2 = 0, b2e = 0, b2rh = 0), significant = FALSE) # by propagation
-  acmaDiameterFromHeight$schnute = fit_gsl_nls("Schnute inverse", dbh ~ -1/a1 * log(1 - (1 - exp(-a2))*(height^b1 - 1.37^b1)/(Ha^b1 - 1.3^b1)), acma2022, start = list(a1 = 0.000003, a2 = 0.002, b1 = 1.3, Ha = 161)) # a1p, b1p, Hap not significant, Ha-a1 evaporation increases with Levenberg
+  acmaDiameterFromHeight$schnute = fit_gsl_nls("Schnute inverse", dbh ~ -1/a1 * log(1 - (1 - exp(-a2))*(height^b1 - 1.37^b1)/(Ha^b1 - 1.37^b1)), acma2022, start = list(a1 = 0.000003, a2 = 0.002, b1 = 1.3, Ha = 161)) # a1p, b1p, Hap not significant, Ha-a1 evaporation increases with Levenberg
   acmaDiameterFromHeight$sharmaParton = fit_gsl_nls("modified Sharma-Parton", dbh ~ a1*(height - 1.37)^b1*(exp(b2*(standTreesPerHectare/topHeight)^b3*(height - 1.37)) - 1), acma2022, start = list(a1 = 20, b1 = 1, b2 = 0.1, b3 = -0.1, b4 = 0.3), control = gsl_nls_control(scale = "levenberg")) # a1p, b1p, b2p, b3p, b4p all NaN-inf, a1-b2 evaporation, job NaN-inf with More
   acmaDiameterFromHeight$sibbesenReplace = fit_gsl_nls("Sibbesen replace", dbh ~ a1*(height - 1.37)^(b1*(height - 1.37)^b2), acma2022, start = list(a1 = 1.3, b1 = 1, b2 = 0), significant = FALSE) # a1p, b1p, b2, b2p not significant
   #acmaDiameterFromHeight$sibbesenReplaceAbat = fit_gsl_nls("Sibbesen replace ABA+T", dbh ~ (a1 + a3 * basalAreaTaller)*(height - 1.37)^(b1*(height - 1.37)^b2), acma2022, start = list(a1 = 0.5, a3 = 0, b1 = 2.2, b2 = -0.13))
@@ -208,7 +225,8 @@ if (acmaOptions$fitDbh)
   #to_fixed_coeffficients(acmaDiameterFromHeight$weibull)
   
   # all significant GAM forms NaN with Γ link
-  acmaDiameterFromHeight$gam = fit_gam("REML GAM", dbh ~ I(height^1.263) + s(height, bs = "ts", by = as.factor(isPlantation), k = 7), data = acma2022) # 10x10 median AIC 1665, RMSE 10.8
+  acmaDiameterFromHeight$gam = fit_gam("REML GAM", dbh ~ I(height^1.263) + s(height, bs = "ts", by = as.factor(isPlantation), k = 7), data = acma2022) # 10x10 median RMSE 10.6, AIC 1644
+  #acmaDiameterFromHeight$gamSchnute = fit_gam("REML GAM", dbh ~ I(-1/3.265e-06 * log(1 - (1 - exp(-0.001811)) * (height^1.343 - 1.37^1.343)/(172.2^1.343 - 1.37^1.343))) + s(height, bs = "ts", k = 7), data = acma2022) # 10x10 median RMSE 10.6, AIC 1654
   #acmaDiameterFromHeight$gamAbat = fit_gam("REML GAM ABA+T", dbh ~ I(height^1.263) + s(height, basalAreaTaller, bootstrapStandBasalAreaPerHectare, bs = "ts", by = as.factor(isPlantation), k = 13), data = acma2022)
   #acmaDiameterFromHeight$gamAbatPhysio = fit_gam("REML GAM ABA+T physio", dbh ~ I(height^1.263) + s(height, basalAreaTaller, bootstrapStandBasalAreaPerHectare, slope, sin(3.14159/180 * aspect), terrainRoughness, bs = "ts", by = as.factor(isPlantation), k = 85), data = acma2022)
   #acmaDiameterFromHeight$gamAbatPhysioRelHt = fit_gam("REML GAM ABA+T RelHt physio", dbh ~ I(height^1.263) + s(height, bootstrapStandBasalAreaPerHectare, basalAreaTaller, slope, terrainRoughness, relativeHeight, bs = "ts", by = as.factor(isPlantation), k = 85), data = acma2022)
@@ -280,7 +298,7 @@ if (acmaOptions$fitDbhMixed)
   #acmaDiameterFromHeightMixed$powerAbat = fit_nlme("power ABA+T", dbh ~ (a1 + a1r + a1p * isPlantation + a3 * basalAreaTaller)*(height - 1.37)^(b1 + b1p * isPlantation), acma2022, 
   #                                                 fixedFormula = a1 + a1p + a2 + b1 + b1p ~ 1, randomFormula = a1r ~ 1|stand/plot,
   #                                                 start = list(fixed = c(a1 = 3.63, a1p = -2.32, a3 = -0.00064, b1 = 0.898, b1p = 0.272)))
-  acmaDiameterFromHeightMixed$powerPhysio = fit_nlme("power physio", dbh ~ a1*(height - 1.37)^(b1 + b1r + b1tw * topographicWetnessFD8f), acma2022, # a1r viable but noticeably slower to converge than b1r
+  acmaDiameterFromHeightMixed$powerPhysio = fit_nlme("power physio", dbh ~ a1*(height - 1.37)^(b1 + b1r + b1tw * topographicWetnessFD8f), acma2022, # a1r job max iterations
                                                      fixedFormula = a1 + b1 + b1tw ~ 1, randomFormula = b1r ~ 1|stand/plot,
                                                      start = list(fixed = c(a1 = 0.8, b1 = 1.1, b1tw = 0.02)))
   #acmaDiameterFromHeightMixed$powerRelHt = fit_nlme("power RelHt", dbh ~ (a1 + a1r + a4 * relativeHeight)*(height - 1.37)^b1, acma2022, # relative height not significant
@@ -315,7 +333,7 @@ if (acmaOptions$fitDbhMixed)
   #                                                        fixedFormula = a1 + a7 + a4 + b1 + b1p + b2 ~ 1, randomFormula = a1r ~ 1|stand/plot,
   #                                                        start = list(fixed = c(a1 = 1.2, a7 = -0.06, a4 = 0, b1 = 1.45, b1p = -0.064, b2 = 0.03)))
   acmaDiameterFromHeightMixed$ruarkRelHtPhysio = create_fit_statistics(name = "Ruark RelHt physio", fitting = "nlme", significant = FALSE)
-  #acmaDiameterFromHeightMixed$schnute = fit_nlme("Schnute inverse", dbh ~ -1/(a1 + a1r) * log(1 - (1 - exp(-a2))*(height^b1 - 1.37^b1)/(Ha^b1 - 1.3^b1)), acma2022, # a1r, b1r, Har step halving
+  #acmaDiameterFromHeightMixed$schnute = fit_nlme("Schnute inverse", dbh ~ -1/(a1 + a1r) * log(1 - (1 - exp(-a2))*(height^b1 - 1.37^b1)/(Ha^b1 - 1.37^b1)), acma2022, # a1r, b1r, Har step halving
   #                                               fixedFormula = a1 + a2 + b1 + Ha ~ 1, randomFormula = Har ~ 1|stand/plot,
   #                                               start = list(fixed = c(a1 = 0.000003, a2 = 0.002, b1 = 1.3, Ha = 161)))
   acmaDiameterFromHeightMixed$schnute = create_fit_statistics(name = "Schnute inverse", fitting = "nlme")
@@ -354,7 +372,18 @@ if (acmaOptions$fitDbhMixed)
   acmaDiameterFromHeightMixed$weibull = fit_nlme("Weibull inverse", dbh ~ (a1 * log(1 - pmin((b1 + b1r)*(height - 1.37), 0.9999)))^b2, acma2022, # a1r singularity in backsolve, b2r step halving
                                                  fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b1r ~ 1|stand/plot,
                                                  start = list(fixed = c(a1 = -30, b1 = 0.07, b2 = 0.63)))
+  #acmaDiameterFromHeightMixed$powerPhysio$validation %>% summarize(maeMin = min(mae), maeMedian = median(mae), maeMean = mean(mae), maeMax = max(mae), aicMin = min(aic), aicMedian = median(aic), aicMean = mean(aic), aicMax = max(aic))
 
+  acmaDiameterFromHeightMixed$gam = fit_gam("REML GAM", dbh ~ I(height^1.263) + s(height, bs = "ts", by = as.factor(isPlantation), k = 7), random = list(uniquePlotID = ~1), data = acma2022, significant = FALSE) # collapses to linear
+  #acmaDiameterFromHeightMixed$gamAbat = fit_gam("REML GAM ABA+T", dbh ~ I(height^1.263) + s(height, basalAreaTaller, bootstrapStandBasalAreaPerHectare, bs = "ts", by = as.factor(isPlantation), k = 13), random = list(uniquePlotID = ~1), data = acma2022)
+  #acmaDiameterFromHeightMixed$gamAbatPhysio = fit_gam("REML GAM ABA+T physio", dbh ~ I(height^1.263) + s(height, basalAreaTaller, bootstrapStandBasalAreaPerHectare, slope, sin(3.14159/180 * aspect), terrainRoughness, bs = "ts", by = as.factor(isPlantation), k = 85), random = list(uniquePlotID = ~1), data = acma2022)
+  #acmaDiameterFromHeightMixed$gamAbatPhysioRelHt = fit_gam("REML GAM ABA+T RelHt physio", dbh ~ I(height^1.263) + s(height, bootstrapStandBasalAreaPerHectare, basalAreaTaller, slope, terrainRoughness, relativeHeight, bs = "ts", by = as.factor(isPlantation), k = 85), random = list(uniquePlotID = ~1), data = acma2022)
+  acmaDiameterFromHeightMixed$gamPhysio = fit_gam("REML GAM physio", dbh ~ I(height^1.263) + s(height, sin(3.14159/180 * aspect), terrainRoughness, topographicWetnessFD8f, bs = "ts", k = 16), random = list(uniquePlotID = ~1), data = acma2022, significant = FALSE) # k = 16 minimum > ~9, plantation not significant
+  acmaDiameterFromHeightMixed$gamRelHt = fit_gam("REML GAM RelHt", dbh ~ I(height^1.263) + s(height, relativeHeight, bs = "ts", k = 4), random = list(uniquePlotID = ~1), data = acma2022, significant = FALSE) # collapses to linear
+  acmaDiameterFromHeightMixed$gamRelHtPhysio = fit_gam("REML GAM RelHt physio", dbh ~ I(height^1.263) + s(height, relativeHeight, sin(3.14159/180 * aspect), terrainRoughness, topographicWetnessFD8f, bs = "ts", by = as.factor(isPlantation), k = 57), random = list(uniquePlotID = ~1), data = acma2022, significant = FALSE)
+  #lapply(acmaDiameterFromHeightMixed$gamRelHt$fit, function(fit) { return(k.check(fit$gam)) })
+  #lapply(acmaDiameterFromHeightMixed$gamRelHt$fit, function(fit) { return(summary(fit$gam)) })
+  
   saveRDS(acmaDiameterFromHeightMixed, paste0("trees/height-diameter/data/ACMA3 DBH mixed ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds"))
 }
 

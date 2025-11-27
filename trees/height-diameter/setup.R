@@ -21,9 +21,9 @@ plotLetters = c("(a)", "(b)", "(c)", "(d)", "(e)", "(f)", "(g)", "(h)", "(i)", "
 
 htDiaOptions = tibble(folds = 10,
                       repetitions = 10,
-                      includeInvestigatory = FALSE, # default to excluding plotting and other add ons in species scripts
+                      includeInvestigatory = FALSE, # default to not running plotting and other add ons from background jobs
                       includeSetup = FALSE,
-                      rangerThreads = 0.5 * future::availableCores(), 
+                      rangerThreads = 0.5 * future::availableCores(), # actually available threads, assume all cores hyperthreaded (Ryzen) by default
                       rangerTrees = 500,
                       retainModelThreshold = 5) # cross validation retains model objects if folds * repetitions is less than or equal to this threshold, e.g. 25 = retaining models up to and including 5x5 cross validation
 
@@ -108,7 +108,10 @@ create_fit_statistics = function(name, fittingMethod, fitSet = "primary", signif
 }
 
 # currently supports fixed effect GAMs and mixed GAMs with a single random smooth
-# mgcv::gam()'s default is family = gaussian() but family = Gamma() can be more accurate, partly due to preventing prediction of negative
+# If random is set it is passed to mgcv::gamm() and fittingMethod is set to "gamm" rather than fitting with gam() with fittingMethod = "gam". 
+# If randomTermIndex is set it indicates the formula passed to gam() contains random smooths and fittingMethod is left as "gam".
+#
+# gam() and gamm()'s default is family = gaussian() but family = Gamma() can be more accurate, partly due to preventing prediction of negative
 # heights. However, mgcv's fitting of Gaussian random effects seems to compose poorly, if at all, with out of dataset prediction using 
 # the gamma family.
 #
@@ -120,8 +123,20 @@ create_fit_statistics = function(name, fittingMethod, fitSet = "primary", signif
 # 5                      57
 # 6                      85
 # 7                      331
-fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, randomTermIndex = NA_integer_, threads = 1, significant = TRUE, tDegreesOfFreedom = 8)
+fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, random = NULL, randomTermIndex = NA_integer_, threads = 1, significant = TRUE, tDegreesOfFreedom = 8)
 {
+  if (is.null(random) == FALSE)
+  {
+    if (is.na(randomTermIndex) == FALSE)
+    {
+      stop("Specify one or neither of random or randomTermIndex, not both.")
+    }
+    if (threads != 1)
+    {
+      stop(paste0("gamm() does not support multithreading. Leave threads at 1 rather than setting it to ", threads))
+    }
+  }
+  
   responseVariable = formula[2] # displays as height or dbh but compares as height() or dbh()
   
   if (responseVariable == "height()")
@@ -139,12 +154,19 @@ fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOption
     responseVariable = "DBH"
     allFitWeights = data$heightWeight
   }
+  if (is.null(random))
+  {
+    fittingMethod = "gam"
+  } else {
+    fittingMethod = "gamm"
+  }
+  
   if (significant == FALSE)
   {
     # don't fit GAMs which are marked as not significant
     # This bypass is, if not required, desirable for smooths whose degrees of freedom exceed the amount of data, meaning they can't be
     # fit.
-    nonsignificantFitStats = create_fit_statistics(name = name, fittingMethod = "gam", fitSet = "primary")
+    nonsignificantFitStats = create_fit_statistics(name = name, fittingMethod = fittingMethod, fitSet = "primary")
     nonsignificantFitStats$significant = FALSE
     return(nonsignificantFitStats)
   }
@@ -156,9 +178,19 @@ fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOption
     startFit = Sys.time()
     if (responseVariable == "height") 
     { 
-      gamModel = gam(formula = formula, data = data, family = family, method = "REML", select = TRUE, weights = dbhWeight, nthreads = threads)
+      if (is.null(random))
+      {
+        gamModel = gam(formula = formula, data = data, family = family, method = "REML", select = TRUE, weights = dbhWeight, nthreads = threads)
+      } else {
+        gamModel = gamm(formula = formula, data = data, random = random, family = family, method = "REML", weights = dbhWeight)
+      }
     } else { 
-      gamModel = gam(formula = formula, data = data, family = family, method = "REML", select = TRUE, weights = heightWeight, nthreads = threads)
+      if (is.null(random))
+      {
+        gamModel = gam(formula = formula, data = data, family = family, method = "REML", select = TRUE, weights = heightWeight, nthreads = threads)
+      } else {
+        gamModel = gamm(formula = formula, data = data, random = random, family = family, method = "REML", weights = heightWeight)
+      }
     }
     estimatedParameters = sum(gamModel$edf)
     if (is.na(randomTermIndex))
@@ -182,21 +214,36 @@ fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOption
     trainingData = rsample::analysis(dataFold)
     if (responseVariable == "height") 
     { 
-      gamModel = gam(formula = formula, data = trainingData, family = family, method = "REML", select = TRUE, weights = dbhWeight, nthreads = threads)
+      if (is.null(random))
+      {
+        gamModel = gam(formula = formula, data = trainingData, family = family, method = "REML", select = TRUE, weights = dbhWeight, nthreads = threads)
+      } else {
+        gamModel = gamm(formula = formula, data = trainingData, random = random, family = family, method = "REML", weights = dbhWeight)
+      }
     } else { 
-      gamModel = gam(formula = formula, data = trainingData, family = family, method = "REML", select = TRUE, weights = heightWeight, nthreads = threads)
+      if (is.null(random))
+      {
+        gamModel = gam(formula = formula, data = trainingData, family = family, method = "REML", select = TRUE, weights = heightWeight, nthreads = threads)
+      } else {
+        gamModel = gamm(formula = formula, data = trainingData, random = random, family = family, method = "REML", weights = heightWeight)
+      }
     }
     estimatedParameters = sum(gamModel$edf)
     
     validationData = rsample::assessment(dataFold)
     if (is.na(randomTermIndex))
     {
-      validationPrediction = predict(gamModel, validationData)
+      if (is.null(random))
+      {
+        validationPrediction = predict(gamModel, validationData)
+      } else {
+        validationPrediction = predict(gamModel$gam, validationData) # population prediction with random effects zeroed per gamm() documentation
+      }
     } else {
       validationPrediction = predict(gamModel, validationData, exclude = paste0("s(", attr(gamModel$terms, "term.labels")[randomTermIndex], ")"), newdata.guaranteed = TRUE) # random effect must be removed to make predict outside of the training dataset
     }
     
-    fitStatistics = get_fit_statistics(name = name, fittingMethod = "gam", responseVariable = responseVariable, 
+    fitStatistics = get_fit_statistics(name = name, fittingMethod = fittingMethod, responseVariable = responseVariable, 
                                        trainingData = trainingData, trainingPrediction = fitted(gamModel), estimatedParameters = estimatedParameters, 
                                        validationData = validationData, validationPrediction = validationPrediction,
                                        significant = significant, tDegreesOfFreedom = tDegreesOfFreedom)
@@ -352,6 +399,7 @@ fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions =
   return(get_cross_validation_return_value(splitsAndFits, returnModel))
 }
 
+# nlmeControl(opt) left at nlimb default per https://stats.stackexchange.com/questions/9535/when-should-i-not-use-rs-nlm-function-for-mle
 fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start, control = nlmeControl(maxIter = 100), folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, significant = TRUE, tDegreesOfFreedom = 8)
 {
   responseVariable = modelFormula[2]
@@ -418,7 +466,10 @@ fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start
   # Rather than require error handling by all callers, just return fit failed here.
   return(tryCatch({ splitsAndFits = rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand) %>% mutate(fit = furrr::future_map(splits, fit_nlme_fold))
                     return(get_cross_validation_return_value(splitsAndFits, returnModel)) },
-                  error = function(e) { create_fit_statistics(name, fittingMethod = "nlme") }))
+                  error = function(e) { 
+                    print(e)
+                    create_fit_statistics(name, fittingMethod = "nlme") 
+                    }))
 }
 
 fit_ranger = function(name, variables, data, trees = htDiaOptions$rangerTrees, mtry, minNodeSize, sampleFraction, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, significant = TRUE)
@@ -1260,11 +1311,12 @@ if (htDiaOptions$includeInvestigatory)
 ## variable importance
 if (htDiaOptions$includeInvestigatory)
 {
+  # from VSURFs below
   heightCandidateVariables = c("height", "dbh", "standTreesPerHectare", "standBasalAreaPerHectare", "basalAreaLarger", "standQmd", "relativeDiameter", "topHeight", "isPlantation", "elevation", "slope", "aspect", "terrainRoughness", "topographicWetnessFD8f", "inventoryAge")
   psmeHeightVariables = c("height", "dbh", "relativeDiameter", "topHeight", "standQmd", "standBasalAreaPerHectare", "basalAreaLarger", "standTreesPerHectare", "elevation", "aspect", "terrainRoughness", "slope", "isPlantation", "topographicWetnessFD8f")
   abgrHeightVariables = c("height", "dbh", "relativeDiameter", "basalAreaLarger", "standQmd", "topHeight", "standBasalAreaPerHectare", "terrainRoughness", "slope")
   acmaHeightVariables = c("height", "dbh", "relativeDiameter", "standQmd", "topHeight", "standBasalAreaPerHectare", "basalAreaLarger", "inventoryAge", "terrainRoughness", "slope", "elevation", "topographicWetnessFD8f")
-  otherHeightVariables = c("height", "dbh", "relativeDiameter", "standQmd", "topHeight", "standBasalAreaPerHectare", "basalAreaLarger", "standTreesPerHectare", "slope", "elevation", "terrainRoughness", "topographicWetnessFD8f", "aspect", "isPlantation") # from VSURF below
+  otherHeightVariables = c("height", "dbh", "relativeDiameter", "standQmd", "topHeight", "standBasalAreaPerHectare", "basalAreaLarger", "standTreesPerHectare", "slope", "elevation", "terrainRoughness", "topographicWetnessFD8f", "aspect", "isPlantation")
   
   dbhCandidateVariables  = c("dbh", "height", "topHeight", "relativeHeight", "bootstrapStandBasalAreaPerHectare", "basalAreaTaller", "isPlantation", "elevation", "slope", "aspect", "terrainRoughness", "topographicWetnessFD8f", "inventoryAge")
   allDbhVariables = c("dbh", "height", "bootstrapStandBasalAreaPerHectare", "relativeHeight", "topHeight")

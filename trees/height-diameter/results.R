@@ -219,7 +219,7 @@ heightDiameterModelRanking = heightDiameterModelAucs %>%
          aucNseRank = min_rank(desc(round(aucNse * significant, 3))), 
          aucRmseRank = min_rank(desc(round(aucRmse * significant, 3)))) %>%
   ungroup() %>%
-  mutate(nameAndFit = paste0(name, if_else(fitting == "nlme", " mixed", "")))
+  mutate(nameAndFit = paste0(name, if_else(fitting %in% c("gamm", "nlme"), " mixed", "")))
 heightDiameterModelDisplaySort = heightDiameterModelRanking %>%
   group_by(responseVariable, name, fitting) %>%
   summarize(penalizedBlendedAuc = sum(speciesFraction * if_else(is.na(aucBlended), 0, aucBlended)),
@@ -560,7 +560,7 @@ plot_layout(guides = "collect", widths = c(250, 150, 150, 150)) &
 
 ## Figure 2: height-diameter AUCs
 heightFromDiameterModelComparison = heightDiameterModelRanking %>% filter(responseVariable == "height") %>%
-  mutate(nameAndFit = factor(paste0(name, if_else(fitting == "nlme", " mixed", "")), levels = rev((heightDiameterModelDisplaySort %>% filter(responseVariable == "height"))$nameAndFit)))
+  mutate(nameAndFit = factor(paste0(name, if_else(fitting %in% c("gamm", "nlme"), " mixed", "")), levels = rev((heightDiameterModelDisplaySort %>% filter(responseVariable == "height"))$nameAndFit)))
 plot_auc_bank(heightFromDiameterModelComparison, legendHjustification = 1.05, plotRightMargin = 10)
 #ggsave("trees/height-diameter/figures/Figure 02 height accuracy AUC median.png", height = 17, width = 20, units = "cm", dpi = 150)
 #ggsave("trees/height-diameter/figures/Figure 02 height accuracy AUC median.tif", height = 20, width = 20, units = "cm", dpi = figureDpi, compression = "lzw+p")
@@ -569,7 +569,7 @@ plot_auc_bank(heightFromDiameterModelComparison, legendHjustification = 1.05, pl
 
 ## Figure 3: diameter AUCs
 diameterFromHeightModelComparison = heightDiameterModelRanking %>% filter(responseVariable == "DBH") %>%
-  mutate(nameAndFit = factor(paste0(name, if_else(fitting == "nlme", " mixed", "")), levels = rev((heightDiameterModelDisplaySort %>% filter(responseVariable == "DBH"))$nameAndFit)))
+  mutate(nameAndFit = factor(paste0(name, if_else(fitting %in% c("gamm", "nlme"), " mixed", "")), levels = rev((heightDiameterModelDisplaySort %>% filter(responseVariable == "DBH"))$nameAndFit)))
 plot_auc_bank(diameterFromHeightModelComparison, legendHjustification = 1.02)
 #ggsave("trees/height-diameter/figures/Figure 03 diameter accuracy AUC median.png", height = 17.5, width = 20, units = "cm", dpi = 150)
 #ggsave("trees/height-diameter/figures/Figure 03 diameter accuracy AUC median.tif", height = 20.5, width = 20, units = "cm", dpi = figureDpi, compression = "lzw+p")
