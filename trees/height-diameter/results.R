@@ -15,7 +15,10 @@ if (exists("psmeFitStats") == FALSE)
 { 
   psmeFitStats = readRDS(paste0("trees/height-diameter/data/PSME fit stats ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) 
 }
-#if (exists("abgrFitStats") == FALSE) { abgrFitStats = readRDS(paste0("trees/height-diameter/data/ABGR fit stats ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) }
+if (exists("abgrFitStats") == FALSE) 
+{ 
+  abgrFitStats = readRDS(paste0("trees/height-diameter/data/ABGR fit stats ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) 
+}
 if (exists("acmaFitStats") == FALSE) 
 { 
   acmaFitStats = readRDS(paste0("trees/height-diameter/data/ACMA3 fit stats ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) 
@@ -25,9 +28,9 @@ if (exists("otherFitStats") == FALSE)
   otherFitStats = readRDS(paste0("trees/height-diameter/data/other fit stats ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) 
 }
 
-heightDiameterFitStats = bind_rows(psmeFitStats, acmaFitStats, otherFitStats) %>% # , abgrFitStats
+heightDiameterFitStats = bind_rows(psmeFitStats, abgrFitStats, acmaFitStats, otherFitStats) %>%
   mutate(baseName = if_else(word(name) %in% c("REML", "modified", "unified"), paste(word(name, 1), word(name, 2)), word(name)),
-         species = factor(species, labels = c("Douglas-fir", "bigleaf maple", "grand fir", "other species"), levels = c("PSME", "ACMA3", "ABGR", "other")),
+         species = factor(species, labels = c("Douglas-fir", "grand fir", "bigleaf maple", "other species"), levels = c("PSME", "ABGR", "ACMA3", "other")),
          speciesFraction = recode(species, "Douglas-fir" = 0.543, "bigleaf maple" = 0.183, "grand fir" = 0.144, "other species" = 0.130),
          isBaseForm = (str_detect(name, "Sharma-") == FALSE) & (str_detect(name, "ABA\\+T") == FALSE) & (str_detect(name, "BA\\+L") == FALSE) & (str_detect(name, "physio") == FALSE) & (str_detect(name, "RelDbh") == FALSE) & (str_detect(name, "RelHt") == FALSE),
          hasPhysio = str_detect(name, "physio"),
@@ -49,6 +52,10 @@ if (exists("psmeFixedEffects") == FALSE)
 { 
   psmeFixedEffects = readRDS(paste0("trees/height-diameter/data/PSME coefficients ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) 
 }
+if (exists("abgrFixedEffects") == FALSE) 
+{ 
+  abgrFixedEffects = readRDS(paste0("trees/height-diameter/data/ABGR coefficients ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) 
+}
 if (exists("acmaFixedEffects") == FALSE) 
 { 
   acmaFixedEffects = readRDS(paste0("trees/height-diameter/data/ACMA3 coefficients ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) 
@@ -59,20 +66,21 @@ if (exists("otherFixedEffects") == FALSE)
   otherFixedEffects = readRDS(paste0("trees/height-diameter/data/other coefficients ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) 
 }
 
-heightDiameterFixedEffects = left_join(bind_rows(psmeFixedEffects, acmaFixedEffects, otherFixedEffects) %>% # , abgrFixedEffects
-                                         mutate(species = factor(species, labels = c("Douglas-fir", "bigleaf maple", "grand fir", "other species"), levels = c("PSME", "ACMA3", "ABGR", "other"))),
+heightDiameterFixedEffects = left_join(bind_rows(psmeFixedEffects, abgrFixedEffects, acmaFixedEffects, otherFixedEffects) %>%
+                                         mutate(species = factor(species, labels = c("Douglas-fir", "grand fir", "bigleaf maple", "other species"), levels = c("PSME", "ABGR", "ACMA3", "other"))),
                                        heightDiameterFitStats %>% select(fitSet, responseVariable, species, name, fitting, repetition, fold, isBaseForm, hasRelative, hasStand, hasPhysio, n, fitTimeInS, pctOutOfRange, , mab, mapb, mae, mape, rmse, rmspe, aic, deltaAicN, nse, meanAbsolutePlantationEffect,	meanAbsolutePercentPlantationEffect), # join in extracted model flags and supporting properties flowed through fit stats
                                        by = join_by(fitSet, responseVariable, species, name, fitting, repetition, fold)) %>%
   mutate(isConverged = as.logical(isConverged)) %>%
   select(-fixedEffects) %>%
   relocate(responseVariable, species, fitSet, name, significant, isBaseForm, hasRelative, hasStand, hasPhysio, fitting, repetition, fold, n, fitTimeInS, isConverged, pctOutOfRange, mab, mapb, mae, mape, rmse, rmspe, aic, deltaAicN, nse, meanAbsolutePlantationEffect,	meanAbsolutePercentPlantationEffect, 
-           a1, a1p, a2, a2p, a3, a3p, a4, a5e, a5s, a5as, a5tr, a5tw, b1, b1p, b1rd, b1rh, b1ac, b1e, b1tw, b2, b2p, b2rd, b2rdp, b2rh, b2ba, b2bal, b2s, b2as, b2ac, b2e, b2tw, b3, b3rd, b3as, b3tr, b4, any_of("b4rd"), b4bal, b4e, b4s, b4as, b4ac, b4tw, Ha, Hap, d, dp, kU)
+           a0, a1, a1p, a1rd, a1rh, a1ba, a1bal, a1balp, a1e, a1s, a1as, a1ac, a1tr, a1tw, a2, a2p, a3, a3p, b1, b1p, b1rd, b1rh, b1as, b1ac, b1e, b1tw, b2, b2p, b2rd, b2rdp, b2rh, b2ba, b2bal, b2s, b2as, b2ac, b2e, b2tw, b3, b3rd, b3as, b3tr, b4, b4p, any_of("b4rd"), b4ba, b4e, b4s, b4as, b4ac, b4tw, Ha, Hap, d, dp, kU)
+#names(heightDiameterFixedEffects) # check for unordered columns
 #writexl::write_xlsx(heightDiameterFixedEffects %>% filter(fitSet == "primary") %>% select(-fixedEffects), 
 #                    "trees/height-diameter/data/height-diameter model coefficients.xlsx")
 
 
 # rank model forms by estimated prediction ability (using AUC) for form selection
-aucStart = Sys.time() # ~19 s for PSME+ACMA3+other initial fits, 9900X
+aucStart = Sys.time() # ~24 s for PSME+ABGR+ACMA3+other initial fits, 9900X
 progressr::with_progress({
   crossValidatedModelCount = heightDiameterFitStats %>% group_by(responseVariable, species, name, fitting) %>% 
     summarize(n = 1, .groups = "drop_last") %>%
@@ -85,10 +93,13 @@ progressr::with_progress({
     furrr::future_map_dfr(function(fitResults)
     #purrr::map_dfr(function(fitResults) # for debugging
     {
-      #fitResults = heightDiameterFitStats %>% filter(responseVariable == "DBH", species == "other species", name == "Chapman-Richards inverse", fitting == "gsl_nls") # for debugging
-      if ((nrow(fitResults) == 1) | all(is.na(fitResults$nse)))
+      #fitResults = heightDiameterFitStats %>% filter(responseVariable == "DBH", species == "other species", name == "REML GAM", fitting == "gam") # for debugging
+      if ((nrow(fitResults) == 1) | all(is.na(fitResults$significant)) | all(fitResults$significant == FALSE))
       {
-        # no distribution to compare to since this model has only a no fit result or wasn't cross validated
+        # two cases
+        # - no need to calculate AUCs because this model is not significant
+        # - no distribution to compare to since this model has only a fit failed result
+        # Could calculate AUCs for non-significant models but this is not currently of interest and doing so roughly doubles runtime.
         progressBar(str_pad(paste(fitResults$responseVariable[1], fitResults$species[1], fitResults$name[1], fitResults$fitting[1]), 60, "right"))
         #print(paste("single self row or NA model efficiency:", fitResults$species[1], fitResults$responseVariable[1], fitResults$name[1], fitResults$fitting[1]))
         return(tibble(responseVariable = fitResults$responseVariable[1], species = fitResults$species[1], name = fitResults$name[1], fitting = fitResults$fitting[1], significant = fitResults$significant[1], isBaseForm = fitResults$isBaseForm[1],
@@ -98,13 +109,15 @@ progressr::with_progress({
                       speciesFraction = fitResults$speciesFraction[1]))
       }
       
-      # get all other cross-validation results for this response variable and species
-      matchingFitResults = heightDiameterFitStats %>% filter(responseVariable == fitResults$responseVariable[1], species == fitResults$species[1], ((name == fitResults$name[1]) & (fitting == fitResults$fitting[1])) == FALSE)
+      # get all other cross-validations for significant models for this response variable and species
+      # Could include pairings between significant and non-significant models but this is not currently of interest.
+      matchingFitResults = heightDiameterFitStats %>% filter(significant, responseVariable == fitResults$responseVariable[1], species == fitResults$species[1], ((name == fitResults$name[1]) & (fitting == fitResults$fitting[1])) == FALSE)
       matchingModels = matchingFitResults %>% group_by(name, fitting) %>% summarize(name = name[1], fitting = fitting[1], .groups = "drop")
       #print(paste0(nrow(matchingModels), " AUC intercomparisons...")) # for debugging
       pairwiseAucs = bind_rows(purrr::map2(matchingModels$name, matchingModels$fitting, function(otherModelName, otherModelFitting)
       {
         otherFitResults = matchingFitResults %>% filter(name == otherModelName, fitting == otherModelFitting)
+        #otherFitResults = matchingFitResults %>% filter(name == "REML GAM", fitting == "gamm") # for debugging
         
         if ((nrow(otherFitResults) == 1) | all(is.na(otherFitResults$nse)))
         {
@@ -194,20 +207,42 @@ progressr::with_progress({
     })
 })
 Sys.time() - aucStart
-
-# take median AUCs over otherModelName, excluding self and unsuccessful fits
-# Exclusion of unsuccessful fits is debatable. If a model could not be fit then its AUC could reasonably be taken to be
-# zero rather than NA, implying all models which could be fit have an AUC of 1 in comparison.
-#heightDiameterModelAucs %>% filter(responseVariable == "height", name == "Chapman-Richards RelDbh") %>% group_by(species, name, fitting) %>% summarize(n = n())
+#table(heightDiameterModelAucs$significant, useNA = "ifany")
+#table(heightDiameterModelAucs$otherModelSignificant, useNA = "ifany")
+#ggplot() +
+#  geom_histogram(aes(x = aucMab), heightDiameterModelAucs %>% filter(significant, otherModelSignificant == 1), binwidth = 0.01) +
+#ggplot() +
+#  geom_histogram(aes(x = aucMae), heightDiameterModelAucs %>% filter(significant, otherModelSignificant == 1), binwidth = 0.01) +
+#ggplot() +
+#  geom_histogram(aes(x = aucRmse), heightDiameterModelAucs %>% filter(significant, otherModelSignificant == 1), binwidth = 0.01) +
+#ggplot() +
+#  geom_histogram(aes(x = aucDeltaAicN), heightDiameterModelAucs %>% filter(significant, otherModelSignificant == 1), binwidth = 0.01) +
+#ggplot() +
+#  geom_histogram(aes(x = aucNse), heightDiameterModelAucs %>% filter(significant, otherModelSignificant == 1), binwidth = 0.01) +
+#plot_annotation(theme = theme(plot.margin = margin())) +
+#plot_layout()
+  
+# take median AUCs over otherModelName, excluding unsuccessful fits
+# AUCs for pairs with non-significant members are (currently) mostly excluded above but filtering for significance is repeated here as some
+# rows for failed fits and non-significant models are present in the AUC tibble. Exclusion of unsuccessful fits is debatable. If a model could 
+# not be fit then its AUC could reasonably be taken to be zero rather than NA, implying all models which could be fit have an AUC of 1 in 
+# comparison.
+# Rankings are only meaningful between significant model forms.
+#heightDiameterModelAucs %>% filter(responseVariable == "DBH", species == "other species", name == "REML GAM", fitting == "gam") # for debugging
+#heightDiameterModelAucs %>% filter(is.na(significant)) # for debugging
 #heightDiameterModelRanking %>% filter(responseVariable == "height", name == "Chapman-Richards RelDbh") %>% group_by(species, name, fitting) %>% summarize(n = n())
-heightDiameterModelRanking = heightDiameterModelAucs %>% 
+#ggplot() +
+#  geom_histogram(aes(x = aucMab, fill = fitting, group = fitting), heightDiameterModelAucs %>% filter(significant, otherModelSignificant == 1, responseVariable == "DBH", species == "other species", name == "REML GAM"), binwidth = 0.01) +
+#  coord_cartesian(xlim = c(0, 1)) +
+#  labs(x = "AUC", y = "model fits", fill = NULL)
+heightDiameterModelRanking = heightDiameterModelAucs %>%
   group_by(responseVariable, species, name, fitting) %>%
   summarize(fitting = fitting[1], isBaseForm = isBaseForm[1], hasPhysio = hasPhysio[1], hasStand = hasStand[1], hasRelative = hasRelative[1],
-            aucDeltaAicN = median(if_else(name != otherModelName, aucDeltaAicN, NA_real_), na.rm = TRUE),
-            aucMab = median(if_else(name != otherModelName, aucMab, NA_real_), na.rm = TRUE),
-            aucMae = median(if_else(name != otherModelName, aucMae, NA_real_), na.rm = TRUE),
-            aucNse = median(if_else(name != otherModelName, aucNse, NA_real_), na.rm = TRUE),
-            aucRmse = median(if_else(name != otherModelName, aucNse, NA_real_), na.rm = TRUE),
+            aucDeltaAicN = median(if_else((name != otherModelName) & significant & (otherModelSignificant == 1), aucDeltaAicN, NA_real_), na.rm = TRUE),
+            aucMab = median(if_else((name != otherModelName) & significant & (otherModelSignificant == 1), aucMab, NA_real_), na.rm = TRUE),
+            aucMae = median(if_else((name != otherModelName) & significant & (otherModelSignificant == 1), aucMae, NA_real_), na.rm = TRUE),
+            aucNse = median(if_else((name != otherModelName) & significant & (otherModelSignificant == 1), aucNse, NA_real_), na.rm = TRUE),
+            aucRmse = median(if_else((name != otherModelName) & significant & (otherModelSignificant == 1), aucNse, NA_real_), na.rm = TRUE),
             significant = significant[1],
             speciesFraction = speciesFraction[1],
             .groups = "drop_last") %>%
@@ -250,50 +285,45 @@ preferredForms = full_join(full_join(full_join(heightDiameterModelRanking %>% fi
 
 # summarize predictor variable selection
 # TODO; report selection in GAMs and random forests
+#tibble(parameter = names(heightDiameterFixedEffects)) %>% filter(str_starts(parameter, "b1")) %>% arrange(parameter)
+#tibble(parameter = names(heightDiameterFixedEffects)) %>% filter(str_ends(parameter, "tr")) %>% arrange(parameter)
 predictorVariableResults = heightDiameterFixedEffects %>% 
   filter(fitSet == "primary", fitting %in% c("gsl_nls", "nlrob")) %>% # exclude GAMs and linear controls
-  mutate(hasBasalArea = (is.na(a2) == FALSE) | (is.na(a3) == FALSE) | (is.na(b2ba) == FALSE) | (is.na(b2bal) == FALSE) | (is.na(b4bal) == FALSE) | 
-                        ((responseVariable == "height") & str_detect(name, "(Sharma-Parton|Sharma-Zhang)")),
-         hasPhysio = (is.na(a5e) == FALSE) | (is.na(b1e) == FALSE) | (is.na(b2e) == FALSE) | (is.na(b4e) == FALSE) | 
-                     (is.na(a5s) == FALSE) | (is.na(b2s) == FALSE) | (is.na(b4s) == FALSE) | 
-                     (is.na(a5as) == FALSE) | (is.na(b2as) == FALSE) | (is.na(b3as) == FALSE) | (is.na(b4as) == FALSE) | 
-                     (is.na(b1ac) == FALSE) | (is.na(b2ac) == FALSE) | (is.na(b4ac) == FALSE) | 
-                     (is.na(a5tr) == FALSE) | (is.na(b3tr) == FALSE) | 
-                     (is.na(a5tw) == FALSE) | (is.na(b1tw) == FALSE) | (is.na(b2tw) == FALSE) | (is.na(b4tw) == FALSE),
-         hasPlantation = (is.na(a1p) == FALSE) | (is.na(a2p) == FALSE) | (is.na(a3p) == FALSE) | (is.na(b1p) == FALSE) | (is.na(b2p) == FALSE),
-         hasRelDbhOrRelHt = (is.na(a4) == FALSE) | (is.na(b1rd) == FALSE) | (is.na(b2rd) == FALSE) | (is.na(b3rd) == FALSE) | if("b4rd" %in% names(.)) { is.na(b4rd) == FALSE } else { FALSE } |
+  mutate(hasPlantation = (is.na(a1p) == FALSE) | (is.na(a1balp) == FALSE) | (is.na(a2p) == FALSE) | (is.na(a3p) == FALSE) | 
+                         (is.na(b1p) == FALSE) | (is.na(b2p) == FALSE) | (is.na(b2rdp) == FALSE) | (is.na(b4p) == FALSE),
+         hasRelDbhOrRelHt = (is.na(a1rd) == FALSE) | (is.na(a1rh) == FALSE) | (is.na(b1rd) == FALSE) | (is.na(b2rd) == FALSE) | (is.na(b3rd) == FALSE) | (is.na(b4rd) == FALSE) |
                             (is.na(b1rh) == FALSE) | (is.na(b2rh) == FALSE),
-         hasSignificantBasalArea = hasBasalArea * significant,
-         hasSignificantPhysio = hasPhysio * significant,
          hasSignificantRelative = hasRelDbhOrRelHt * significant,
-         nBasalAreaSignificant = ((is.na(a2) == FALSE) + (is.na(a3) == FALSE)) * significant, # Sharma-Parton and Sharma-Zhang height forms are not counted here as there is no test for whether BA or BAL are significant predictors (modified Sharma-Parton for DBH does not use basal area)
-         nPhysioSignificant = ((is.na(a5e) == FALSE) + (is.na(b1e) == FALSE) + (is.na(b2e) == FALSE) + (is.na(b4e) == FALSE) + 
-                               (is.na(a5s) == FALSE) + (is.na(b2s) == FALSE) + (is.na(b4s) == FALSE) + 
-                               (is.na(a5as) == FALSE) + (is.na(b2as) == FALSE) + (is.na(b3as) == FALSE) + (is.na(b4as) == FALSE) + 
-                               (is.na(b1ac) == FALSE) + (is.na(b2ac) == FALSE) + (is.na(b4ac) == FALSE) + 
-                               (is.na(a5tr) == FALSE) + (is.na(b3tr) == FALSE) + 
-                               (is.na(a5tw) == FALSE) + (is.na(b1tw) == FALSE) + (is.na(b2tw) == FALSE) + (is.na(b4tw) == FALSE)) * significant,
-         significantRelHtOrDbh = (is.na(a4) == FALSE) * significant + (is.na(b1rd) == FALSE) * significant + (is.na(b1rh) == FALSE) * significant + 
-                                 (is.na(b2rd) == FALSE) * significant + (is.na(b1rh) == FALSE) * significant + 
-                                 (is.na(b3rd) == FALSE) * significant + 
-                                 if("b4rd" %in% names(.)) { (is.na(b4rd) == FALSE) * significant } else { 0 },
-         significantBAorAba = (is.na(a2) == FALSE) * significant + (is.na(b2ba) == FALSE) * significant,
-         significantBalOrAat = (is.na(a3) == FALSE) * significant + (is.na(b2bal) == FALSE) * significant + (is.na(b4bal) == FALSE) * significant,
-         significantElevation = (is.na(a5e) == FALSE) * significant + (is.na(b1e) == FALSE) * significant + (is.na(b2e) == FALSE) * significant + (is.na(b4e) == FALSE) * significant,
-         significantSlope = (is.na(a5s) == FALSE) * significant + (is.na(b2s) == FALSE) * significant + (is.na(b4s) == FALSE) * significant,
-         significantSinAspect = (is.na(a5as) == FALSE) * significant + (is.na(b2as) == FALSE) * significant + (is.na(b3as) == FALSE) * significant + (is.na(b4as) == FALSE) * significant,
-         significantCosAspect = (is.na(b1ac) == FALSE) * significant + (is.na(b2ac) == FALSE) * significant + (is.na(b4ac) == FALSE) * significant,
-         significantTerrainRoughness = (is.na(a5tr) == FALSE) * significant + (is.na(b3tr) == FALSE) * significant,
-         significantTopographicWetness = (is.na(a5tw) == FALSE) * significant + (is.na(b1tw) == FALSE) * significant + (is.na(b2tw) == FALSE) * significant + (is.na(b4tw) == FALSE) * significant,
-         a1 = is.na(a1) == FALSE, a1p = is.na(a1p) == FALSE,
-         a2 = is.na(a2) == FALSE, a2p = is.na(a2p) == FALSE,
-         a3 = is.na(a3) == FALSE, a3p = is.na(a3p) == FALSE,
-         a4 = is.na(a4) == FALSE, 
-         # physiographic effects not factorized for plantations
-         b1 = is.na(b1) == FALSE, b1p = is.na(b1p) == FALSE,
-         b2 = is.na(b2) == FALSE, b2p = is.na(b2p) == FALSE,
-         b3 = is.na(b3) == FALSE, #b3p = is.na(b3p) == FALSE,
-         b4 = is.na(b4) == FALSE) #, b4p = is.na(b4p) == FALSE)
+         significantRelHtOrDbh = (is.na(a1rd) == FALSE) * significant + (is.na(a1rh) == FALSE) * significant + 
+                                 (is.na(b1rd) == FALSE) * significant + (is.na(b1rh) == FALSE) * significant + 
+                                 (is.na(b2rd) == FALSE) * significant + (is.na(b2rh) == FALSE) * significant + 
+                                 (is.na(b3rd) == FALSE) * significant + (is.na(b4rd) == FALSE) * significant,
+         hasBasalArea = (is.na(a1ba) == FALSE) | (is.na(a1bal) == FALSE) | (is.na(b2ba) == FALSE) | (is.na(b2bal) == FALSE) | (is.na(b4ba) == FALSE) |
+                        ((responseVariable == "height") & str_detect(name, "(Sharma-Parton|Sharma-Zhang)")),
+         hasSignificantBasalArea = hasBasalArea * significant,
+         significantBAorAba = (is.na(a1ba) == FALSE) * significant + (is.na(b2ba) == FALSE) * significant + (is.na(b4ba) == FALSE) * significant,
+         significantBalOrAat = (is.na(a1bal) == FALSE) * significant + (is.na(b2bal) == FALSE) * significant,
+         nBasalAreaSignificant = ((is.na(a1ba) == FALSE) + (is.na(b2ba) == FALSE) + # Sharma-Parton and Sharma-Zhang height forms are not counted here as there is no test for whether BA or BAL are significant predictors (modified Sharma-Parton for DBH does not use basal area)
+                                  (is.na(a1bal) == FALSE) + (is.na(b2bal) == FALSE)) * significant,
+         hasPhysio = (is.na(a1e) == FALSE) |  (is.na(b1e) == FALSE) |  (is.na(b2e) == FALSE) |                           (is.na(b4e) == FALSE) | 
+                     (is.na(a1s) == FALSE) |                           (is.na(b2s) == FALSE) |                           (is.na(b4s) == FALSE) | 
+                     (is.na(a1as) == FALSE) | (is.na(b1as) == FALSE) | (is.na(b2as) == FALSE) | (is.na(b3as) == FALSE) | (is.na(b4as) == FALSE) | 
+                     (is.na(a1ac) == FALSE) | (is.na(b1ac) == FALSE) | (is.na(b2ac) == FALSE) |                          (is.na(b4ac) == FALSE) | 
+                     (is.na(a1tr) == FALSE) |                                                   (is.na(b3tr) == FALSE) | 
+                     (is.na(a1tw) == FALSE) | (is.na(b1tw) == FALSE) | (is.na(b2tw) == FALSE) |                          (is.na(b4tw) == FALSE),
+         nPhysioSignificant = ((is.na(a1e) == FALSE) +  (is.na(b1e) == FALSE) +  (is.na(b2e) == FALSE) +                           (is.na(b4e) == FALSE) + 
+                               (is.na(a1s) == FALSE) +                           (is.na(b2s) == FALSE) +                           (is.na(b4s) == FALSE) + 
+                               (is.na(a1as) == FALSE) + (is.na(b1as) == FALSE) + (is.na(b2as) == FALSE) + (is.na(b3as) == FALSE) + (is.na(b4as) == FALSE) + 
+                               (is.na(a1ac) == FALSE) + (is.na(b1ac) == FALSE) + (is.na(b2ac) == FALSE) +                          (is.na(b4ac) == FALSE) + 
+                               (is.na(a1tr) == FALSE) +                                                   (is.na(b3tr) == FALSE) + 
+                               (is.na(a1tw) == FALSE) + (is.na(b1tw) == FALSE) + (is.na(b2tw) == FALSE) +                          (is.na(b4tw) == FALSE)) * significant,
+         hasSignificantPhysio = hasPhysio * significant,
+         significantElevation = (is.na(a1e) == FALSE) * significant + (is.na(b1e) == FALSE) * significant + (is.na(b2e) == FALSE) * significant + (is.na(b4e) == FALSE) * significant,
+         significantSlope = (is.na(a1s) == FALSE) * significant + (is.na(b2s) == FALSE) * significant + (is.na(b4s) == FALSE) * significant,
+         significantSinAspect = (is.na(a1as) == FALSE) * significant + (is.na(b1as) == FALSE) * significant + (is.na(b2as) == FALSE) * significant + (is.na(b3as) == FALSE) * significant + (is.na(b4as) == FALSE) * significant,
+         significantCosAspect = (is.na(a1ac) == FALSE) * significant + (is.na(b1ac) == FALSE) * significant + (is.na(b2ac) == FALSE) * significant + (is.na(b4ac) == FALSE) * significant,
+         significantTerrainRoughness = (is.na(a1tr) == FALSE) * significant + (is.na(b3tr) == FALSE) * significant,
+         significantTopographicWetness = (is.na(a1tw) == FALSE) * significant + (is.na(b1tw) == FALSE) * significant + (is.na(b2tw) == FALSE) * significant + (is.na(b4tw) == FALSE) * significant)
 predictorVariableStats = predictorVariableResults %>% 
   group_by(responseVariable, species) %>%
   summarize(n = n(),
@@ -315,15 +345,6 @@ predictorVariableStats = predictorVariableResults %>%
             significantTerrainRoughness = sum(significantTerrainRoughness),
             significantTopographicWetness = sum(significantTopographicWetness),
             significant = sum(significant),
-            a1 = sum(a1), a1p = sum(a1p),
-            a2 = sum(a2), a2p = sum(a2p),
-            a3 = sum(a3), a3p = sum(a3p),
-            a4 = sum(a4), #a4p = sum(a4p),
-            # plantation effects not tested on physiographic predictors
-            b1 = sum(b1), b1p = sum(b1p),
-            b2 = sum(b2), b2p = sum(b2p),
-            b3 = sum(b3), #b3p = sum(b3p),
-            b4 = sum(b4), #b4p = sum(b4p),
             plantationPct = 100 * hasPlantation / n, 
             significantPct = 100 * significant / n,
             significantRelativePct = 100 * significantRelHtOrDbh / hasRelDbhOrRelHt,
@@ -382,19 +403,36 @@ heightDiameterFitStats %>% filter(significant) %>%
   arrange(desc(fitSet), desc(responseVariable))
 
 # highest ranked base forms
-(topBaseForms = left_join(left_join(left_join(left_join(preferredForms %>% filter(isBaseForm) %>% group_by(responseVariable, species) %>% slice_max(aucMab, n = 1) %>% select(responseVariable, species, mabName, mabFitting),
-                                                        preferredForms %>% filter(isBaseForm) %>% group_by(responseVariable, species) %>% slice_max(aucMae, n = 1) %>% select(responseVariable, species, maeName, maeFitting),
-                                                        by = join_by(responseVariable, species)),
-                                              preferredForms %>% filter(isBaseForm) %>% group_by(responseVariable, species) %>% slice_max(aucRmse, n = 1) %>% select(responseVariable, species, rmseName, rmseFitting),
-                                              by = join_by(responseVariable, species)),
-                                    preferredForms %>% filter(isBaseForm) %>% group_by(responseVariable, species) %>% slice_max(aucDeltaAicN, n = 1) %>% select(responseVariable, species, aicName, aicFitting),
-                                    by = join_by(responseVariable, species)),
-                          preferredForms %>% filter(isBaseForm) %>% group_by(responseVariable, species) %>% slice_max(aucNse, n = 1) %>% select(responseVariable, species, nseName, nseFitting),
-                          by = join_by(responseVariable, species)) %>%
-    mutate(isGam = (mabName == "REML GAM") + (maeName == "REML GAM") + (rmseName == "REML GAM") + (aicName == "REML GAM") + (nseName == "REML GAM")) %>%
-    relocate(responseVariable, species, isGam, mabName, maeName, rmseName, aicName, nseName) %>%
+# slice_max(auc) is likely to yield ties when a sufficiently large number of poor models are compared to good models that multiple good models have median AUCs of 
+# 1. left_join() raises warnings about multiple rows matching in this case, which is obscure but indicates something needs to be done to disambiguate the tie and
+# select a single most preferred model. Tie breaking is currently based on parsimony but other factors, such as the mean AUC, can be considered besides the median
+# AUC.
+get_top_base_form = function(preferredForms, statisticAucSuffix)
+{
+  if (statisticAucSuffix == "DeltaAicN")
+  {
+    aucPrefix = "aic"
+  } else {
+    aucPrefix = str_to_lower(statisticAucSuffix)
+  }
+  return(preferredForms %>% filter(isBaseForm) %>% group_by(responseVariable, species) %>% slice_max(.data[[str_c("auc", statisticAucSuffix)]], n = 1) %>%
+           mutate(nTiedForms = n(), isMixed = mabFitting %in% c("nlme", "gamm")) %>% # for now, break ties by excluding more complex mixed models in favor of fixed effect models
+           filter((nTiedForms == 1) | (isMixed == FALSE)) %>%
+           select(responseVariable, species, all_of(str_c(aucPrefix, "Name")), all_of(str_c(aucPrefix, "Fitting"))))
+}
+
+#preferredForms %>% filter(isBaseForm) %>% group_by(responseVariable, species) %>% slice_max(aucMab, n = 1) %>% select(responseVariable, species, mabName, mabFitting, aucMab)
+#preferredForms %>% filter(responseVariable == "DBH", species == "other species", mabName == "REML GAM")
+(topBaseForms = left_join(left_join(left_join(left_join(get_top_base_form(preferredForms, "Mab"), get_top_base_form(preferredForms, "Mae"), by = join_by(responseVariable, species)),
+                                              get_top_base_form(preferredForms, "Rmse"), by = join_by(responseVariable, species)),
+                                    get_top_base_form(preferredForms, "DeltaAicN"), by = join_by(responseVariable, species)),
+                          get_top_base_form(preferredForms, "Nse"), by = join_by(responseVariable, species)) %>%
+    mutate(isGam = (mabName == "REML GAM") + (maeName == "REML GAM") + (rmseName == "REML GAM") + (aicName == "REML GAM") + (nseName == "REML GAM"),
+           isRandomForest = (mabName == "random forest") + (maeName == "random forest") + (rmseName == "random forest") + (aicName == "random forest") + (nseName == "random forest")) %>%
+    relocate(responseVariable, species, mabName, maeName, rmseName, aicName, nseName, isGam, isRandomForest) %>%
     arrange(desc(responseVariable)))
-(pctGamPreference = 100 * sum(topBaseForms$isGam) / (5 * nrow(topBaseForms))) # GAM preference percentage for abstract
+(pctGamPreference = 100 * sum(topBaseForms$isGam) / (5 * nrow(topBaseForms))) # maybe for abstract
+(pctRandomForestPreference = 100 * sum(topBaseForms$isRandomForest) / (5 * nrow(topBaseForms))) # maybe for abstract
 #print(topBaseForms, width = Inf)
 
 

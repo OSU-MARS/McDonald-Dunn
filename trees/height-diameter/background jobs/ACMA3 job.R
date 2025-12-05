@@ -4,7 +4,7 @@ jobStartTime = Sys.time()
 source("trees/height-diameter/setup.R")
 progressr::handlers(global = TRUE)
 progressr::handlers("progress")
-future::plan(future::multisession, workers = 10) # minimum two workers, https://github.com/HenrikBengtsson/globals/issues/87
+future::plan(future::multisession, workers = 10)
 
 source("trees/height-diameter/ACMA3.R")
 warnings()

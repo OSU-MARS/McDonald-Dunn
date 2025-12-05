@@ -166,12 +166,13 @@ fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOption
     # don't fit GAMs which are marked as not significant
     # This bypass is, if not required, desirable for smooths whose degrees of freedom exceed the amount of data, meaning they can't be
     # fit.
+    message(paste0(name, " for ", folds, "x", repetitions, " ", responseVariable, " not fit using ", fittingMethod, "() as it is not a significant model form."))
     nonsignificantFitStats = create_fit_statistics(name = name, fittingMethod = fittingMethod, fitSet = "primary")
     nonsignificantFitStats$significant = FALSE
     return(nonsignificantFitStats)
   }
   
-  message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using gam()..."))
+  message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using ", fittingMethod, "()..."))
   progressBar = progressr::progressor(steps = folds * repetitions)
   if ((folds == 1) & (repetitions == 1))
   {
@@ -182,14 +183,14 @@ fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOption
       {
         gamModel = gam(formula = formula, data = data, family = family, method = "REML", select = TRUE, weights = dbhWeight, nthreads = threads)
       } else {
-        gamModel = gamm(formula = formula, data = data, random = random, family = family, method = "REML", weights = dbhWeight)
+        gamModel = gamm(formula = formula, data = data, random = random, family = family, method = "REML", weights = dbhWeight, verbosePQL = FALSE)
       }
     } else { 
       if (is.null(random))
       {
         gamModel = gam(formula = formula, data = data, family = family, method = "REML", select = TRUE, weights = heightWeight, nthreads = threads)
       } else {
-        gamModel = gamm(formula = formula, data = data, random = random, family = family, method = "REML", weights = heightWeight)
+        gamModel = gamm(formula = formula, data = data, random = random, family = family, method = "REML", weights = heightWeight, verbosePQL = FALSE)
       }
     }
     estimatedParameters = sum(gamModel$edf)
@@ -218,14 +219,14 @@ fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOption
       {
         gamModel = gam(formula = formula, data = trainingData, family = family, method = "REML", select = TRUE, weights = dbhWeight, nthreads = threads)
       } else {
-        gamModel = gamm(formula = formula, data = trainingData, random = random, family = family, method = "REML", weights = dbhWeight)
+        gamModel = gamm(formula = formula, data = trainingData, random = random, family = family, method = "REML", weights = dbhWeight, verbosePQL = FALSE)
       }
     } else { 
       if (is.null(random))
       {
         gamModel = gam(formula = formula, data = trainingData, family = family, method = "REML", select = TRUE, weights = heightWeight, nthreads = threads)
       } else {
-        gamModel = gamm(formula = formula, data = trainingData, random = random, family = family, method = "REML", weights = heightWeight)
+        gamModel = gamm(formula = formula, data = trainingData, random = random, family = family, method = "REML", weights = heightWeight, verbosePQL = FALSE)
       }
     }
     estimatedParameters = sum(gamModel$edf)
@@ -330,7 +331,7 @@ fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions =
     if ((folds == 1) & (repetitions == 1))
     {
       startFit = Sys.time()
-      allFit = lm(formula = formula, data = data, offset = breastHeight, weights = dbhWeight)
+      allFit = lm(formula = formula, data = data, weights = dbhWeight)
       allFitStats = get_fit_statistics(name = name, fittingMethod = "lm", responseVariable = "height", 
                                        trainingData = data, trainingPrediction = fitted(allFit), estimatedParameters = length(coef(allFit)), 
                                        validationData = data, validationPrediction = fitted(allFit),
@@ -345,7 +346,7 @@ fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions =
     {
       startFit = Sys.time()
       trainingData = rsample::analysis(dataFold)
-      linearModel = lm(formula = formula, data = trainingData, offset = breastHeight, weights = dbhWeight) # specifying breastHeight as a constant fails with 'variable lengths differ'
+      linearModel = lm(formula = formula, data = trainingData, weights = dbhWeight)
       validationData = rsample::assessment(dataFold)
       fitStatistics = get_fit_statistics(name = name, fittingMethod = "lm", responseVariable = "height", 
                                          trainingData = trainingData, trainingPrediction = fitted(linearModel), estimatedParameters = length(coef(linearModel)) + 1,
@@ -799,13 +800,35 @@ plot_auc_bank = function(aucs, fillLabel = "median AUC", omitMab = FALSE, xLimit
   return(aucBank)
 }
 
+plot_gam_smooths = function(gam, columns = waiver(), rows = waiver())
+{
+  plot_gam_smooth = function(smooth)
+  {
+    return(ggplot() +
+             geom_line(aes(x = smooth$x, y = smooth$fit + qt(0.995, 10) * smooth$se), color = "grey70", linetype = "dashed") +
+             geom_line(aes(x = smooth$x, y = smooth$fit), color = "blue") +
+             geom_line(aes(x = smooth$x, y = smooth$fit + qt(0.005, 10) * smooth$se), color = "grey70", linetype = "dashed") +
+             labs(x = smooth$xlab, y = smooth$ylab, color = NULL))
+  }
+  
+  # all.terms = TRUE affects only plotting; parametric term would have to be extracted and plotted separately
+  smooths = plot.gam(gam, scale = 0, select = 0) # https://stackoverflow.com/questions/46345546/prevent-plot-gam-from-producing-a-figure
+  plot = plot_gam_smooth(smooths[[1]])
+  for (smoothIndex in 2:length(smooths))
+  {
+    plot = plot + plot_gam_smooth(smooths[[smoothIndex]])
+  }
+  return(plot + plot_annotation(theme = theme(plot.margin = margin())) +
+           plot_layout(ncol = columns, nrow = rows, guides = "collect"))
+}
+
 predict_bootstrap_dbh = function(trees)
 {
   return(if_else(is.na(trees$height), trees$dbh, # fall back to measured DBH if height isn't available for DBH prediction TODO: error model
                  case_match(trees$species, # base DBH models selected by 10x10 cross validation
-                            "PSME" ~ 1.934203 * (trees$height - 1.37)^0.849846 * exp((0.008790 + 0.001245 * trees$relativeHeight + 0.002616 * cos(3.14159/180 * trees$aspect)) * (trees$height - 1.37)), # Ruark RelHt physio on MAE basis, could also use Sibbesen replace RelHt physio
+                            "PSME" ~ (1.941428 - 0.088674 * cos(3.14159/180 * trees$aspect)) * (trees$height - 1.37)^(0.851545) * exp((0.008463 + 0.002658 * trees$relativeHeight) * (trees$height - 1.37)), # Ruark RelHt physio, could also use Sibbesen replace RelHt physio
                             "ACMA" ~ predict(acmaDiameterFromHeightPreferred$randomForest, trees)$predictions,
-                            #"ABGR" ~ , # TODO
+                            "ABGR" ~ (2.0238 + 0.4090 * trees$relativeHeight) * (trees$height - 1.37)^(0.8846), # power RelHt
                             .default = predict(otherDiameterFromHeightPreferred$gam, trees))))
 }
 
@@ -841,7 +864,7 @@ unnest_fixed_effects = function(fit)
 {
   # GAM coefficients aren't recorded and random forest lack coefficients, leading to fixedEffects being a column of null lists
   # In these cases unnest(fixedEffects) creates a NA column named fixedEffects, which has no use; suppress this behavior.
-  if (all(fit$fitting %in% c("gam", "ranger")))
+  if (all(fit$fitting %in% c("gam", "gamm", "ranger")))
   {
     # repetition and fold are only present in cross validated fits
     fixedEffects = fit %>% select(fitSet, fitting, name, any_of(c("repetition", "fold")), significant, isConverged)
@@ -850,7 +873,8 @@ unnest_fixed_effects = function(fit)
   }
   
   # standardize naming of linear model coefficients, if present
-  fixedEffects %<>% rename(any_of(c(a1 = "dbh", a1 = "I(height - 1.37)", a1p = "I(isPlantation * dbh)", a1p = "I(isPlantation * (height - 1.37))",
+  fixedEffects %<>% rename(any_of(c(a0 = "(Intercept)", 
+                                    a1 = "dbh", a1 = "I(height - 1.37)", a1p = "I(isPlantation * dbh)", a1p = "I(isPlantation * (height - 1.37))",
                                     a2 = "I(dbh^2)", a2 = "I((height - 1.37)^2)", a2p = "I(isPlantation * dbh^2)", a2p = "I(isPlantation * (height - 1.37)^2)")))
   return(fixedEffects)
 }
@@ -902,8 +926,7 @@ trees2022 = read_xlsx("inventory/FVS.xlsx", sheet = "FVS_TreeInit") %>%
          isConifer = species %in% c("ABGR", "CADE", "CHLA", "conifer", "PIPO", "PSME", "TABR", "THPL", "TSHE"),
          isLive = (history != "dead") & (history != "snag"), 
          isLiveUnbroken = isLive & (damage != "brokenTop"),
-         uniquePlotID = factor(paste(stand, plot)),
-         breastHeight = 1.37) %>% # m, used for offset in lm() height regressions
+         uniquePlotID = factor(paste(stand, plot))) %>%
   # about 1% of records are for trees shorter than breast height with a 0.25 cm or 2.5 cm DBH dubbed in rather than having a NA DBH
   # Trees which are DBH measure only (and therefore have NA heights) need to be retained for calculation of TPH, basal area, and BAL.
   filter(is.na(height) | (height >= 1.37)) %>%
