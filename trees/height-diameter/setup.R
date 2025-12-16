@@ -824,11 +824,29 @@ plot_gam_smooths = function(gam, columns = waiver(), rows = waiver())
 
 predict_bootstrap_dbh = function(trees)
 {
-  return(if_else(is.na(trees$height), trees$dbh, # fall back to measured DBH if height isn't available for DBH prediction TODO: error model
-                 case_match(trees$species, # base DBH models selected by 10x10 cross validation
+  return(if_else(is.na(trees$height), 
+                 # height not measured: approximate DBH prediction error applying variance models to measured DBH
+                 # Since DBH regressions predict mean tree diameters prediction errors will tend to be negative on trees with large diameters
+                 # for their height and positive for trees with comparatively small diameters. But, as error injection occurs on trees whose
+                 # height has not been measured, it is not possible to determine which way injected error should be skewed. However, the error
+                 # distribution is broadly symmetrical and the power regressions through the boostrap errors agree fairly well with empirical
+                 # estimates of the standard deviation calculated in the setup block below. So a Gaussian model with a heteroskedastic standard
+                 # deviation is not unreasonable. The actual error distribution is heavy tailed, in part due to outliers which seem likely 
+                 # broken tops or trees with large amounts of lean that were not coded as such, but using Gaussian tails helps compensate for
+                 # such data errors as well as mitigating overdispersion of DBHes due to the inability to skew error injection.
+                 #
+                 # Because DBH models have low bias DBH errors progressively average out of bootstrap stand basal area estimates (ABA) with
+                 # increasing cruise intensity in a stand. Basal area taller also averages down as suppression increases.
+                 case_match(trees$species,
+                            "PSME" ~ trees$dbh + rnorm(n = nrow(trees), mean = 0, sd = sqrt(0.0117 * trees$dbh^1.606)),
+                            "ABGR" ~ trees$dbh + rnorm(n = nrow(trees), mean = 0, sd = sqrt(0.521 * trees$dbh^0.697)),
+                            "ACMA" ~ trees$dbh + rnorm(n = nrow(trees), mean = 0, sd = sqrt(0.0258 * trees$dbh^1.613)),
+                            .default = trees$dbh + rnorm(n = nrow(trees), mean = 0, sd = sqrt(0.000661 * trees$dbh^2.037))),
+                 # height measured: predict DBH from bootstrap models selected by 10x10 cross validation
+                 case_match(trees$species,
                             "PSME" ~ (1.941428 - 0.088674 * cos(3.14159/180 * trees$aspect)) * (trees$height - 1.37)^(0.851545) * exp((0.008463 + 0.002658 * trees$relativeHeight) * (trees$height - 1.37)), # Ruark RelHt physio, could also use Sibbesen replace RelHt physio
-                            "ACMA" ~ predict(acmaDiameterFromHeightPreferred$randomForest, trees)$predictions,
                             "ABGR" ~ (2.0238 + 0.4090 * trees$relativeHeight) * (trees$height - 1.37)^(0.8846), # power RelHt
+                            "ACMA" ~ predict(acmaDiameterFromHeightPreferred$randomForest, trees)$predictions,
                             .default = predict(otherDiameterFromHeightPreferred$gam, trees))))
 }
 
@@ -931,6 +949,8 @@ trees2022 = read_xlsx("inventory/FVS.xlsx", sheet = "FVS_TreeInit") %>%
   # Trees which are DBH measure only (and therefore have NA heights) need to be retained for calculation of TPH, basal area, and BAL.
   filter(is.na(height) | (height >= 1.37)) %>%
   relocate(stand, plot, tree, species, dbh, height, treeCount, isLive, isLiveUnbroken)
+
+set.seed(0) # for now, make injected DBH errors repeatable
 trees2022 = left_join(left_join(trees2022, stands2022 %>% rename(standArea = area, standAreaNet = areaNet), by = join_by(stand)),
                       plots2022 %>% select(-PlotID, -Contractor, -Year, -cosAspect, -sinAspect),
                       by = join_by(stand == STAND, plot == fvsPlotID)) %>%
@@ -1009,6 +1029,7 @@ other2022 = trees2022 %>% filter(speciesModel == "other", is.na(dbh) == FALSE, i
   # mutate(dbhWeight = treeCount / ((0.940 + 0.213 * isPlantation) * dbh^0.898), heightWeight = treeCount / (1.989 * height^1.552)) # all data
   mutate(dbhWeight = treeCount / ((0.915 + 0.229 * isPlantation) * dbh^0.906), heightWeight = treeCount / (2.047 * height^1.552),
          heightMax = 50, dbhMax = 125, heightDiameterRatioMax = (1.37 + 0.835 * dbh^0.551) / (0.01 * dbh), heightDiameterRatioMin = (1.37 + 7.032 * dbh^0.436) / (0.01 * dbh))
+
 
 ## weighting for heteroskedasticity
 if (htDiaOptions$includeSetup)
@@ -1171,6 +1192,54 @@ if (htDiaOptions$includeSetup)
   #ggsave("trees/height-diameter/figures/Figure S variance models.png", height = 12, width = 16.5, units = "cm", dpi = 300)
 }
 
+
+## DBH error models if not predictable from height
+if (htDiaOptions$includeSetup)
+{
+  dbhErrorModelTrees2022 = trees2022 %>% filter(is.na(height) == FALSE, damage != "brokenTop")
+  dbhErrorSymmetricalBinned2022 = dbhErrorModelTrees2022 %>% 
+    mutate(dbhClass = 2.5 * round(dbh/2.5), bootstrapDbhErrorClass = 2.5 * round(abs(bootstrapDbh - dbh) / 2.5)) %>% 
+    group_by(speciesModel, dbhClass, bootstrapDbhErrorClass) %>% 
+    summarize(treeCount = sum(treeCount), squaredError = sum(treeCount * (bootstrapDbh - dbh)^2), .groups = "drop")
+  
+  gsl_nls(bootstrapDbh - dbh ~ a1 * dbh^b1, data = dbhErrorModelTrees2022 %>% filter(speciesModel == "PSME"), start = c(a1 = 0.01, b1 = 1.6), weight = treeCount)
+  gsl_nls(bootstrapDbh - dbh ~ a1 * dbh^b1, data = dbhErrorModelTrees2022 %>% filter(speciesModel == "ABGR"), start = c(a1 = 0.6, b1 = 0.7), weight = treeCount)
+  gsl_nls(bootstrapDbh - dbh ~ a1 * dbh^b1, data = dbhErrorModelTrees2022 %>% filter(speciesModel == "ACMA"), start = c(a1 = 0.04, b1 = 1.5), weight = treeCount)
+  gsl_nls(bootstrapDbh - dbh ~ a1 * dbh^b1, data = dbhErrorModelTrees2022 %>% filter(speciesModel == "other"), start = c(a1 = 0.0006, b1 = 2.0), weight = treeCount)
+  
+  # symmetrical error models
+  ggplot() +
+    geom_tile(aes(x = dbhClass, y = bootstrapDbhErrorClass, fill = treeCount), dbhErrorSymmetricalBinned2022) +
+    geom_line(aes(x = dbhClass, y = stdDev, color = "σ"), dbhErrorSymmetricalBinned2022 %>% group_by(speciesModel, dbhClass) %>% summarize(treeCount = sum(treeCount), stdDev = sqrt(1/(treeCount - 1) * sum(squaredError))) %>% filter(treeCount > 10)) + 
+    #geom_smooth(aes(x = dbh, y = abs(bootstrapDbh - dbh)), dbhErrorModelTrees2022, color = "red", method = "gam") +
+    geom_line(aes(x = dbh, y = case_match(speciesModel, "PSME" ~ 0.0117 * dbh^1.606,
+                                                        "ABGR" ~ 0.521 * dbh^0.697,
+                                                        "ACMA" ~ 0.0258 * dbh^1.613,
+                                                        "other" ~ 0.000661 * dbh^2.037), color = "power model", group = speciesModel),
+                dbhErrorModelTrees2022) +
+    coord_equal() +
+    facet_wrap(vars(speciesModel)) +
+    labs(x = "DBH, cm", y = "|bootstrap DBH error|, cm", color = NULL, fill = "tree\ncount") +
+    scale_color_manual(breaks = c("σ", "power model"), labels = c("σ", "power\nmodel"), values = c("red", "blue")) +
+    scale_fill_viridis_c(trans = "log10")
+  
+  # asymmetrical error models
+  ggplot() +
+    #geom_segment(aes(x = x, y = y, xend = xend, yend = yend), crossing(tibble(x = 0, y = 0, xend = 200), tibble(yend = c(100, -100)), levels(dbhErrorModelTrees2022$speciesModel)), color = "grey90", linewidth = 0.3) +
+    geom_bin_2d(aes(x = dbh, y = bootstrapDbh - dbh), dbhErrorModelTrees2022, binwidth = c(2.5, 2.5)) +
+    geom_smooth(aes(x = dbh, y = bootstrapDbh - dbh), dbhErrorModelTrees2022, color = "red", method = "gam") +
+    geom_line(aes(x = dbh, y = case_match(speciesModel, "PSME" ~ 2.205 * dbh^-0.193,
+                                          "ABGR" ~ 0.313 * dbh^-0.065,
+                                          "ACMA" ~ 1.426 * dbh^0.069,
+                                          "other" ~ 0 * dbh^5.8), group = speciesModel),
+              dbhErrorModelTrees2022, color = "blue") +
+    coord_equal() +
+    facet_wrap(vars(speciesModel)) +
+    labs(x = "DBH, cm", y = "bootstrap DBH error, cm", fill = "cruise\nrecords") +
+    scale_fill_viridis_c(trans = "log10")
+}
+
+
 ## data checks and summaries, species limits on height and diameter prediction bounds
 if (htDiaOptions$includeInvestigatory)
 {
@@ -1330,6 +1399,7 @@ if (htDiaOptions$includeInvestigatory)
   plot_layout(guides = "collect", widths = c(250, 150, 150, 150)) &
     scale_fill_viridis_c(trans = "log10", breaks = c(1, 3, 10, 30, 100, 200), labels = c(1, 3, 10, 30, 100, "200+"), limits = c(1, 200), na.value = "yellow")
 }
+
 
 ## variable importance
 if (htDiaOptions$includeInvestigatory)
