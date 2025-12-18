@@ -268,7 +268,6 @@ fit_gsl_nls = function(name, formula, data, start, control = gsl_nls_control(max
   if (responseVariable == "height()")
   {
     responseVariable = "height"
-    allFitNonlinear = gsl_nls(fn = formula, data = data, start = start, weights = dbhWeight, control = control)
   } else {
     if (responseVariable != "dbh()")
     {
@@ -276,12 +275,17 @@ fit_gsl_nls = function(name, formula, data, start, control = gsl_nls_control(max
     }
     
     responseVariable = "DBH"
-    allFitNonlinear = gsl_nls(fn = formula, data = data, start = start, weights = heightWeight, control = control)
   }
     
   startFit = Sys.time()
   if ((folds == 1) & (repetitions == 1))
   {
+    if (responseVariable == "height")
+    {
+      allFitNonlinear = gsl_nls(fn = formula, data = data, start = start, weights = dbhWeight, control = control)
+    } else {
+      allFitNonlinear = gsl_nls(fn = formula, data = data, start = start, weights = heightWeight, control = control)
+    }
     allFitStats = get_fit_statistics(name = name, fittingMethod = "gsl_nls", responseVariable = responseVariable, 
                                      trainingData = data, trainingPrediction = fitted(allFitNonlinear), estimatedParameters = length(coef(allFitNonlinear)), 
                                      validationData = data, validationPrediction = fitted(allFitNonlinear),
@@ -292,16 +296,15 @@ fit_gsl_nls = function(name, formula, data, start, control = gsl_nls_control(max
     return(get_fit_return_value(allFitNonlinear, allFitStats, returnModel))
   }
   
-  allFitFixedEffects = coef(allFitNonlinear)
   fit_gsl_nls_fold = function(dataFold)
   {
     startFit = Sys.time()
     trainingData = rsample::analysis(dataFold)
     if (responseVariable == "height")
     {
-      nonlinearModel = gsl_nls(fn = formula, data = trainingData, start = allFitFixedEffects, weights = dbhWeight, control = control)
+      nonlinearModel = gsl_nls(fn = formula, data = trainingData, start = start, weights = dbhWeight, control = control)
     } else {
-      nonlinearModel = gsl_nls(fn = formula, data = trainingData, start = allFitFixedEffects, weights = heightWeight, control = control)
+      nonlinearModel = gsl_nls(fn = formula, data = trainingData, start = start, weights = heightWeight, control = control)
     }
     
     validationData = rsample::assessment(dataFold)
@@ -1412,11 +1415,11 @@ if (htDiaOptions$includeInvestigatory)
   otherHeightVariables = c("height", "dbh", "relativeDiameter", "standQmd", "topHeight", "standBasalAreaPerHectare", "basalAreaLarger", "standTreesPerHectare", "slope", "elevation", "terrainRoughness", "topographicWetnessFD8f", "aspect", "isPlantation")
   
   dbhCandidateVariables  = c("dbh", "height", "topHeight", "relativeHeight", "bootstrapStandBasalAreaPerHectare", "basalAreaTaller", "isPlantation", "elevation", "slope", "aspect", "terrainRoughness", "topographicWetnessFD8f", "inventoryAge")
-  allDbhVariables = c("dbh", "height", "bootstrapStandBasalAreaPerHectare", "relativeHeight", "topHeight")
-  psmeDbhVariables = c("dbh", "height", "bootstrapStandBasalAreaPerHectare", "relativeHeight")
-  abgrDbhVariables = c("dbh", "height", "relativeHeight", "bootstrapStandBasalAreaPerHectare", "basalAreaTaller")
-  acmaDbhVariables = c("dbh", "height", "bootstrapStandBasalAreaPerHectare")
-  otherDbhVariables = c("dbh", "height", "bootstrapStandBasalAreaPerHectare")
+  allDbhVariables = c("dbh", "height", "topHeight", "relativeHeight", "bootstrapStandBasalAreaPerHectare", "basalAreaTaller", "isPlantation", "elevation", "slope", "aspect", "terrainRoughness", "topographicWetnessFD8f") # no variables eliminated in interpretation but drop age
+  psmeDbhVariables = c("dbh", "height", "topHeight", "basalAreaTaller", "bootstrapStandBasalAreaPerHectare", "elevation", "terrainRoughness", "slope", "aspect", "topographicWetnessFD8f")
+  abgrDbhVariables = c("dbh", "height", "relativeHeight", "topHeight", "bootstrapStandBasalAreaPerHectare", "slope")
+  acmaDbhVariables = c("dbh", "height", "relativeHeight", "topHeight", "basalAreaTaller", "bootstrapStandBasalAreaPerHectare", "topographicWetnessFD8f", "terrainRoughness", "aspect")
+  otherDbhVariables = c("dbh", "height", "relativeHeight", "topHeight", "basalAreaTaller", "bootstrapStandBasalAreaPerHectare", "slope", "terrainRoughness", "elevation")
   
   variableImportanceTrees2022 = bind_rows(psme2022, abgr2022, acma2022, other2022)
   
@@ -1520,11 +1523,11 @@ if (htDiaOptions$includeInvestigatory)
   # ranger tuning for generalized height prediction, 9950X timings with 500 trees and all predictors
   #                 height                                       diameter
   # species         tune time   mtry  node size  sample  MAE     tune time   mtry  node size  sample    notes
-  # all             1.00 min    2     2          0.827           1.28 min    2     2          0.741
-  # Douglas-fir     42 s        2     2          0.785   2.280   49 s        3     2          0.328     36 rows (0.5%) excluded from VSURF for lack of inventory age, height MAE @ 100 trees 2.349, MAE 200 2.317, MAE 300 2.292, MAE 400 2.284
-  # grand fir       24 s        4     2          0.513           20 s        4     4          0.495     13 rows (0.6%) excluded from VSURF for lack of inventory age
-  # bigleaf maple   26 s        3     2          0.761           24 s        2     7          0.709     14 rows (0.6%) excluded from VSURF for lack of inventory age
-  # other           22 s        3     2          0.839           20 s        2     2          0.592     11 rows (0.8%) excluded from VSURF for lack of inventory age
+  # all             1.00 min    2     2          0.827           60 s        2     4          0.704
+  # Douglas-fir     42 s        2     2          0.785   2.280   47 s        3     4          0.670     36 rows (0.5%) excluded from VSURF for lack of inventory age, height MAE @ 100 trees 2.349, MAE 200 2.317, MAE 300 2.292, MAE 400 2.284
+  # grand fir       24 s        4     2          0.513           23 s        3     4          0.216     13 rows (0.6%) excluded from VSURF for lack of inventory age
+  # bigleaf maple   26 s        3     2          0.761           27 s        2     3          0.586     14 rows (0.6%) excluded from VSURF for lack of inventory age
+  # other           22 s        3     2          0.839           25 s        4     3          0.733     11 rows (0.8%) excluded from VSURF for lack of inventory age
   # See https://mlr.mlr-org.com/articles/tutorial/measures.html#regression-1 for tuning targets. These include MAE and RMSE.
   #
   # ranger tuning for base for height prediction, 9900X timings with plantation factorization
@@ -1579,7 +1582,7 @@ if (htDiaOptions$includeInvestigatory)
   otherHeightTuning = tibble(responseVariable = "height", species = "other", mtry = otherHeightTuneResult$recommended.pars$mtry, minNodeSize = otherHeightTuneResult$recommended.pars$min.node.size, samplingFraction = otherHeightTuneResult$recommended.pars$sample.fraction)
 
   # ranger tuning for diameter prediction
-  allDbhRangerTask = makeRegrTask(id = "all2022dbh", data = as.data.frame(variableImportanceTrees2022 %>% select(all_of(allDbhVariables))), target = "dbh")
+  allDbhRangerTask = makeRegrTask(id = "all2022dbh", data = as.data.frame(variableImportanceTrees2022 %>% select(all_of(allDbhVariables)) %>% mutate(isPlantation = as.numeric(isPlantation))), target = "dbh")
   allDbhTuneStart = Sys.time()
   allDbhTuneResult = tuneRanger(allDbhRangerTask, measure = list(rmse), num.trees = htDiaOptions$rangerTrees, num.threads = 12, iters = 70,
                                  build.final.model = FALSE)
