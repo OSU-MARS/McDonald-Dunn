@@ -36,16 +36,16 @@ heightDiameterFitStats = bind_rows(psmeFitStats, abgrFitStats, acmaFitStats, oth
          hasPhysio = str_detect(name, "physio"),
          hasStand = str_detect(name, "ABA\\+T") | str_detect(name, "BA\\+L"),
          hasRelative = str_detect(name, "RelDbh") | str_detect(name, "RelHt"),
-         significant = as.logical(significant)) %>% # since R lacks NA_logical_ significant can end up being either of type double (0/1/NA_real_) or logical (TRUE/FALSE), standardize back to logical (TRUE/FALSE/NA)
+         distinct = as.logical(distinct)) %>% # since R lacks NA_logical_ distinct can end up being either of type double (0/1/NA_real_) or logical (TRUE/FALSE), standardize back to logical (TRUE/FALSE/NA)
   group_by(fitSet, responseVariable, fitting, name, species, repetition, fold) %>% # calculate out of range fraction within each fold
   mutate(pctOutOfRange = 100 * nPredictionOutOfRange / n) %>%
   group_by(fitSet, responseVariable, species) %>% # ΔAICn within response variable and species, needed for AUCs and model selection
   mutate(deltaAicN = aic/n - min(aic/n, na.rm = TRUE)) %>%
   ungroup()
 # report duplicate naming and fit failures
-heightDiameterFitStats %>% group_by(fitSet, fitting, responseVariable, species, name) %>% summarize(n = n(), significant = any(significant), .groups = "drop") %>% filter(n != htDiaOptions$folds * htDiaOptions$repetitions, ((fitting == "gam") & (n == 1) & (significant == FALSE)) == FALSE)
+heightDiameterFitStats %>% group_by(fitSet, fitting, responseVariable, species, name) %>% summarize(n = n(), distinct = any(distinct), .groups = "drop") %>% filter(n != htDiaOptions$folds * htDiaOptions$repetitions, ((fitting == "gam") & (n == 1) & (distinct == FALSE)) == FALSE)
 # report unexpected NA AICs
-#heightDiameterFitStats %>% filter(is.na(deltaAicN)) %>% group_by(fitSet, fitting, responseVariable, species, name) %>% summarize(n = n(), significant = any(significant), .groups = "drop") %>% filter(fitting != "ranger", ((fitting == "gam") & (n == 1) & (significant == FALSE)) == FALSE)
+#heightDiameterFitStats %>% filter(is.na(deltaAicN)) %>% group_by(fitSet, fitting, responseVariable, species, name) %>% summarize(n = n(), distinct = any(distinct), .groups = "drop") %>% filter(fitting != "ranger", ((fitting == "gam") & (n == 1) & (distinct == FALSE)) == FALSE)
 
 # model coefficients 
 if (exists("psmeFixedEffects") == FALSE) 
@@ -72,7 +72,7 @@ heightDiameterFixedEffects = left_join(bind_rows(psmeFixedEffects, abgrFixedEffe
                                        by = join_by(fitSet, responseVariable, species, name, fitting, repetition, fold)) %>%
   mutate(isConverged = as.logical(isConverged)) %>%
   select(-fixedEffects) %>%
-  relocate(responseVariable, species, fitSet, name, significant, isBaseForm, hasRelative, hasStand, hasPhysio, fitting, repetition, fold, n, fitTimeInS, isConverged, pctOutOfRange, mab, mapb, mae, mape, rmse, rmspe, aic, deltaAicN, nse, meanAbsolutePlantationEffect,	meanAbsolutePercentPlantationEffect, 
+  relocate(responseVariable, species, fitSet, name, distinct, isBaseForm, hasRelative, hasStand, hasPhysio, fitting, repetition, fold, n, fitTimeInS, isConverged, pctOutOfRange, mab, mapb, mae, mape, rmse, rmspe, aic, deltaAicN, nse, meanAbsolutePlantationEffect,	meanAbsolutePercentPlantationEffect, 
            a0, a1, a1p, a1rd, a1rh, a1ba, a1bal, a1balp, a1e, a1s, a1as, a1ac, a1tr, a1tw, a2, a2p, a3, a3p, b1, b1p, b1rd, b1rh, b1as, b1ac, b1e, b1tw, b2, b2p, b2rd, b2rdp, b2rh, b2ba, b2bal, b2s, b2as, b2ac, b2e, b2tw, b3, b3rd, b3as, b3tr, b4, b4p, any_of("b4rd"), b4ba, b4e, b4s, b4as, b4ac, b4tw, Ha, Hap, d, dp, kU)
 #names(heightDiameterFixedEffects) # check for unordered columns
 #writexl::write_xlsx(heightDiameterFixedEffects %>% filter(fitSet == "primary") %>% select(-fixedEffects), 
@@ -94,24 +94,24 @@ progressr::with_progress({
     #purrr::map_dfr(function(fitResults) # for debugging
     {
       #fitResults = heightDiameterFitStats %>% filter(responseVariable == "DBH", species == "other species", name == "REML GAM", fitting == "gam") # for debugging
-      if ((nrow(fitResults) == 1) | all(is.na(fitResults$significant)) | all(fitResults$significant == FALSE))
+      if ((nrow(fitResults) == 1) | all(is.na(fitResults$distinct)) | all(fitResults$distinct == FALSE))
       {
         # two cases
-        # - no need to calculate AUCs because this model is not significant
+        # - no need to calculate AUCs because this model is not distinct
         # - no distribution to compare to since this model has only a fit failed result
-        # Could calculate AUCs for non-significant models but this is not currently of interest and doing so roughly doubles runtime.
+        # Could calculate AUCs for indistinct models but this is not currently of interest and doing so roughly doubles runtime.
         progressBar(str_pad(paste(fitResults$responseVariable[1], fitResults$species[1], fitResults$name[1], fitResults$fitting[1]), 60, "right"))
         #print(paste("single self row or NA model efficiency:", fitResults$species[1], fitResults$responseVariable[1], fitResults$name[1], fitResults$fitting[1]))
-        return(tibble(responseVariable = fitResults$responseVariable[1], species = fitResults$species[1], name = fitResults$name[1], fitting = fitResults$fitting[1], significant = fitResults$significant[1], isBaseForm = fitResults$isBaseForm[1],
-                      otherModelName = NA_character_, otherModelFitting = NA_character_, otherModelSignificant = NA_integer_,
+        return(tibble(responseVariable = fitResults$responseVariable[1], species = fitResults$species[1], name = fitResults$name[1], fitting = fitResults$fitting[1], distinct = fitResults$distinct[1], isBaseForm = fitResults$isBaseForm[1],
+                      otherModelName = NA_character_, otherModelFitting = NA_character_, otherModeldistinct = NA_integer_,
                       hasPhysio = fitResults$hasPhysio[1], hasStand = fitResults$hasStand[1], hasRelative = fitResults$hasRelative[1],
                       aucDeltaAicN = NA_real_, aucMab = NA_real_, aucMabN = 0, aucMae = NA_real_, aucNse = NA_real_, aucRmse = NA_real_,
                       speciesFraction = fitResults$speciesFraction[1]))
       }
       
-      # get all other cross-validations for significant models for this response variable and species
-      # Could include pairings between significant and non-significant models but this is not currently of interest.
-      matchingFitResults = heightDiameterFitStats %>% filter(significant, responseVariable == fitResults$responseVariable[1], species == fitResults$species[1], ((name == fitResults$name[1]) & (fitting == fitResults$fitting[1])) == FALSE)
+      # get all other cross-validations for distinct models for this response variable and species
+      # Could include pairings between distinct and not distinct models but this is not currently of interest.
+      matchingFitResults = heightDiameterFitStats %>% filter(distinct, responseVariable == fitResults$responseVariable[1], species == fitResults$species[1], ((name == fitResults$name[1]) & (fitting == fitResults$fitting[1])) == FALSE)
       matchingModels = matchingFitResults %>% group_by(name, fitting) %>% summarize(name = name[1], fitting = fitting[1], .groups = "drop")
       #print(paste0(nrow(matchingModels), " AUC intercomparisons...")) # for debugging
       pairwiseAucs = bind_rows(purrr::map2(matchingModels$name, matchingModels$fitting, function(otherModelName, otherModelFitting)
@@ -123,8 +123,8 @@ progressr::with_progress({
         {
           # also no distribution to compare to if the other model has only a no fit result or wasn't cross validated
           #print(paste("single other row or NA model efficiency:", fitResults$species[1], fitResults$responseVariable[1], fitResults$name[1], fitResults$fitting[1]))
-          return(tibble(responseVariable = fitResults$responseVariable[1], species = fitResults$species[1], name = fitResults$name[1], fitting = fitResults$fitting[1], significant = fitResults$significant[1], isBaseForm = fitResults$isBaseForm[1],
-                        otherModelName = otherModelName, otherModelFitting = otherModelFitting, otherModelSignificant = otherFitResults$significant[1],
+          return(tibble(responseVariable = fitResults$responseVariable[1], species = fitResults$species[1], name = fitResults$name[1], fitting = fitResults$fitting[1], distinct = fitResults$distinct[1], isBaseForm = fitResults$isBaseForm[1],
+                        otherModelName = otherModelName, otherModelFitting = otherModelFitting, otherModelDistinct = otherFitResults$distinct[1],
                         hasPhysio = fitResults$hasPhysio[1], hasStand = fitResults$hasStand[1], hasRelative = fitResults$hasRelative[1],
                         aucDeltaAicN = NA_real_, aucMab = NA_real_, aucMabN = 0, aucMae = NA_real_, aucNse = NA_real_, aucRmse = NA_real_,
                         speciesFraction = fitResults$speciesFraction[1]))
@@ -191,8 +191,8 @@ progressr::with_progress({
         }
         
         #print(paste0("AUC: ", fitResults$species[1], " ", fitResults$responseVariable[1], " ", fitResults$name[1], " ", fitResults$fitting[1], " @ ", nrow(fitResults)," folds x ", otherModelName, " ", otherModelFitting, " @ ", nrow(otherFitResults), " folds."))
-        return(tibble(responseVariable = fitResults$responseVariable[1], species = fitResults$species[1], name = fitResults$name[1], fitting = fitResults$fitting[1], significant = fitResults$significant[1], isBaseForm = fitResults$isBaseForm[1],
-                      otherModelName = otherModelName, otherModelFitting = otherModelFitting, otherModelSignificant = otherFitResults$significant[1],
+        return(tibble(responseVariable = fitResults$responseVariable[1], species = fitResults$species[1], name = fitResults$name[1], fitting = fitResults$fitting[1], distinct = fitResults$distinct[1], isBaseForm = fitResults$isBaseForm[1],
+                      otherModelName = otherModelName, otherModelFitting = otherModelFitting, otherModelDistinct = otherFitResults$distinct[1],
                       hasPhysio = fitResults$hasPhysio[1], hasStand = fitResults$hasStand[1], hasRelative = fitResults$hasRelative[1],
                       aucDeltaAicN = aucAicN,
                       aucMab = aucMab, aucMabN = nrow(availableMabData),
@@ -207,59 +207,59 @@ progressr::with_progress({
     })
 })
 Sys.time() - aucStart
-#table(heightDiameterModelAucs$significant, useNA = "ifany")
-#table(heightDiameterModelAucs$otherModelSignificant, useNA = "ifany")
+#table(heightDiameterModelAucs$distinct, useNA = "ifany")
+#table(heightDiameterModelAucs$otherModelDistinct, useNA = "ifany")
 #ggplot() +
-#  geom_histogram(aes(x = aucMab), heightDiameterModelAucs %>% filter(significant, otherModelSignificant == 1), binwidth = 0.01) +
+#  geom_histogram(aes(x = aucMab), heightDiameterModelAucs %>% filter(distinct, otherModelDistinct == 1), binwidth = 0.01) +
 #ggplot() +
-#  geom_histogram(aes(x = aucMae), heightDiameterModelAucs %>% filter(significant, otherModelSignificant == 1), binwidth = 0.01) +
+#  geom_histogram(aes(x = aucMae), heightDiameterModelAucs %>% filter(distinct, otherModelDistinct == 1), binwidth = 0.01) +
 #ggplot() +
-#  geom_histogram(aes(x = aucRmse), heightDiameterModelAucs %>% filter(significant, otherModelSignificant == 1), binwidth = 0.01) +
+#  geom_histogram(aes(x = aucRmse), heightDiameterModelAucs %>% filter(distinct, otherModelDistinct == 1), binwidth = 0.01) +
 #ggplot() +
-#  geom_histogram(aes(x = aucDeltaAicN), heightDiameterModelAucs %>% filter(significant, otherModelSignificant == 1), binwidth = 0.01) +
+#  geom_histogram(aes(x = aucDeltaAicN), heightDiameterModelAucs %>% filter(distinct, otherModelDistinct == 1), binwidth = 0.01) +
 #ggplot() +
-#  geom_histogram(aes(x = aucNse), heightDiameterModelAucs %>% filter(significant, otherModelSignificant == 1), binwidth = 0.01) +
+#  geom_histogram(aes(x = aucNse), heightDiameterModelAucs %>% filter(distinct, otherModelDistinct == 1), binwidth = 0.01) +
 #plot_annotation(theme = theme(plot.margin = margin())) +
 #plot_layout()
   
 # take median AUCs over otherModelName, excluding unsuccessful fits
-# AUCs for pairs with non-significant members are (currently) mostly excluded above but filtering for significance is repeated here as some
-# rows for failed fits and non-significant models are present in the AUC tibble. Exclusion of unsuccessful fits is debatable. If a model could 
+# AUCs for pairs with not distinct members are (currently) mostly excluded above but filtering for significance is repeated here as some
+# rows for failed fits and not distinct models are present in the AUC tibble. Exclusion of unsuccessful fits is debatable. If a model could 
 # not be fit then its AUC could reasonably be taken to be zero rather than NA, implying all models which could be fit have an AUC of 1 in 
 # comparison.
-# Rankings are only meaningful between significant model forms.
+# Rankings are only meaningful between distinct model forms.
 #heightDiameterModelAucs %>% filter(responseVariable == "DBH", species == "other species", name == "REML GAM", fitting == "gam") # for debugging
-#heightDiameterModelAucs %>% filter(is.na(significant)) # for debugging
+#heightDiameterModelAucs %>% filter(is.na(distinct)) # for debugging
 #heightDiameterModelRanking %>% filter(responseVariable == "height", name == "Chapman-Richards RelDbh") %>% group_by(species, name, fitting) %>% summarize(n = n())
 #ggplot() +
-#  geom_histogram(aes(x = aucMab, fill = fitting, group = fitting), heightDiameterModelAucs %>% filter(significant, otherModelSignificant == 1, responseVariable == "DBH", species == "other species", name == "REML GAM"), binwidth = 0.01) +
+#  geom_histogram(aes(x = aucMab, fill = fitting, group = fitting), heightDiameterModelAucs %>% filter(distinct, otherModelDistinct == 1, responseVariable == "DBH", species == "other species", name == "REML GAM"), binwidth = 0.01) +
 #  coord_cartesian(xlim = c(0, 1)) +
 #  labs(x = "AUC", y = "model fits", fill = NULL)
 heightDiameterModelRanking = heightDiameterModelAucs %>%
   group_by(responseVariable, species, name, fitting) %>%
   summarize(fitting = fitting[1], isBaseForm = isBaseForm[1], hasPhysio = hasPhysio[1], hasStand = hasStand[1], hasRelative = hasRelative[1],
-            aucDeltaAicN = median(if_else((name != otherModelName) & significant & (otherModelSignificant == 1), aucDeltaAicN, NA_real_), na.rm = TRUE),
-            aucMab = median(if_else((name != otherModelName) & significant & (otherModelSignificant == 1), aucMab, NA_real_), na.rm = TRUE),
-            aucMae = median(if_else((name != otherModelName) & significant & (otherModelSignificant == 1), aucMae, NA_real_), na.rm = TRUE),
-            aucNse = median(if_else((name != otherModelName) & significant & (otherModelSignificant == 1), aucNse, NA_real_), na.rm = TRUE),
-            aucRmse = median(if_else((name != otherModelName) & significant & (otherModelSignificant == 1), aucNse, NA_real_), na.rm = TRUE),
-            significant = significant[1],
+            aucDeltaAicN = median(if_else((name != otherModelName) & distinct & (otherModelDistinct == 1), aucDeltaAicN, NA_real_), na.rm = TRUE),
+            aucMab = median(if_else((name != otherModelName) & distinct & (otherModelDistinct == 1), aucMab, NA_real_), na.rm = TRUE),
+            aucMae = median(if_else((name != otherModelName) & distinct & (otherModelDistinct == 1), aucMae, NA_real_), na.rm = TRUE),
+            aucNse = median(if_else((name != otherModelName) & distinct & (otherModelDistinct == 1), aucNse, NA_real_), na.rm = TRUE),
+            aucRmse = median(if_else((name != otherModelName) & distinct & (otherModelDistinct == 1), aucNse, NA_real_), na.rm = TRUE),
+            distinct = distinct[1],
             speciesFraction = speciesFraction[1],
             .groups = "drop_last") %>%
   group_by(responseVariable, species, isBaseForm) %>%
-  mutate(aucBlended = if_else(significant, 0.1 * aucMab + 0.3 * if_else(responseVariable == "height", aucMae, aucRmse) + 0.1 * if_else(responseVariable == "DBH", aucMae, aucRmse) + 0.4 * if_else(fitting == "ranger", 0.5, aucDeltaAicN) + 0.1 * aucNse, 0.5),
-         aucDeltaAicNRank = min_rank(desc(round(aucDeltaAicN * significant, 3))), 
-         aucMabRank = min_rank(desc(round(aucMab * significant, 3))), 
-         aucMaeRank = min_rank(desc(round(aucMae * significant, 3))), 
-         aucNseRank = min_rank(desc(round(aucNse * significant, 3))), 
-         aucRmseRank = min_rank(desc(round(aucRmse * significant, 3)))) %>%
+  mutate(aucBlended = if_else(distinct, 0.1 * aucMab + 0.3 * if_else(responseVariable == "height", aucMae, aucRmse) + 0.1 * if_else(responseVariable == "DBH", aucMae, aucRmse) + 0.4 * if_else(fitting == "ranger", 0.5, aucDeltaAicN) + 0.1 * aucNse, 0.5),
+         aucDeltaAicNRank = min_rank(desc(round(aucDeltaAicN * distinct, 3))), 
+         aucMabRank = min_rank(desc(round(aucMab * distinct, 3))), 
+         aucMaeRank = min_rank(desc(round(aucMae * distinct, 3))), 
+         aucNseRank = min_rank(desc(round(aucNse * distinct, 3))), 
+         aucRmseRank = min_rank(desc(round(aucRmse * distinct, 3)))) %>%
   ungroup() %>%
   mutate(nameAndFit = paste0(name, if_else(fitting %in% c("gamm", "nlme"), " mixed", "")))
 heightDiameterModelDisplaySort = heightDiameterModelRanking %>%
   group_by(responseVariable, name, fitting) %>%
   summarize(penalizedBlendedAuc = sum(speciesFraction * if_else(is.na(aucBlended), 0, aucBlended)),
             nameAndFit = nameAndFit[1],
-            .groups = "drop") %>% # can also weight non-significant fits differently
+            .groups = "drop") %>% # can also weight not distinct fits differently
   arrange(responseVariable, penalizedBlendedAuc)
 #heightDiameterModelRanking %>% group_by(responseVariable, species) %>%
 #  summarize(n = n(), mabN = sum(is.na(aucMab) == FALSE), maeN = sum(is.na(aucMae) == FALSE), rmseN = sum(is.na(aucRmse) == FALSE), nseN = sum(is.na(aucNse) == FALSE), .groups = "drop")
@@ -267,15 +267,15 @@ heightDiameterModelDisplaySort = heightDiameterModelRanking %>%
 # find preferred model forms
 # TODO: should these be full joins?
 nPreferredModelForms = 4
-preferredForms = full_join(full_join(full_join(heightDiameterModelRanking %>% filter(significant) %>% group_by(responseVariable, species, isBaseForm) %>% slice_max(aucMab, n = nPreferredModelForms, na_rm = TRUE) %>% arrange(desc(aucMab)) %>% mutate(mabName = name, mabFitting = fitting, rank = row_number()) %>% select(responseVariable, species, isBaseForm, rank, mabName, mabFitting, aucMab),
-                                               heightDiameterModelRanking %>% filter(significant) %>% group_by(responseVariable, species, isBaseForm) %>% slice_max(aucMae, n = nPreferredModelForms, na_rm = TRUE) %>% arrange(desc(aucMae)) %>% mutate(maeName = name, maeFitting = fitting, rank = row_number()) %>% select(responseVariable, species, isBaseForm, rank, maeName, maeFitting, aucMae),
+preferredForms = full_join(full_join(full_join(heightDiameterModelRanking %>% filter(distinct) %>% group_by(responseVariable, species, isBaseForm) %>% slice_max(aucMab, n = nPreferredModelForms, na_rm = TRUE) %>% arrange(desc(aucMab)) %>% mutate(mabName = name, mabFitting = fitting, rank = row_number()) %>% select(responseVariable, species, isBaseForm, rank, mabName, mabFitting, aucMab),
+                                               heightDiameterModelRanking %>% filter(distinct) %>% group_by(responseVariable, species, isBaseForm) %>% slice_max(aucMae, n = nPreferredModelForms, na_rm = TRUE) %>% arrange(desc(aucMae)) %>% mutate(maeName = name, maeFitting = fitting, rank = row_number()) %>% select(responseVariable, species, isBaseForm, rank, maeName, maeFitting, aucMae),
                                                by = join_by(responseVariable, species, isBaseForm, rank)),
-                                     full_join(heightDiameterModelRanking %>% filter(significant) %>% group_by(responseVariable, species, isBaseForm) %>% slice_max(aucRmse, n = nPreferredModelForms, na_rm = TRUE) %>% arrange(desc(aucRmse)) %>% mutate(rmseName = name, rmseFitting = fitting, rank = row_number()) %>% select(responseVariable, species, isBaseForm, rank, rmseName, rmseFitting, aucRmse),
-                                               heightDiameterModelRanking %>% filter(significant) %>% group_by(responseVariable, species, isBaseForm) %>% slice_max(aucDeltaAicN, n = nPreferredModelForms, na_rm = TRUE) %>% arrange(desc(aucDeltaAicN)) %>% mutate(aicName = name, aicFitting = fitting, rank = row_number()) %>% select(responseVariable, species, isBaseForm, rank, aicName, aicFitting, aucDeltaAicN),
+                                     full_join(heightDiameterModelRanking %>% filter(distinct) %>% group_by(responseVariable, species, isBaseForm) %>% slice_max(aucRmse, n = nPreferredModelForms, na_rm = TRUE) %>% arrange(desc(aucRmse)) %>% mutate(rmseName = name, rmseFitting = fitting, rank = row_number()) %>% select(responseVariable, species, isBaseForm, rank, rmseName, rmseFitting, aucRmse),
+                                               heightDiameterModelRanking %>% filter(distinct) %>% group_by(responseVariable, species, isBaseForm) %>% slice_max(aucDeltaAicN, n = nPreferredModelForms, na_rm = TRUE) %>% arrange(desc(aucDeltaAicN)) %>% mutate(aicName = name, aicFitting = fitting, rank = row_number()) %>% select(responseVariable, species, isBaseForm, rank, aicName, aicFitting, aucDeltaAicN),
                                                by = join_by(responseVariable, species, isBaseForm, rank)),
                                      by = join_by(responseVariable, species, isBaseForm, rank)),
-                           full_join(heightDiameterModelRanking %>% filter(significant) %>% group_by(responseVariable, species, isBaseForm) %>% slice_max(aucNse, n = nPreferredModelForms, na_rm = TRUE) %>% arrange(desc(aucNse)) %>% mutate(nseName = name, nseFitting = fitting, rank = row_number()) %>% select(responseVariable, species, isBaseForm, rank, nseName, nseFitting, aucNse),
-                                     heightDiameterModelRanking %>% filter(significant) %>% group_by(responseVariable, species, isBaseForm) %>% slice_max(aucBlended, n = nPreferredModelForms, na_rm = TRUE) %>% arrange(desc(aucBlended)) %>% mutate(blendedName = name, blendedFitting = fitting, rank = row_number()) %>% select(responseVariable, species, isBaseForm, rank, blendedName, blendedFitting, aucBlended),
+                           full_join(heightDiameterModelRanking %>% filter(distinct) %>% group_by(responseVariable, species, isBaseForm) %>% slice_max(aucNse, n = nPreferredModelForms, na_rm = TRUE) %>% arrange(desc(aucNse)) %>% mutate(nseName = name, nseFitting = fitting, rank = row_number()) %>% select(responseVariable, species, isBaseForm, rank, nseName, nseFitting, aucNse),
+                                     heightDiameterModelRanking %>% filter(distinct) %>% group_by(responseVariable, species, isBaseForm) %>% slice_max(aucBlended, n = nPreferredModelForms, na_rm = TRUE) %>% arrange(desc(aucBlended)) %>% mutate(blendedName = name, blendedFitting = fitting, rank = row_number()) %>% select(responseVariable, species, isBaseForm, rank, blendedName, blendedFitting, aucBlended),
                                      by = join_by(responseVariable, species, isBaseForm, rank)),
                            by = join_by(responseVariable, species, isBaseForm, rank)) %>%
   arrange(desc(responseVariable), species, desc(isBaseForm), rank) %>%
@@ -293,37 +293,37 @@ predictorVariableResults = heightDiameterFixedEffects %>%
                          (is.na(b1p) == FALSE) | (is.na(b2p) == FALSE) | (is.na(b2rdp) == FALSE) | (is.na(b4p) == FALSE),
          hasRelDbhOrRelHt = (is.na(a1rd) == FALSE) | (is.na(a1rh) == FALSE) | (is.na(b1rd) == FALSE) | (is.na(b2rd) == FALSE) | (is.na(b3rd) == FALSE) | (is.na(b4rd) == FALSE) |
                             (is.na(b1rh) == FALSE) | (is.na(b2rh) == FALSE),
-         hasSignificantRelative = hasRelDbhOrRelHt * significant,
-         significantRelHtOrDbh = (is.na(a1rd) == FALSE) * significant + (is.na(a1rh) == FALSE) * significant + 
-                                 (is.na(b1rd) == FALSE) * significant + (is.na(b1rh) == FALSE) * significant + 
-                                 (is.na(b2rd) == FALSE) * significant + (is.na(b2rh) == FALSE) * significant + 
-                                 (is.na(b3rd) == FALSE) * significant + (is.na(b4rd) == FALSE) * significant,
+         hasDistinctRelative = hasRelDbhOrRelHt * distinct,
+         distinctRelHtOrDbh = (is.na(a1rd) == FALSE) * distinct + (is.na(a1rh) == FALSE) * distinct + 
+                                 (is.na(b1rd) == FALSE) * distinct + (is.na(b1rh) == FALSE) * distinct + 
+                                 (is.na(b2rd) == FALSE) * distinct + (is.na(b2rh) == FALSE) * distinct + 
+                                 (is.na(b3rd) == FALSE) * distinct + (is.na(b4rd) == FALSE) * distinct,
          hasBasalArea = (is.na(a1ba) == FALSE) | (is.na(a1bal) == FALSE) | (is.na(b2ba) == FALSE) | (is.na(b2bal) == FALSE) | (is.na(b4ba) == FALSE) |
                         ((responseVariable == "height") & str_detect(name, "(Sharma-Parton|Sharma-Zhang)")),
-         hasSignificantBasalArea = hasBasalArea * significant,
-         significantBAorAba = (is.na(a1ba) == FALSE) * significant + (is.na(b2ba) == FALSE) * significant + (is.na(b4ba) == FALSE) * significant,
-         significantBalOrAat = (is.na(a1bal) == FALSE) * significant + (is.na(b2bal) == FALSE) * significant,
-         nBasalAreaSignificant = ((is.na(a1ba) == FALSE) + (is.na(b2ba) == FALSE) + # Sharma-Parton and Sharma-Zhang height forms are not counted here as there is no test for whether BA or BAL are significant predictors (modified Sharma-Parton for DBH does not use basal area)
-                                  (is.na(a1bal) == FALSE) + (is.na(b2bal) == FALSE)) * significant,
+         hasDistinctBasalArea = hasBasalArea * distinct,
+         distinctBAorAba = (is.na(a1ba) == FALSE) * distinct + (is.na(b2ba) == FALSE) * distinct + (is.na(b4ba) == FALSE) * distinct,
+         distinctBalOrAat = (is.na(a1bal) == FALSE) * distinct + (is.na(b2bal) == FALSE) * distinct,
+         nBasalAreaDistinct = ((is.na(a1ba) == FALSE) + (is.na(b2ba) == FALSE) + # Sharma-Parton and Sharma-Zhang height forms are not counted here as there is no test for whether BA or BAL are distinct predictors (modified Sharma-Parton for DBH does not use basal area)
+                                  (is.na(a1bal) == FALSE) + (is.na(b2bal) == FALSE)) * distinct,
          hasPhysio = (is.na(a1e) == FALSE) |  (is.na(b1e) == FALSE) |  (is.na(b2e) == FALSE) |                           (is.na(b4e) == FALSE) | 
                      (is.na(a1s) == FALSE) |                           (is.na(b2s) == FALSE) |                           (is.na(b4s) == FALSE) | 
                      (is.na(a1as) == FALSE) | (is.na(b1as) == FALSE) | (is.na(b2as) == FALSE) | (is.na(b3as) == FALSE) | (is.na(b4as) == FALSE) | 
                      (is.na(a1ac) == FALSE) | (is.na(b1ac) == FALSE) | (is.na(b2ac) == FALSE) |                          (is.na(b4ac) == FALSE) | 
                      (is.na(a1tr) == FALSE) |                                                   (is.na(b3tr) == FALSE) | 
                      (is.na(a1tw) == FALSE) | (is.na(b1tw) == FALSE) | (is.na(b2tw) == FALSE) |                          (is.na(b4tw) == FALSE),
-         nPhysioSignificant = ((is.na(a1e) == FALSE) +  (is.na(b1e) == FALSE) +  (is.na(b2e) == FALSE) +                           (is.na(b4e) == FALSE) + 
+         nPhysioDistinct = ((is.na(a1e) == FALSE) +  (is.na(b1e) == FALSE) +  (is.na(b2e) == FALSE) +                           (is.na(b4e) == FALSE) + 
                                (is.na(a1s) == FALSE) +                           (is.na(b2s) == FALSE) +                           (is.na(b4s) == FALSE) + 
                                (is.na(a1as) == FALSE) + (is.na(b1as) == FALSE) + (is.na(b2as) == FALSE) + (is.na(b3as) == FALSE) + (is.na(b4as) == FALSE) + 
                                (is.na(a1ac) == FALSE) + (is.na(b1ac) == FALSE) + (is.na(b2ac) == FALSE) +                          (is.na(b4ac) == FALSE) + 
                                (is.na(a1tr) == FALSE) +                                                   (is.na(b3tr) == FALSE) + 
-                               (is.na(a1tw) == FALSE) + (is.na(b1tw) == FALSE) + (is.na(b2tw) == FALSE) +                          (is.na(b4tw) == FALSE)) * significant,
-         hasSignificantPhysio = hasPhysio * significant,
-         significantElevation = (is.na(a1e) == FALSE) * significant + (is.na(b1e) == FALSE) * significant + (is.na(b2e) == FALSE) * significant + (is.na(b4e) == FALSE) * significant,
-         significantSlope = (is.na(a1s) == FALSE) * significant + (is.na(b2s) == FALSE) * significant + (is.na(b4s) == FALSE) * significant,
-         significantSinAspect = (is.na(a1as) == FALSE) * significant + (is.na(b1as) == FALSE) * significant + (is.na(b2as) == FALSE) * significant + (is.na(b3as) == FALSE) * significant + (is.na(b4as) == FALSE) * significant,
-         significantCosAspect = (is.na(a1ac) == FALSE) * significant + (is.na(b1ac) == FALSE) * significant + (is.na(b2ac) == FALSE) * significant + (is.na(b4ac) == FALSE) * significant,
-         significantTerrainRoughness = (is.na(a1tr) == FALSE) * significant + (is.na(b3tr) == FALSE) * significant,
-         significantTopographicWetness = (is.na(a1tw) == FALSE) * significant + (is.na(b1tw) == FALSE) * significant + (is.na(b2tw) == FALSE) * significant + (is.na(b4tw) == FALSE) * significant)
+                               (is.na(a1tw) == FALSE) + (is.na(b1tw) == FALSE) + (is.na(b2tw) == FALSE) +                          (is.na(b4tw) == FALSE)) * distinct,
+         hasDistinctPhysio = hasPhysio * distinct,
+         distinctElevation = (is.na(a1e) == FALSE) * distinct + (is.na(b1e) == FALSE) * distinct + (is.na(b2e) == FALSE) * distinct + (is.na(b4e) == FALSE) * distinct,
+         distinctSlope = (is.na(a1s) == FALSE) * distinct + (is.na(b2s) == FALSE) * distinct + (is.na(b4s) == FALSE) * distinct,
+         distinctSinAspect = (is.na(a1as) == FALSE) * distinct + (is.na(b1as) == FALSE) * distinct + (is.na(b2as) == FALSE) * distinct + (is.na(b3as) == FALSE) * distinct + (is.na(b4as) == FALSE) * distinct,
+         distinctCosAspect = (is.na(a1ac) == FALSE) * distinct + (is.na(b1ac) == FALSE) * distinct + (is.na(b2ac) == FALSE) * distinct + (is.na(b4ac) == FALSE) * distinct,
+         distinctTerrainRoughness = (is.na(a1tr) == FALSE) * distinct + (is.na(b3tr) == FALSE) * distinct,
+         distinctTopographicWetness = (is.na(a1tw) == FALSE) * distinct + (is.na(b1tw) == FALSE) * distinct + (is.na(b2tw) == FALSE) * distinct + (is.na(b4tw) == FALSE) * distinct)
 predictorVariableStats = predictorVariableResults %>% 
   group_by(responseVariable, species) %>%
   summarize(n = n(),
@@ -331,23 +331,23 @@ predictorVariableStats = predictorVariableResults %>%
             hasPhysio = sum(hasPhysio),
             hasPlantation = sum(hasPlantation),
             hasRelDbhOrRelHt = sum(hasRelDbhOrRelHt),
-            hasSignificantBasalArea = sum(hasSignificantBasalArea),
-            hasSignificantPhysio = sum(hasSignificantPhysio),
-            nBasalAreaSignificant = sum(nBasalAreaSignificant),
-            nPhysioSignificant = sum(nPhysioSignificant),
-            significantRelHtOrDbh = sum(significantRelHtOrDbh),
-            significantBAorAba = sum(significantBAorAba),
-            significantBalOrAat = sum(significantBalOrAat),
-            significantElevation = sum(significantElevation),
-            significantSlope = sum(significantSlope),
-            significantSinAspect = sum(significantSinAspect),
-            significantCosAspect = sum(significantCosAspect),
-            significantTerrainRoughness = sum(significantTerrainRoughness),
-            significantTopographicWetness = sum(significantTopographicWetness),
-            significant = sum(significant),
+            hasDistinctBasalArea = sum(hasDistinctBasalArea),
+            hasDistinctPhysio = sum(hasDistinctPhysio),
+            nBasalAreaDistinct = sum(nBasalAreaDistinct),
+            nPhysioDistinct = sum(nPhysioDistinct),
+            distinctRelHtOrDbh = sum(distinctRelHtOrDbh),
+            distinctBAorAba = sum(distinctBAorAba),
+            distinctBalOrAat = sum(distinctBalOrAat),
+            distinctElevation = sum(distinctElevation),
+            distinctSlope = sum(distinctSlope),
+            distinctSinAspect = sum(distinctSinAspect),
+            distinctCosAspect = sum(distinctCosAspect),
+            distinctTerrainRoughness = sum(distinctTerrainRoughness),
+            distinctTopographicWetness = sum(distinctTopographicWetness),
+            distinct = sum(distinct),
             plantationPct = 100 * hasPlantation / n, 
-            significantPct = 100 * significant / n,
-            significantRelativePct = 100 * significantRelHtOrDbh / hasRelDbhOrRelHt,
+            distinctPct = 100 * distinct / n,
+            distinctRelativePct = 100 * distinctRelHtOrDbh / hasRelDbhOrRelHt,
             .groups = "drop")
 
 
@@ -376,7 +376,7 @@ modelCounts %>% summarize(nAucsIfAllFitsSucceeded = sum(nAucsIfAllFitsSucceeded)
            nTotalBaseSharmaAucs = sum(nBaseSharmaAucs)))
 
 # generalization effect sizes for stand and physiographic variables
-heightDiameterFitStats %>% filter(significant) %>% 
+heightDiameterFitStats %>% filter(distinct) %>% 
   mutate(deltaAicN = aic/n - min(aic/n, na.rm = TRUE)) %>% # change to unrestricted ΔAICn
   filter(baseName %in% c("Chapman-Richards", "Ruark", "Sharma-Parton", "Sharma-Zhang", "Sibbesen", "Weibull", "REML GAM")) %>% # remove base forms which weren't generalized
   group_by(responseVariable, species, baseName) %>%
@@ -459,7 +459,7 @@ heightDiameterFitStats %>% group_by(responseVariable, species) %>% # plantation 
 improvementThresholdProbability = 0.5
 heightDiameterModelAucs %>% 
   mutate(baseName = if_else(word(name) %in% c("REML", "modified", "unified"), paste(word(name, 1), word(name, 2)), word(name))) %>%
-  filter(isBaseForm == FALSE, fitting %in% c("gsl_nls", "nlrob"), significant, baseName %in% c("Chapman-Richards", "Sharma-Parton", "Ruark", "Sibbesen"), (responseVariable == "height") | (baseName != "Sibbesen")) %>%
+  filter(isBaseForm == FALSE, fitting %in% c("gsl_nls", "nlrob"), distinct, baseName %in% c("Chapman-Richards", "Sharma-Parton", "Ruark", "Sibbesen"), (responseVariable == "height") | (baseName != "Sibbesen")) %>%
   group_by(responseVariable) %>%
   summarize(n = sum(is.na(aucDeltaAicN) == FALSE), 
             baseBetter = sum(aucDeltaAicN <= improvementThresholdProbability), # base form is ΔAICn preferable
@@ -473,10 +473,10 @@ heightDiameterModelAucs %>%
 
 # frequency of generalizing predictor selection
 predictorVariableStats %>%
-  mutate(balAat = significantBalOrAat / hasSignificantBasalArea, baAba = significantBAorAba / hasSignificantBasalArea,
-         elev = significantElevation / hasSignificantPhysio, slope = significantSlope / hasSignificantPhysio, sinAspect = significantSinAspect / hasSignificantPhysio, cosAspect = significantCosAspect / hasSignificantPhysio, roughness = significantTerrainRoughness / hasSignificantPhysio, wetness = significantTopographicWetness / hasSignificantPhysio) %>%
+  mutate(balAat = distinctBalOrAat / hasDistinctBasalArea, baAba = distinctBAorAba / hasDistinctBasalArea,
+         elev = distinctElevation / hasDistinctPhysio, slope = distinctSlope / hasDistinctPhysio, sinAspect = distinctSinAspect / hasDistinctPhysio, cosAspect = distinctCosAspect / hasDistinctPhysio, roughness = distinctTerrainRoughness / hasDistinctPhysio, wetness = distinctTopographicWetness / hasDistinctPhysio) %>%
   select(responseVariable, species, balAat, baAba, elev, slope, sinAspect, cosAspect, roughness, wetness) %>%
-  arrange(desc(responseVariable)) # since relative DBH and height are singleton groups they are always selected with probability 1 if when significant
+  arrange(desc(responseVariable)) # since relative DBH and height are singleton groups they are always selected with probability 1 if when distinct
 
 # highest ranked model forms by goodness of fit metric
 # Potential issue: while with_ties = FALSE avoids multijoin situations by forcing slice_max() to choose only one model the most parsimonious model is selected
@@ -501,14 +501,14 @@ print(left_join(left_join(left_join(left_join(preferredForms %>% group_by(respon
 
 # summarize fitting success
 # Show results for all fit sets here, whether or not primary.
-heightDiameterFitStats %>% filter(is.na(significant) | (significant == TRUE)) %>%
+heightDiameterFitStats %>% filter(is.na(distinct) | (distinct == TRUE)) %>%
   group_by(fitSet, responseVariable, species, name, fitting) %>%
   # reduce cross validated fits to a single record
   summarize(gslNls = fitting[1] == "gsl_nls", 
             lm = fitting[1] == "lm", 
             gam = fitting[1] == "gam",
             nlme = fitting[1] == "nlme",
-            fail = is.na(significant[1]),
+            fail = is.na(distinct[1]),
             .groups = "drop") %>%
   # summarize across fitting attempts at equal weight, regardless of cross validation settings
   group_by(fitSet) %>%
@@ -524,10 +524,10 @@ heightDiameterFitStats %>% filter(is.na(significant) | (significant == TRUE)) %>
          totalFailPct = 100 * fail / uniqueNonlinear) %>%
   arrange(desc(fitSet))
 # fittings which failed
-heightDiameterFitStats %>% filter(is.na(significant)) %>% select(fitSet, responseVariable, species, name, fitting) %>% arrange(desc(fitSet))
+heightDiameterFitStats %>% filter(is.na(distinct)) %>% select(fitSet, responseVariable, species, name, fitting) %>% arrange(desc(fitSet))
 
 # generalization's effects on MAB versus plantation effect sizes
-deltaMapb = heightDiameterFitStats %>% filter(fitSet == "primary", significant) %>%
+deltaMapb = heightDiameterFitStats %>% filter(fitSet == "primary", distinct) %>%
   group_by(responseVariable, species, baseName) %>%
   mutate(deltaMapb = mapb - median(na.omit(if_else(isBaseForm | (name == "Sharma-Parton"), mapb, NA_real_)))) %>% # find MAB relative to median MAB (%) of all base fits
   filter(isBaseForm == FALSE, baseName %in% c("REML GAM", "Chapman-Richards", "Ruark", "Sharma-Parton", "Sibbesen"))
@@ -563,7 +563,7 @@ plot_layout(guides = "collect") &
   scale_y_discrete(limits = rev)
 
 # summaries for supplemental material
-standVariableSelection = predictorVariableResults %>% filter(significant == 1, isBaseForm == FALSE) %>% 
+standVariableSelection = predictorVariableResults %>% filter(distinct == 1, isBaseForm == FALSE) %>% 
   group_by(responseVariable, species, name, fitting) %>%
   summarize(hasBasalArea = hasBasalArea[1], hasRelative = hasRelative[1],
             .groups = "drop")
@@ -646,9 +646,9 @@ plot_layout(nrow = 2, ncol = 2, guides = "collect") &
   guides(color = "none", fill = guide_legend(ncol = 7)) &
   scale_color_manual(breaks = levels(heightDiameterFitStats$species), limits = levels(heightDiameterFitStats$species), values = speciesGroupColors) &
   scale_fill_manual(breaks = levels(heightDiameterFitStats$species), limits = levels(heightDiameterFitStats$species), values = speciesGroupColors) &
-  scale_alpha_manual(breaks = c("reweighted", "fixed weights", "not significant"), values = c(0.75, 0.75, 0.6), drop = FALSE) &
-  scale_shape_manual(breaks = c("reweighted", "fixed weights", "not significant"), values = c(16, 18, 3), drop = FALSE) &
-  scale_size_manual(breaks = c("reweighted", "fixed weights", "not significant"), values = c(1.5, 1.9, 1.4), drop = FALSE) &
+  scale_alpha_manual(breaks = c("reweighted", "fixed weights", "not distinct"), values = c(0.75, 0.75, 0.6), drop = FALSE) &
+  scale_shape_manual(breaks = c("reweighted", "fixed weights", "not distinct"), values = c(16, 18, 3), drop = FALSE) &
+  scale_size_manual(breaks = c("reweighted", "fixed weights", "not distinct"), values = c(1.5, 1.9, 1.4), drop = FALSE) &
   theme(legend.key.size = unit(0.6, "line"), legend.position = "bottom", legend.text = element_text(margin = margin(l = 1, r = 6.5)))
 #ggsave("trees/height-diameter/figures/Figure 04 model efficiency.png", height = 10, width = 20, units = "cm")
 #ggsave("trees/height-diameter/figures/Figure 04 model efficiency.tif", height = 10, width = 20, units = "cm", dpi = figureDpi, compression = "lzw+p")
@@ -657,7 +657,7 @@ plot_layout(nrow = 2, ncol = 2, guides = "collect") &
 
 ## Figure 5: fitting success, model significance, and predictor variable use
 modelFitStats = heightDiameterFitStats %>% group_by(responseVariable, species, name, fitting) %>%
-  summarize(modelFit = is.na(significant[1]) == FALSE, .groups = "drop_last") %>% 
+  summarize(modelFit = is.na(distinct[1]) == FALSE, .groups = "drop_last") %>% 
   summarize(fitPct = 100 * mean(modelFit), .groups = "drop") %>%
   mutate(species = factor(species, levels = levels(predictorVariableResults$species)))
   
@@ -668,33 +668,33 @@ ggplot(modelFitStats %>% filter(responseVariable == "height")) +
   #labs(x = NULL, y = NULL, fill = NULL, title = bquote(bold(.(plotLetters[1]))~"height fits")) +
   scale_y_discrete(limits = rev(levels(predictorVariableResults$species))) +
 ggplot(predictorVariableStats %>% filter(responseVariable == "height")) +
-  geom_col(aes(x = significantPct, y = species, fill = species), width = 0.6) + 
+  geom_col(aes(x = distinctPct, y = species, fill = species), width = 0.6) + 
   coord_cartesian(xlim = c(0, 100)) +
   labs(x = NULL, y = NULL, fill = NULL, title = bquote(.(plotLetters[2])~"height forms")) +
   #labs(x = NULL, y = NULL, fill = NULL, title = bquote(bold(.(plotLetters[2]))~"height forms")) +
   scale_y_discrete(labels = NULL, limits = rev(levels(predictorVariableResults$species))) +
-ggplot(heightDiameterFitStats %>% filter(responseVariable == "height", significant)) +
+ggplot(heightDiameterFitStats %>% filter(responseVariable == "height", distinct)) +
   geom_violin(aes(x = meanAbsolutePercentPlantationEffect, y = species, color = species, group = species), draw_quantiles = c(0.25, 0.5, 0.75), na.rm = TRUE, width = 1.2) +
   coord_cartesian(xlim = c(0, 125)) +
   labs(x = NULL, y = NULL, color = NULL, title = bquote(.(plotLetters[3])~"height")) +
   #labs(x = NULL, y = NULL, color = NULL, title = bquote(bold(.(plotLetters[3]))~"height")) +
   scale_y_discrete(labels = NULL, limits = rev(levels(predictorVariableResults$species))) +
 ggplot(predictorVariableResults %>% filter(responseVariable == "height", hasBasalArea)) +
-  geom_count(aes(x = nBasalAreaSignificant, y = species, color = species)) + 
+  geom_count(aes(x = nBasalAreaDistinct, y = species, color = species)) + 
   coord_cartesian(xlim = c(-0.2, 2.2)) +
   labs(x = NULL, y = NULL, fill = NULL, title = bquote(.(plotLetters[4])~"BA+L")) +
   #labs(x = NULL, y = NULL, fill = NULL, title = bquote(bold(.(plotLetters[4]))~"BA+L")) +
   scale_x_continuous(breaks = seq(0, 2), minor_breaks = NULL) +
   scale_y_discrete(labels = NULL, limits = rev(levels(predictorVariableResults$species))) +
 ggplot(predictorVariableResults %>% filter(responseVariable == "height", hasPhysio)) +
-  geom_count(aes(x = nPhysioSignificant, y = species, color = species), shape = 18) + 
+  geom_count(aes(x = nPhysioDistinct, y = species, color = species), shape = 18) + 
   coord_cartesian(xlim = c(-0.3, 5.3)) +
   labs(x = NULL, y = NULL, fill = NULL, title = bquote(.(plotLetters[5])~"height physiographic")) +
   #labs(x = NULL, y = NULL, fill = NULL, title = bquote(bold(.(plotLetters[5]))~"height physiographic")) +
   scale_x_continuous(breaks = seq(0, 5), minor_breaks = NULL) +
   scale_y_discrete(labels = NULL, limits = rev(levels(predictorVariableResults$species))) +
 ggplot(predictorVariableResults %>% filter(responseVariable == "height", hasRelDbhOrRelHt)) +
-  geom_count(aes(x = significantRelHtOrDbh, y = species, color = species)) + 
+  geom_count(aes(x = distinctRelHtOrDbh, y = species, color = species)) + 
   labs(x = NULL, y = NULL, fill = NULL, title = bquote(.(plotLetters[6])~"RelDbh")) +
   #labs(x = NULL, y = NULL, fill = NULL, title = bquote(bold(.(plotLetters[6]))~"RelDbh")) +
   coord_cartesian(xlim = c(-0.3, 1.3)) +
@@ -707,35 +707,35 @@ ggplot(modelFitStats %>% filter(responseVariable == "DBH")) +
   #labs(x = "model forms\nfit, %", y = NULL, fill = NULL, title = bquote(bold(.(plotLetters[7]))~"DBH fits")) +
   scale_y_discrete(limits = rev(levels(predictorVariableResults$species))) +
 ggplot(predictorVariableStats %>% filter(responseVariable == "DBH")) +
-  geom_col(aes(x = significantPct, y = species, fill = species), width = 0.6) + 
+  geom_col(aes(x = distinctPct, y = species, fill = species), width = 0.6) + 
   coord_cartesian(xlim = c(0, 100)) +
-  labs(x = "significant\nforms, %", y = NULL, fill = NULL, title = bquote(.(plotLetters[8])~"DBH forms")) +
-  #labs(x = "significant\nforms, %", y = NULL, fill = NULL, title = bquote(bold(.(plotLetters[8]))~"DBH forms")) +
+  labs(x = "distinct\nforms, %", y = NULL, fill = NULL, title = bquote(.(plotLetters[8])~"DBH forms")) +
+  #labs(x = "distinct\nforms, %", y = NULL, fill = NULL, title = bquote(bold(.(plotLetters[8]))~"DBH forms")) +
   scale_y_discrete(labels = NULL, limits = rev(levels(predictorVariableResults$species))) +
-ggplot(heightDiameterFitStats %>% filter(responseVariable == "DBH", significant)) +
+ggplot(heightDiameterFitStats %>% filter(responseVariable == "DBH", distinct)) +
   geom_violin(aes(x = meanAbsolutePercentPlantationEffect, y = species, color = species, group = species), draw_quantiles = c(0.25, 0.5, 0.75), na.rm = TRUE, width = 1.2) +
   coord_cartesian(xlim = c(0, 125)) +
   labs(x = "mean absolute\nplantation effect, %", y = NULL, color = NULL, title = bquote(.(plotLetters[9])~"DBH")) +
   #labs(x = "mean absolute\nplantation effect, %", y = NULL, color = NULL, title = bquote(bold(.(plotLetters[9]))~"DBH")) +
   scale_y_discrete(labels = NULL, limits = rev(levels(predictorVariableResults$species))) +
 ggplot(predictorVariableResults %>% filter(responseVariable == "DBH", hasBasalArea)) +
-  geom_count(aes(x = nBasalAreaSignificant, y = species, color = species)) + 
+  geom_count(aes(x = nBasalAreaDistinct, y = species, color = species)) + 
   coord_cartesian(xlim = c(-0.2, 2.2)) +
-  labs(x = "significant\nvariables", y = NULL, fill = NULL, title = bquote(.(plotLetters[10])~"ABA+T")) +
-  #labs(x = "significant\nvariables", y = NULL, fill = NULL, title = bquote(bold(.(plotLetters[10]))~"ABA+T")) +
+  labs(x = "distinct\nvariables", y = NULL, fill = NULL, title = bquote(.(plotLetters[10])~"ABA+T")) +
+  #labs(x = "distinct\nvariables", y = NULL, fill = NULL, title = bquote(bold(.(plotLetters[10]))~"ABA+T")) +
   scale_x_continuous(breaks = seq(0, 2), minor_breaks = NULL) +
   scale_y_discrete(labels = NULL, limits = rev(levels(predictorVariableResults$species))) +
 ggplot(predictorVariableResults %>% filter(responseVariable == "DBH", hasPhysio)) +
-  geom_count(aes(x = nPhysioSignificant, y = species, color = species), shape = 18) + 
+  geom_count(aes(x = nPhysioDistinct, y = species, color = species), shape = 18) + 
   coord_cartesian(xlim = c(-0.3, 5.3)) +
-  labs(x = "significant\nvariables", y = NULL, fill = NULL, title = bquote(.(plotLetters[11])~"DBH physiographic")) +
-  #labs(x = "significant\nvariables", y = NULL, fill = NULL, title = bquote(bold(.(plotLetters[11]))~"DBH physiographic")) +
+  labs(x = "distinct\nvariables", y = NULL, fill = NULL, title = bquote(.(plotLetters[11])~"DBH physiographic")) +
+  #labs(x = "distinct\nvariables", y = NULL, fill = NULL, title = bquote(bold(.(plotLetters[11]))~"DBH physiographic")) +
   scale_x_continuous(breaks = seq(0, 5), minor_breaks = NULL) +
   scale_y_discrete(labels = NULL, limits = rev(levels(predictorVariableResults$species))) +
 ggplot(predictorVariableResults %>% filter(responseVariable == "DBH", hasRelDbhOrRelHt)) +
-  geom_count(aes(x = significantRelHtOrDbh, y = species, color = species)) + 
-  labs(x = "significant\nvariables", y = NULL, fill = NULL, title = bquote(.(plotLetters[12])~"RelHt")) +
-  #labs(x = "significant\nvariables", y = NULL, fill = NULL, title = bquote(bold(.(plotLetters[12]))~"RelHt")) +
+  geom_count(aes(x = distinctRelHtOrDbh, y = species, color = species)) + 
+  labs(x = "distinct\nvariables", y = NULL, fill = NULL, title = bquote(.(plotLetters[12])~"RelHt")) +
+  #labs(x = "distinct\nvariables", y = NULL, fill = NULL, title = bquote(bold(.(plotLetters[12]))~"RelHt")) +
   coord_cartesian(xlim = c(-0.3, 1.3)) +
   scale_x_continuous(breaks = c(0, 1), minor_breaks = NULL) +
   scale_y_discrete(labels = NULL, limits = rev(levels(predictorVariableResults$species))) +
@@ -753,7 +753,7 @@ plot_layout(nrow = 2, ncol = 6, widths = c(1.7, 1.7, 2.2, 1.7, 2.7, 1.2), guides
 ## Figure 6: Douglas-fir and bigleaf maple preferred models
 # preferred forms from 10x10 cross validation
 #print(preferredForms %>% filter(species %in% c("Douglas-fir", "red alder")) %>% select(-mabName, -aucMab, -nseName, -aucNse) %>% rename(respVar = responseVariable, base = isBaseForm, aucAic = aucDeltaAicN) %>% mutate(species = factor(species, labels = c("PSME", "ACMA3", "ABGR", "other"), levels = c("Douglas-fir", "bigleaf maple", "grand fir", "other species")), maeName = str_trunc(maeName, 28, ellipsis = ""), rmseName = str_trunc(rmseName, 28, ellipsis = ""), aicName = str_trunc(aicName, 28, ellipsis = "")), n = 33)
-print(heightDiameterModelRanking %>% filter(significant, isBaseForm) %>% select(-aucBlended, -starts_with("has"), -speciesFraction) %>%
+print(heightDiameterModelRanking %>% filter(distinct, isBaseForm) %>% select(-aucBlended, -starts_with("has"), -speciesFraction) %>%
         pivot_longer(starts_with("auc"), names_to = "statistic", values_to = "auc") %>% mutate(statistic = factor(statistic, levels = c("aucMab", "aucMae", "aucRmse", "aucDeltaAicN", "aucNse"))) %>%
         group_by(species, responseVariable, statistic) %>%
         slice_max(auc, n = 1) %>% arrange(species, desc(responseVariable), statistic), n = 70)
@@ -1116,24 +1116,24 @@ heightFromDiameterResults = heightDiameterFitStats %>%
           rmspe = quantile(rmspe, probs = quantiles, na.rm = TRUE), 
           deltaAicN = quantile(deltaAicN, probs = quantiles, na.rm = TRUE), 
           nse = quantile(nse, probs = quantiles, na.rm = TRUE),
-          significant = significant[1]) %>%
+          distinct = distinct[1]) %>%
   pivot_wider(names_from = quantiles, names_sep = "_q", values_from = c("mapb", "mape", "rmspe", "deltaAicN", "nse")) %>%
   mutate(verticalDodge = recode(species, "Douglas-fir" = 0.15, "bigleaf maple" = 0.05, "grand fir" = -0.05, "other species" = -0.15))
 
 ggplot(heightFromDiameterResults) +
-  geom_errorbar(aes(xmin = mapb_q0.025, xmax = mapb_q0.975, y = name, color = species, alpha = significant), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
-  geom_point(aes(x = mapb_q0.5, y = name, color = species, alpha = significant, size = significant, shape = significant), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge)) +
+  geom_errorbar(aes(xmin = mapb_q0.025, xmax = mapb_q0.975, y = name, color = species, alpha = distinct), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
+  geom_point(aes(x = mapb_q0.5, y = name, color = species, alpha = distinct, size = distinct, shape = distinct), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge)) +
   coord_cartesian(xlim = c(0, 40)) +
   labs(x = "MAB, %", y = NULL, color = NULL, alpha = NULL, shape = NULL, size = NULL) +
 ggplot(heightFromDiameterResults) +
-  geom_errorbar(aes(xmin = mape_q0.025, xmax = mape_q0.975, y = name, color = species, alpha = significant), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
-  geom_point(aes(x = mape_q0.5, y = name, color = species, alpha = significant, shape = significant, size = significant), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge)) +
+  geom_errorbar(aes(xmin = mape_q0.025, xmax = mape_q0.975, y = name, color = species, alpha = distinct), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
+  geom_point(aes(x = mape_q0.5, y = name, color = species, alpha = distinct, shape = distinct, size = distinct), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge)) +
   coord_cartesian(xlim = c(0, 60)) +
   labs(x = "MAE, %", y = NULL, color = NULL, alpha = NULL, shape = NULL, size = NULL) +
   scale_y_discrete(labels = NULL) +
 ggplot(heightFromDiameterResults) +
-  geom_errorbar(aes(xmin = rmspe_q0.025, xmax = rmspe_q0.975, y = name, color = species, alpha = significant), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
-  geom_point(aes(x = rmspe_q0.5, y = name, color = species, alpha = significant, shape = significant, size = significant), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge)) +
+  geom_errorbar(aes(xmin = rmspe_q0.025, xmax = rmspe_q0.975, y = name, color = species, alpha = distinct), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
+  geom_point(aes(x = rmspe_q0.5, y = name, color = species, alpha = distinct, shape = distinct, size = distinct), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge)) +
   coord_cartesian(xlim = c(0, 100)) +
   labs(x = "RMSE, %", y = NULL, color = NULL, alpha = NULL, shape = NULL, size = NULL) +
   #scale_x_continuous(breaks = seq(0, 20, by = 2)) +
@@ -1144,15 +1144,15 @@ ggplot(heightFromDiameterResults) +
   #geom_segment(x = 0.255, xend = 0.275, y = "REML GAM", yend = "REML GAM", arrow = arrow(length = unit(0.2, "line"), type = "closed"), color = "grey70", linewidth = 0.4) +
   #geom_segment(x = 0.255, xend = 0.275, y = "REML GAM BA+L", yend = "REML GAM BA+L", arrow = arrow(length = unit(0.2, "line"), type = "closed"), color = "grey70", linewidth = 0.4) +
   #geom_segment(x = 0.255, xend = 0.275, y = "REML GAM physio", yend = "REML GAM physio", arrow = arrow(length = unit(0.2, "line"), type = "closed"), color = "grey70", linewidth = 0.4) +
-  geom_errorbar(aes(xmin = deltaAicN_q0.025, xmax = deltaAicN_q0.975, y = name, color = species, alpha = significant), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
-  geom_point(aes(x = deltaAicN_q0.5, y = name, color = species, alpha = significant, shape = significant, size = significant), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge)) +
+  geom_errorbar(aes(xmin = deltaAicN_q0.025, xmax = deltaAicN_q0.975, y = name, color = species, alpha = distinct), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
+  geom_point(aes(x = deltaAicN_q0.5, y = name, color = species, alpha = distinct, shape = distinct, size = distinct), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge)) +
   labs(x = "ΔAICn", y = NULL, color = NULL, alpha = NULL, shape = NULL, size = NULL) +
   coord_cartesian(xlim = c(0, 10)) + # exclude high AIC of linear, parabolic, and Douglas-fir power+Curtis fits to avoid squashing of nonlinear differences
   scale_x_continuous(breaks = seq(0, 10, by = 2)) +
   scale_y_discrete(labels = NULL) +
 ggplot(heightFromDiameterResults) +
-  geom_errorbar(aes(xmin = nse_q0.025, xmax = nse_q0.975, y = name, color = species, alpha = significant), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
-  geom_point(aes(x = nse_q0.5, y = name, color = species, alpha = significant, shape = significant, size = significant), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge)) +
+  geom_errorbar(aes(xmin = nse_q0.025, xmax = nse_q0.975, y = name, color = species, alpha = distinct), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
+  geom_point(aes(x = nse_q0.5, y = name, color = species, alpha = distinct, shape = distinct, size = distinct), na.rm = TRUE, position = position_nudge(y = heightFromDiameterResults$verticalDodge)) +
   coord_cartesian(xlim = c(0.1, 1)) +
   labs(x = "model efficiency", y = NULL, color = NULL, alpha = NULL, shape = NULL, size = NULL) +
   scale_x_continuous(breaks = c(0.1, 0.4, 0.7, 1), minor_breaks = c(0.2, 0.3, 0.5, 0.6, 0.8, 0.9)) +
@@ -1160,10 +1160,10 @@ ggplot(heightFromDiameterResults) +
 plot_annotation(theme = theme(plot.margin = margin(0, 2, 0, 0, "pt"))) +
 plot_layout(nrow = 1, ncol = 5, guides = "collect") &
   guides(color = guide_legend(byrow = TRUE, order = 1, ncol = 4), alpha = guide_legend(byrow = TRUE, order = 2, ncol = 1), shape = guide_legend(byrow = TRUE, order = 2, ncol = 2), size = guide_legend(byrow = TRUE, order = 2, ncol = 2)) &
-  scale_alpha_manual(breaks = c("fixed weights", "not significant"), labels = c("form significant", "not significant"), values = c(0.75, 0.3)) &
+  scale_alpha_manual(breaks = c("fixed weights", "not distinct"), labels = c("form distinct", "not distinct"), values = c(0.75, 0.3)) &
   scale_color_manual(breaks = levels(heightFromDiameterResults$species), limits = levels(heightFromDiameterResults$species), values = speciesGroupColors) &
-  scale_shape_manual(breaks = c("fixed weights", "not significant"), labels = c("form significant", "not significant"), values = c(16, 3)) &
-  scale_size_manual(breaks = c("fixed weights", "not significant"), labels = c("form significant", "not significant"), values = c(1.9, 1.4)) &
+  scale_shape_manual(breaks = c("fixed weights", "not distinct"), labels = c("form distinct", "not distinct"), values = c(16, 3)) &
+  scale_size_manual(breaks = c("fixed weights", "not distinct"), labels = c("form distinct", "not distinct"), values = c(1.9, 1.4)) &
   theme(legend.key.size = unit(0.2, "line"), legend.justification = "left", legend.position = "bottom")
 #ggsave("trees/height-diameter/figures/Figure S02 height accuracy.png", height = 16, width = 20, units = "cm", dpi = figureDpi)
 #ggsave("trees/height-diameter/figures/Figure S02 height accuracy.tif", height = 22, width = 20, units = "cm", dpi = figureDpi, compression = "lzw+p")
@@ -1193,24 +1193,24 @@ diameterFromHeightResults = heightDiameterFitStats %>%
           rmspe = quantile(rmspe, probs = quantiles, na.rm = TRUE), 
           deltaAicN = quantile(deltaAicN, probs = quantiles, na.rm = TRUE), 
           nse = quantile(nse, probs = quantiles, na.rm = TRUE), 
-          significant = significant[1]) %>%
+          distinct = distinct[1]) %>%
   pivot_wider(names_from = quantiles, names_sep = "_q", values_from = c("mapb", "mape", "rmspe", "deltaAicN", "nse")) %>%
   mutate(verticalDodge = recode(species, "Douglas-fir" = 0.15, "bigleaf maple" = 0.05, "grand fir" = -0.05, "other species" = -0.15))
 
 ggplot(diameterFromHeightResults) +
-  geom_errorbar(aes(xmin = mapb_q0.025, xmax = mapb_q0.975, y = name, color = species, alpha = significant), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
-  geom_point(aes(x = mapb_q0.5, y = name, color = species, alpha = significant, shape = significant, size = significant), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge)) +
+  geom_errorbar(aes(xmin = mapb_q0.025, xmax = mapb_q0.975, y = name, color = species, alpha = distinct), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
+  geom_point(aes(x = mapb_q0.5, y = name, color = species, alpha = distinct, shape = distinct, size = distinct), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge)) +
   coord_cartesian(xlim = c(0, 40)) +
   labs(x = "MAB, %", y = NULL, color = NULL, alpha = NULL, shape = NULL, size = NULL) +
 ggplot(diameterFromHeightResults) +
-  geom_errorbar(aes(xmin = mape_q0.025, xmax = mape_q0.975, y = name, color = species, alpha = significant), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
-  geom_point(aes(x = mape_q0.5, y = name, color = species, alpha = significant, shape = significant, size = significant), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge)) +
+  geom_errorbar(aes(xmin = mape_q0.025, xmax = mape_q0.975, y = name, color = species, alpha = distinct), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
+  geom_point(aes(x = mape_q0.5, y = name, color = species, alpha = distinct, shape = distinct, size = distinct), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge)) +
   coord_cartesian(xlim = c(0, 60)) +
   labs(x = "MAE, %", y = NULL, color = NULL, alpha = NULL, shape = NULL, size = NULL) +
   scale_y_discrete(labels = NULL) +
 ggplot(diameterFromHeightResults) +
-  geom_errorbar(aes(xmin = rmspe_q0.025, xmax = rmspe_q0.975, y = name, color = species, alpha = significant), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
-  geom_point(aes(x = rmspe_q0.5, y = name, color = species, alpha = significant, shape = significant, size = significant), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge)) +
+  geom_errorbar(aes(xmin = rmspe_q0.025, xmax = rmspe_q0.975, y = name, color = species, alpha = distinct), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
+  geom_point(aes(x = rmspe_q0.5, y = name, color = species, alpha = distinct, shape = distinct, size = distinct), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge)) +
   coord_cartesian(xlim = c(0, 100)) +
   labs(x = "RMSE, %", y = NULL, color = NULL, alpha = NULL, shape = NULL, size = NULL) +
   scale_y_discrete(labels = NULL) +
@@ -1221,16 +1221,16 @@ ggplot(diameterFromHeightResults) +
   #geom_segment(x = 0.255, xend = 0.275, y = "REML GAM", yend = "REML GAM", arrow = arrow(length = unit(0.2, "line"), type = "closed"), color = "grey70", linewidth = 0.4) +
   #geom_segment(x = 0.255, xend = 0.275, y = "REML GAM ABA+T", yend = "REML GAM ABA+T", arrow = arrow(length = unit(0.2, "line"), type = "closed"), color = "grey70", linewidth = 0.4) +
   #geom_segment(x = 0.255, xend = 0.275, y = "REML GAM physio", yend = "REML GAM physio", arrow = arrow(length = unit(0.2, "line"), type = "closed"), color = "grey70", linewidth = 0.4) +
-  geom_errorbar(aes(xmin = deltaAicN_q0.025, xmax = deltaAicN_q0.975, y = name, color = species, alpha = significant), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
-  geom_point(aes(x = deltaAicN_q0.5, y = name, color = species, alpha = significant, shape = significant, size = significant), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge)) +
+  geom_errorbar(aes(xmin = deltaAicN_q0.025, xmax = deltaAicN_q0.975, y = name, color = species, alpha = distinct), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
+  geom_point(aes(x = deltaAicN_q0.5, y = name, color = species, alpha = distinct, shape = distinct, size = distinct), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge)) +
   coord_cartesian(xlim = c(0, 10)) +
   labs(x = "ΔAICn", y = NULL, color = NULL, alpha = NULL, shape = NULL, size = NULL) +
   scale_x_continuous(breaks = seq(0, 10, by = 2)) +
   #scale_x_continuous(breaks = c(0, 1, 2, 3, 4, 5, 6, 7), trans = scales::pseudo_log_trans()) +
   scale_y_discrete(labels = NULL) +
 ggplot(diameterFromHeightResults) +
-  geom_errorbar(aes(xmin = nse_q0.025, xmax = nse_q0.975, y = name, color = species, alpha = significant), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
-  geom_point(aes(x = nse_q0.5, y = name, color = species, alpha = significant, shape = significant, size = significant), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge)) +
+  geom_errorbar(aes(xmin = nse_q0.025, xmax = nse_q0.975, y = name, color = species, alpha = distinct), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge), linewidth = 0.5, orientation = "y", width = 0.1) +
+  geom_point(aes(x = nse_q0.5, y = name, color = species, alpha = distinct, shape = distinct, size = distinct), na.rm = TRUE, position = position_nudge(y = diameterFromHeightResults$verticalDodge)) +
   coord_cartesian(xlim = c(0.1, 1)) +
   labs(x = "model efficiency", y = NULL, color = NULL, alpha = NULL, shape = NULL, size = NULL) +
   scale_x_continuous(breaks = c(0.1, 0.4, 0.7, 1), minor_breaks = c(0.2, 0.3, 0.5, 0.6, 0.8, 0.9)) +
@@ -1238,10 +1238,10 @@ ggplot(diameterFromHeightResults) +
 plot_annotation(theme = theme(plot.margin = margin(0, 2, 0, 0, "pt"))) +
 plot_layout(nrow = 1, ncol = 5, guides = "collect") &
   guides(color = guide_legend(byrow = TRUE, order = 1, ncol = 4), alpha = guide_legend(byrow = TRUE, order = 2, ncol = 1), shape = guide_legend(byrow = TRUE, order = 2, ncol = 2), size = guide_legend(byrow = TRUE, order = 2, ncol = 2)) &
-  scale_alpha_manual(breaks = c("reweighted", "fixed weights", "not significant"), labels = c("NLME/nlrob", "form significant", "not significant"), values = c(0.75, 0.75, 0.3)) &
+  scale_alpha_manual(breaks = c("reweighted", "fixed weights", "not distinct"), labels = c("NLME/nlrob", "form distinct", "not distinct"), values = c(0.75, 0.75, 0.3)) &
   scale_color_manual(breaks = levels(heightFromDiameterResults$species), limits = levels(heightFromDiameterResults$species), values = speciesGroupColors) &
-  scale_shape_manual(breaks = c("reweighted", "fixed weights", "not significant"), labels = c("NLME/nlrob", "form significant", "not significant"), values = c(16, 18, 3)) &
-  scale_size_manual(breaks = c("reweighted", "fixed weights", "not significant"), labels = c("NLME/nlrob", "form significant", "not significant"), values = c(1.5, 1.9, 1.4)) &
+  scale_shape_manual(breaks = c("reweighted", "fixed weights", "not distinct"), labels = c("NLME/nlrob", "form distinct", "not distinct"), values = c(16, 18, 3)) &
+  scale_size_manual(breaks = c("reweighted", "fixed weights", "not distinct"), labels = c("NLME/nlrob", "form distinct", "not distinct"), values = c(1.5, 1.9, 1.4)) &
   theme(legend.key.size = unit(0.2, "line"), legend.justification = "left", legend.position = "bottom")
 #ggsave("trees/height-diameter/figures/Figure S03 DBH accuracy.png", height = 16, width = 20, units = "cm", dpi = figureDpi)
 #ggsave("trees/height-diameter/figures/Figure S03 DBH accuracy.tif", height = 22, width = 20, units = "cm", dpi = figureDpi, compression = "lzw+p")
@@ -1252,33 +1252,33 @@ plot_layout(nrow = 1, ncol = 5, guides = "collect") &
 
 
 ## supplementary spreadsheet: model forms by species and use 
-preferredModelForms = heightDiameterModelRanking %>% filter(significant) %>% 
+preferredModelForms = heightDiameterModelRanking %>% filter(distinct) %>% 
   group_by(responseVariable, species) %>% 
   arrange(desc(aucBlended)) %>% 
   mutate(rank = row_number()) %>% 
   arrange(desc(responseVariable), species, isBaseForm, rank) %>%
   select(-nameAndFit, -starts_with("has"), -speciesFraction) %>%
-  relocate(responseVariable, species, rank, name, fitting, isBaseForm, significant, aucMab, aucMae, aucRmse, aucDeltaAicN, aucNse)
-preferredModelFormsHeightNonPhysio = heightDiameterModelRanking %>% filter(significant, hasPhysio == FALSE) %>% 
+  relocate(responseVariable, species, rank, name, fitting, isBaseForm, distinct, aucMab, aucMae, aucRmse, aucDeltaAicN, aucNse)
+preferredModelFormsHeightNonPhysio = heightDiameterModelRanking %>% filter(distinct, hasPhysio == FALSE) %>% 
   group_by(responseVariable, species) %>% 
   arrange(desc(aucBlended)) %>% 
   mutate(rank = row_number()) %>% 
   arrange(desc(responseVariable), species, isBaseForm, rank) %>%
   select(-nameAndFit, -starts_with("has"), -speciesFraction) %>%
-  relocate(responseVariable, species, rank, name, fitting, isBaseForm, significant, aucMab, aucMae, aucRmse, aucDeltaAicN, aucNse)
-preferredModelFormsInitialDbh = heightDiameterModelRanking %>% filter(responseVariable == "DBH", significant, hasStand == FALSE) %>% 
+  relocate(responseVariable, species, rank, name, fitting, isBaseForm, distinct, aucMab, aucMae, aucRmse, aucDeltaAicN, aucNse)
+preferredModelFormsInitialDbh = heightDiameterModelRanking %>% filter(responseVariable == "DBH", distinct, hasStand == FALSE) %>% 
   group_by(responseVariable, species) %>% 
   arrange(desc(aucBlended)) %>% 
   mutate(rank = row_number()) %>% 
   arrange(desc(responseVariable), species, isBaseForm, rank) %>%
   select(-nameAndFit, -starts_with("has"), -speciesFraction) %>%
-  relocate(responseVariable, species, rank, name, fitting, isBaseForm, significant, aucMab, aucMae, aucRmse, aucDeltaAicN, aucNse)
+  relocate(responseVariable, species, rank, name, fitting, isBaseForm, distinct, aucMab, aucMae, aucRmse, aucDeltaAicN, aucNse)
 #writexl::write_xlsx(list(preferred = preferredModelForms, heightNonPhysio = preferredModelFormsHeightNonPhysio, initialDbh = preferredModelFormsInitialDbh), "trees/height-diameter/figures/height-diameter model AUCs.xlsx")
 
 
 ## additional info
 # nonphysical predictions
-outOfRange = heightDiameterFixedEffects %>% filter(fitSet == "primary", significant) %>% 
+outOfRange = heightDiameterFixedEffects %>% filter(fitSet == "primary", distinct) %>% 
   group_by(responseVariable, species, name) %>%
   summarize(baseName = if_else(word(name[1]) %in% c("REML", "modified", "unified"), paste(word(name[1], 1), word(name[1], 2)), word(name[1])),
             isBaseForm = isBaseForm[1], pctOutOfRange = mean(pctOutOfRange), .groups = "drop")

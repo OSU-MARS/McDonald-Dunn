@@ -1,4 +1,4 @@
-# options(rstudio.help.showDataPreview = FALSE) # useful with 2025 RStudio versions whose data preview on autocomplete is broken by column subsetting errors
+options(rstudio.help.showDataPreview = FALSE) # useful with 2025 RStudio versions whose data preview on autocomplete is broken by column subsetting errors
 library(dplyr)
 library(ggplot2)
 library(ggtrendline)
@@ -96,14 +96,14 @@ check_plot_fit_stats = function(fitStatistics)
     scale_fill_discrete(breaks = c("height", "DBH"))
 }
 
-create_fit_statistics = function(name, fittingMethod, fitSet = "primary", significant = NA_real_)
+create_fit_statistics = function(name, fittingMethod, fitSet = "primary", distinct = NA_real_)
 {
   # https://github.com/tidyverse/tibble/issues/1569
   return(tibble::tibble_row(fitSet = fitSet, fitting = fittingMethod, name = name, 
                             estimatedParameters = NA_real_, 
                             fixedEffects = vector("list", length = 1),
                             training = tibble(.rows = 1), validation = tibble(.rows = 1),
-                            isConverged = NA_real_, significant = significant,
+                            isConverged = NA_real_, distinct = distinct,
                             fitTimeInS = NA_real_))
 }
 
@@ -123,7 +123,7 @@ create_fit_statistics = function(name, fittingMethod, fitSet = "primary", signif
 # 5                      57
 # 6                      85
 # 7                      331
-fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, random = NULL, randomTermIndex = NA_integer_, threads = 1, significant = TRUE, tDegreesOfFreedom = 8)
+fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, random = NULL, randomTermIndex = NA_integer_, threads = 1, distinct = TRUE, tDegreesOfFreedom = 8)
 {
   if (is.null(random) == FALSE)
   {
@@ -161,15 +161,15 @@ fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOption
     fittingMethod = "gamm"
   }
   
-  if (significant == FALSE)
+  if (distinct == FALSE)
   {
-    # don't fit GAMs which are marked as not significant
+    # don't fit GAMs which are marked as not distinct
     # This bypass is, if not required, desirable for smooths whose degrees of freedom exceed the amount of data, meaning they can't be
     # fit.
-    message(paste0(name, " for ", folds, "x", repetitions, " ", responseVariable, " not fit using ", fittingMethod, "() as it is not a significant model form."))
-    nonsignificantFitStats = create_fit_statistics(name = name, fittingMethod = fittingMethod, fitSet = "primary")
-    nonsignificantFitStats$significant = FALSE
-    return(nonsignificantFitStats)
+    message(paste0(name, " for ", folds, "x", repetitions, " ", responseVariable, " not fit using ", fittingMethod, "() as it is not a distinct model form."))
+    notDistinctFitStats = create_fit_statistics(name = name, fittingMethod = fittingMethod, fitSet = "primary")
+    notDistinctFitStats$distinct = FALSE
+    return(notDistinctFitStats)
   }
   
   message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using ", fittingMethod, "()..."))
@@ -203,7 +203,7 @@ fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOption
     allFitStats = get_fit_statistics(name = name, fittingMethod = "gam", responseVariable = responseVariable, 
                                      trainingData = data, trainingPrediction = fitted(gamModel), estimatedParameters = estimatedParameters, 
                                      validationData = data, validationPrediction = validationPrediction,
-                                     significant = significant, tDegreesOfFreedom = tDegreesOfFreedom)
+                                     distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
     allFitStats$fitTimeInS = get_elapsed_time(startFit)
     progressBar()
     return(get_fit_return_value(gamModel, allFitStats, returnModel))
@@ -247,7 +247,7 @@ fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOption
     fitStatistics = get_fit_statistics(name = name, fittingMethod = fittingMethod, responseVariable = responseVariable, 
                                        trainingData = trainingData, trainingPrediction = fitted(gamModel), estimatedParameters = estimatedParameters, 
                                        validationData = validationData, validationPrediction = validationPrediction,
-                                       significant = significant, tDegreesOfFreedom = tDegreesOfFreedom)
+                                       distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
     # fitStatistics$fixedEffects not useful to set as GAM object is required
     fitStatistics$fitTimeInS = get_elapsed_time(startFit)
     progressBar()
@@ -258,7 +258,7 @@ fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOption
   return(get_cross_validation_return_value(splitsAndFits, returnModel))
 }
 
-fit_gsl_nls = function(name, formula, data, start, control = gsl_nls_control(maxiter = 100), folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, significant = TRUE, tDegreesOfFreedom = 8)
+fit_gsl_nls = function(name, formula, data, start, control = gsl_nls_control(maxiter = 100), folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
 {
   responseVariable = formula[2]
   message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using gsl_nls()..."))
@@ -289,7 +289,7 @@ fit_gsl_nls = function(name, formula, data, start, control = gsl_nls_control(max
     allFitStats = get_fit_statistics(name = name, fittingMethod = "gsl_nls", responseVariable = responseVariable, 
                                      trainingData = data, trainingPrediction = fitted(allFitNonlinear), estimatedParameters = length(coef(allFitNonlinear)), 
                                      validationData = data, validationPrediction = fitted(allFitNonlinear),
-                                     significant = significant, tDegreesOfFreedom = tDegreesOfFreedom)
+                                     distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
     allFitStats$fixedEffects[[1]] = bind_rows(coef(allFitNonlinear))
     allFitStats$fitTimeInS = get_elapsed_time(startFit)
     progressBar()
@@ -311,7 +311,7 @@ fit_gsl_nls = function(name, formula, data, start, control = gsl_nls_control(max
     fitStatistics = get_fit_statistics(name = name, fittingMethod = "gsl_nls", responseVariable = responseVariable, 
                                        trainingData = trainingData, trainingPrediction = fitted(nonlinearModel), estimatedParameters = length(coef(nonlinearModel)), 
                                        validationData = validationData, validationPrediction = predict(nonlinearModel, validationData),
-                                       significant = significant, tDegreesOfFreedom = tDegreesOfFreedom)
+                                       distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
     fitStatistics$fixedEffects[[1]] = bind_rows(coef(nonlinearModel))
     fitStatistics$fitTimeInS = get_elapsed_time(startFit)
     progressBar()
@@ -322,7 +322,7 @@ fit_gsl_nls = function(name, formula, data, start, control = gsl_nls_control(max
   return(get_cross_validation_return_value(splitsAndFits, returnModel))
 }
 
-fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, significant = TRUE, tDegreesOfFreedom = 8)
+fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
 {
   responseVariable = formula[2]
   message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using lm()..."))
@@ -338,7 +338,7 @@ fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions =
       allFitStats = get_fit_statistics(name = name, fittingMethod = "lm", responseVariable = "height", 
                                        trainingData = data, trainingPrediction = fitted(allFit), estimatedParameters = length(coef(allFit)), 
                                        validationData = data, validationPrediction = fitted(allFit),
-                                       significant = significant, tDegreesOfFreedom = tDegreesOfFreedom)
+                                       distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
       allFitStats$fixedEffects[[1]] = bind_rows(coef(allFit))
       allFitStats$fitTimeInS = get_elapsed_time(startFit)
       progressBar()
@@ -354,7 +354,7 @@ fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions =
       fitStatistics = get_fit_statistics(name = name, fittingMethod = "lm", responseVariable = "height", 
                                          trainingData = trainingData, trainingPrediction = fitted(linearModel), estimatedParameters = length(coef(linearModel)) + 1,
                                          validationData = validationData, validationPrediction = predict(linearModel, validationData), 
-                                         significant = significant, tDegreesOfFreedom = tDegreesOfFreedom)
+                                         distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
       fitStatistics$fixedEffects[[1]] = bind_rows(coef(linearModel))
       fitStatistics$fitTimeInS = get_elapsed_time(startFit)
       progressBar()
@@ -375,7 +375,7 @@ fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions =
       allFitStats = get_fit_statistics(name = name, fittingMethod = "lm", responseVariable = "DBH", 
                                        trainingData = data, trainingPrediction = fitted(allFit), estimatedParameters = length(coef(allFit)), 
                                        validationData = data, validationPrediction = fitted(allFit), 
-                                       significant = significant, tDegreesOfFreedom = tDegreesOfFreedom)
+                                       distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
       allFitStats$fixedEffects[[1]] = bind_rows(coef(allFit))
       allFitStats$fitTimeInS = get_elapsed_time(startFit)
       progressBar()
@@ -391,7 +391,7 @@ fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions =
       fitStatistics = get_fit_statistics(name = name, fittingMethod = "lm", responseVariable = "DBH", 
                                          trainingData = trainingData, trainingPrediction = fitted(linearModel), estimatedParameters = length(coef(linearModel)), 
                                          validationData = validationData, validationPrediction = predict(linearModel, validationData), 
-                                         significant = significant, tDegreesOfFreedom = tDegreesOfFreedom)
+                                         distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
       fitStatistics$fixedEffects[[1]] = bind_rows(coef(linearModel))
       fitStatistics$fitTimeInS = get_elapsed_time(startFit)
       progressBar()
@@ -404,7 +404,7 @@ fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions =
 }
 
 # nlmeControl(opt) left at nlimb default per https://stats.stackexchange.com/questions/9535/when-should-i-not-use-rs-nlm-function-for-mle
-fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start, control = nlmeControl(maxIter = 100), folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, significant = TRUE, tDegreesOfFreedom = 8)
+fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start, control = nlmeControl(maxIter = 100), folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
 {
   responseVariable = modelFormula[2]
   message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using nlme()..."))
@@ -434,7 +434,7 @@ fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start
     allFitStats = get_fit_statistics(name = name, fittingMethod = "nlme", responseVariable = responseVariable, 
                                      trainingData = data, trainingPrediction = fitted(allFitNonlinear), estimatedParameters = length(fixed.effects(allFitNonlinear)) + length(random.effects(allFitNonlinear)), 
                                      validationData = data, validationPrediction = predict(allFitNonlinear, newdata = data, level = 0),
-                                     significant = significant, tDegreesOfFreedom = tDegreesOfFreedom)
+                                     distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
     allFitStats$fixedEffects[[1]] = bind_rows(fixed.effects(allFitNonlinear)) # see remarks on fixed.effects() below
     allFitStats$fitTimeInS = get_elapsed_time(startFit)
     progressBar()
@@ -457,7 +457,7 @@ fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start
     fitStatistics = get_fit_statistics(name = name, fittingMethod = "nlme", responseVariable = responseVariable, 
                                        trainingData = trainingData, trainingPrediction = fitted(nonlinearModel), estimatedParameters = length(fixed.effects(nonlinearModel)) + length(random.effects(nonlinearModel)),
                                        validationData = validationData, validationPrediction = predict(nonlinearModel, validationData, level = 0),
-                                       significant = significant, tDegreesOfFreedom = tDegreesOfFreedom)
+                                       distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
     # nlme.coefficients() returns a data frame repeating fixed effects for every random effect level, increasing result .Rds sizes by an order of magnitude
     # If needed, random effects can be persisted as a vector from random.effects().
     fitStatistics$fixedEffects[[1]] = bind_rows(fixed.effects(nonlinearModel))
@@ -476,7 +476,7 @@ fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start
                     }))
 }
 
-fit_ranger = function(name, variables, data, trees = htDiaOptions$rangerTrees, mtry, minNodeSize, sampleFraction, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, significant = TRUE)
+fit_ranger = function(name, variables, data, trees = htDiaOptions$rangerTrees, mtry, minNodeSize, sampleFraction, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE)
 {
   responseVariable = variables[1]
   if (responseVariable == "height")
@@ -509,7 +509,7 @@ fit_ranger = function(name, variables, data, trees = htDiaOptions$rangerTrees, m
     allForestStats = get_fit_statistics(name = name, fittingMethod = "ranger", responseVariable = responseVariable, 
                                         trainingData = data, trainingPrediction = allForest$predictions, estimatedParameters = NA_real_, 
                                         validationData = data, validationPrediction = allForest$predictions,
-                                        significant = significant, tDegreesOfFreedom = NA_real_)
+                                        distinct = distinct, tDegreesOfFreedom = NA_real_)
     allForestStats$fitTimeInS = get_elapsed_time(startFit)
     progressBar()
     return(get_fit_return_value(allForest, allForestStats, returnModel))
@@ -532,7 +532,7 @@ fit_ranger = function(name, variables, data, trees = htDiaOptions$rangerTrees, m
     fitStatistics = get_fit_statistics(name = name, fittingMethod = "ranger", responseVariable = responseVariable, 
                                        trainingData = trainingData, trainingPrediction = forest$predictions, estimatedParameters = NA_real_, 
                                        validationData = validationData, validationPrediction = predict(forest, validationData)$predictions,
-                                       significant = significant, tDegreesOfFreedom = NA_real_)
+                                       distinct = distinct, tDegreesOfFreedom = NA_real_)
     fitStatistics$fitTimeInS = get_elapsed_time(startFit)
     progressBar()
     return(get_fit_return_value(forest, fitStatistics, returnModel))
@@ -578,12 +578,12 @@ get_fit_return_value = function(model, fitStatistics, returnModel)
   }
 }
 
-get_fit_statistics = function(name, fittingMethod, responseVariable, trainingData, trainingPrediction, estimatedParameters, validationData, validationPrediction, fitSet = "primary", isConverged = TRUE, significant = TRUE, tDegreesOfFreedom = 8)
+get_fit_statistics = function(name, fittingMethod, responseVariable, trainingData, trainingPrediction, estimatedParameters, validationData, validationPrediction, fitSet = "primary", isConverged = TRUE, distinct = TRUE, tDegreesOfFreedom = 8)
 {
   fitStatistics = create_fit_statistics(name = name, fittingMethod = fittingMethod, fitSet = fitSet)
   fitStatistics$estimatedParameters = estimatedParameters
   fitStatistics$isConverged = isConverged
-  fitStatistics$significant = significant
+  fitStatistics$distinct = distinct
 
   if (responseVariable == "DBH")
   {
@@ -722,8 +722,8 @@ plot_auc_bank = function(aucs, fillLabel = "median AUC", omitMab = FALSE, xLimit
         labs(fill = fillLabel) +
         scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
         ggnewscale::new_scale_fill() +
-        geom_tile(aes(x = species, y = nameAndFit, fill = significant), aucs) +
-        scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not significant\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), guide = guide_legend(order = 2)) +
+        geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucs) +
+        scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), guide = guide_legend(order = 2)) +
         geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucs %>% filter(if_else(isBaseForm, aucMaeRank <= 2, aucMaeRank <= 2)), fill = "transparent") +
         labs(title = bquote(.(plotLetters[1])~"MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
         #labs(title = bquote(bold(.(plotLetters[1]))~"MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
@@ -735,8 +735,8 @@ plot_auc_bank = function(aucs, fillLabel = "median AUC", omitMab = FALSE, xLimit
         labs(fill = fillLabel) +
         scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
         ggnewscale::new_scale_fill() +
-        geom_tile(aes(x = species, y = nameAndFit, fill = significant), aucs) +
-        scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not significant\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+        geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucs) +
+        scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
         geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucs %>% filter(if_else(isBaseForm, aucMabRank <= 2, aucMabRank <= 2)), fill = "transparent") +
         labs(title = bquote(.(plotLetters[1])~"MAB"), x = NULL, y = NULL, color = NULL, fill = NULL) +
         #labs(title = bquote(bold(.(plotLetters[1]))~"MAB"), x = NULL, y = NULL, color = NULL, fill = NULL) +
@@ -746,9 +746,9 @@ plot_auc_bank = function(aucs, fillLabel = "median AUC", omitMab = FALSE, xLimit
         labs(fill = fillLabel) +
         scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
         ggnewscale::new_scale_fill() +
-        geom_tile(aes(x = species, y = nameAndFit, fill = significant), aucs) +
+        geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucs) +
         geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucs %>% filter(if_else(isBaseForm, aucMaeRank <= 2, aucMaeRank <= 2)), fill = "transparent") +
-        scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not significant\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+        scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
         labs(title = bquote(.(plotLetters[2])~"MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
         #labs(title = bquote(bold(.(plotLetters[2]))~"MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
         scale_y_discrete(labels = NULL, limits = rev)
@@ -761,9 +761,9 @@ plot_auc_bank = function(aucs, fillLabel = "median AUC", omitMab = FALSE, xLimit
       labs(fill = fillLabel) +
       scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
       ggnewscale::new_scale_fill() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = significant), aucs) +
+      geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucs) +
       geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucs %>% filter(if_else(isBaseForm, aucRmseRank <= 2, aucRmseRank <= 2)), fill = "transparent") +
-      scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not significant\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+      scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
       labs(title = bquote(.(plotLetters[letterOffset + 1])~"RMSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
       #labs(title = bquote(bold(.(plotLetters[letterOffset + 1]))~"RMSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
       scale_y_discrete(labels = NULL, limits = rev) +
@@ -772,9 +772,9 @@ plot_auc_bank = function(aucs, fillLabel = "median AUC", omitMab = FALSE, xLimit
       labs(fill = fillLabel) +
       scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "grey70") +
       ggnewscale::new_scale_fill() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = significant), aucs) +
+      geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucs) +
       geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucs %>% filter(if_else(isBaseForm, aucDeltaAicNRank <= 2, aucDeltaAicNRank <= 2)), fill = "transparent") +
-      scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not significant\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+      scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
       labs(title = bquote(.(plotLetters[letterOffset + 2])~"ΔAICn"), x = NULL, y = NULL, color = NULL, fill = NULL) +
       #labs(title = bquote(bold(.(plotLetters[letterOffset + 2]))~"ΔAICn"), x = NULL, y = NULL, color = NULL, fill = NULL) +
       scale_y_discrete(labels = NULL, limits = rev) +
@@ -783,9 +783,9 @@ plot_auc_bank = function(aucs, fillLabel = "median AUC", omitMab = FALSE, xLimit
       labs(fill = fillLabel) +
       scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
       ggnewscale::new_scale_fill() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = significant), aucs) +
+      geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucs) +
       geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucs %>% filter(if_else(isBaseForm, aucNseRank <= 2, aucNseRank <= 2)), fill = "transparent") +
-      scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not significant\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+      scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
       labs(title = bquote(.(plotLetters[letterOffset + 3])~"model efficiency"), x = NULL, y = NULL, color = NULL, fill = NULL) +
       #labs(title = bquote(bold(.(plotLetters[letterOffset + 3]))~"model efficiency"), x = NULL, y = NULL, color = NULL, fill = NULL) +
       scale_y_discrete(labels = NULL, limits = rev) +
@@ -888,9 +888,9 @@ unnest_fixed_effects = function(fit)
   if (all(fit$fitting %in% c("gam", "gamm", "ranger")))
   {
     # repetition and fold are only present in cross validated fits
-    fixedEffects = fit %>% select(fitSet, fitting, name, any_of(c("repetition", "fold")), significant, isConverged)
+    fixedEffects = fit %>% select(fitSet, fitting, name, any_of(c("repetition", "fold")), distinct, isConverged)
   } else {
-    fixedEffects = fit %>% select(fitSet, fitting, name, any_of(c("repetition", "fold")), significant, isConverged, fixedEffects) %>% unnest(fixedEffects)
+    fixedEffects = fit %>% select(fitSet, fitting, name, any_of(c("repetition", "fold")), distinct, isConverged, fixedEffects) %>% unnest(fixedEffects)
   }
   
   # standardize naming of linear model coefficients, if present
@@ -902,7 +902,7 @@ unnest_fixed_effects = function(fit)
 
 unnest_validation_statistics = function(fit)
 {
-  return(fit %>% select(fitSet, fitting, name, any_of(c("repetition", "fold")), significant, isConverged, fitTimeInS, validation) %>% unnest(validation))
+  return(fit %>% select(fitSet, fitting, name, any_of(c("repetition", "fold")), distinct, isConverged, fitTimeInS, validation) %>% unnest(validation))
 }
 
 # load data
@@ -970,7 +970,9 @@ trees2022 = left_join(left_join(trees2022, stands2022 %>% rename(standArea = are
          standBasalAreaPerHectare = sum(isLive * basalAreaPerHectare) / plotsInStand, # m²/ha
          standTreesPerHectare = sum(isLive * treesPerHectare) / plotsInStand, # stand's total trees per hectare
          standQmd = sqrt(standBasalAreaPerHectare / (pi/4 * 0.01^2 * standTreesPerHectare)), # quadratic mean diameter, cm
-         relativeDiameter = dbh / standQmd,
+         relativeDiameter = dbh / standQmd, #) %>%
+  #group_by(stand, plot) %>%
+  #mutate(plotBasalArea = sum(isLive * basalAreaPerHectare),
          isMapped = any(is.na(elevation)) == FALSE) %>%
   filter(isMapped) %>% # exclude trees on plots not matched to GIS data
   # top height by tallest trees in stand, regardless of plot
@@ -989,6 +991,8 @@ trees2022 = left_join(left_join(trees2022, stands2022 %>% rename(standArea = are
          bootstrapStandBasalAreaPerHectare = sum(isLive * predictedBasalAreaPerHectare) / plotsInStand, # m²/ha
          basalAreaTaller = (cumsum(isLive * predictedBasalAreaPerHectare) - predictedBasalAreaPerHectare[1]) / plotsInStand,
          treesPerHectareTaller = cumsum(isLiveUnbroken * treesPerHectare) / plotsInStand) %>%
+  #group_by(stand, plot) %>%
+  #mutate(bootstrapPlotBasalAreaPerHectare = sum(isLive * predictedBasalAreaPerHectare))
   select(-predictedBasalAreaPerHectare) %>% # no longer needed; drop to prevent inadvertent misuse
   ungroup()
 
@@ -1045,9 +1049,9 @@ if (htDiaOptions$includeSetup)
   
   psmeHeightHeteroskedasticity = psme2022 %>% select(treeCount, dbh, isPlantation) %>% mutate(residual = psmeHeightFromDbh$residuals, squaredResidual = residual^2)
   psmeHeightVariance = gsl_nls(squaredResidual ~ a1 * dbh^b1, psmeHeightHeteroskedasticity, start = list(a1 = 0.5, b1 = 1), weight = treeCount / dbh^0.89)
-  #psmeHeightVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * dbh^b1, psmeHeightHeteroskedasticity, start = list(a1 = 0.5, a1p = 0, b1 = 1), weight = treeCount / dbh^0.88) # a1p not significant
-  #psmeHeightVariance = gsl_nls(squaredResidual ~ a1 * dbh^(b1 + b1p * isPlantation), psmeHeightHeteroskedasticity, start = list(a1 = 0.5, b1 = 1, b1p = 0), weight = treeCount / dbh^0.90) # b1p not significant
-  #psmeHeightVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * dbh^(b1 + b1p * isPlantation), psmeHeightHeteroskedasticity, start = list(a1 = 0.5, a1p = 0, b1 = 1, b1p = 0), weight = treeCount / dbh^0.90) # b1p not significant
+  #psmeHeightVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * dbh^b1, psmeHeightHeteroskedasticity, start = list(a1 = 0.5, a1p = 0, b1 = 1), weight = treeCount / dbh^0.88) # a1p not distinct
+  #psmeHeightVariance = gsl_nls(squaredResidual ~ a1 * dbh^(b1 + b1p * isPlantation), psmeHeightHeteroskedasticity, start = list(a1 = 0.5, b1 = 1, b1p = 0), weight = treeCount / dbh^0.90) # b1p not distinct
+  #psmeHeightVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * dbh^(b1 + b1p * isPlantation), psmeHeightHeteroskedasticity, start = list(a1 = 0.5, a1p = 0, b1 = 1, b1p = 0), weight = treeCount / dbh^0.90) # b1p not distinct
   #confint(psmeHeightVariance, level = 0.99)
   psmeDbhHeteroskedasticity = psme2022 %>% select(treeCount, height, isPlantation) %>% mutate(residual = psmeDbhFromHeight$residuals, squaredResidual = residual^2)
   psmeDbhVariance = gsl_nls(squaredResidual ~ a1 * height^(b1 + b1p * isPlantation), psmeDbhHeteroskedasticity, start = list(a1 = 1, b1 = 1, b1p = 0), weight = treeCount / height^1.98)
@@ -1064,9 +1068,9 @@ if (htDiaOptions$includeSetup)
   
   abgrHeightHeteroskedasticity = abgr2022 %>% select(treeCount, dbh, isPlantation) %>% mutate(residual = abgrHeightFromDbh$residuals, squaredResidual = residual^2)
   abgrHeightVariance = gsl_nls(squaredResidual ~ a1 * dbh^b1, abgrHeightHeteroskedasticity, start = list(a1 = 0.5, b1 = 1), weight = treeCount / dbh^0.96)
-  #abgrHeightVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * dbh^b1, abgrHeightHeteroskedasticity, start = list(a1 = 0.5, a1p = 0, b1 = 1), weight = treeCount / dbh^0.93) # a1p not significant
-  #abgrHeightVariance = gsl_nls(squaredResidual ~ a1 * dbh^(b1 + b1p * isPlantation), abgrHeightHeteroskedasticity, start = list(a1 = 0.5, b1 = 1, b1p = 0), weight = treeCount / dbh^0.90) # b1p not significant
-  #abgrHeightVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * dbh^(b1 + b1p * isPlantation), abgrHeightHeteroskedasticity, start = list(a1 = 0.5, a1p = 0, b1 = 1, b1p = 0), weight = treeCount / dbh^0.90) # a1p, b1p not significant
+  #abgrHeightVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * dbh^b1, abgrHeightHeteroskedasticity, start = list(a1 = 0.5, a1p = 0, b1 = 1), weight = treeCount / dbh^0.93) # a1p not distinct
+  #abgrHeightVariance = gsl_nls(squaredResidual ~ a1 * dbh^(b1 + b1p * isPlantation), abgrHeightHeteroskedasticity, start = list(a1 = 0.5, b1 = 1, b1p = 0), weight = treeCount / dbh^0.90) # b1p not distinct
+  #abgrHeightVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * dbh^(b1 + b1p * isPlantation), abgrHeightHeteroskedasticity, start = list(a1 = 0.5, a1p = 0, b1 = 1, b1p = 0), weight = treeCount / dbh^0.90) # a1p, b1p not distinct
   confint(abgrHeightVariance, level = 0.99)
   abgrDbhHeteroskedasticity = abgr2022 %>% select(treeCount, height, isPlantation) %>% mutate(residual = abgrDbhFromHeight$residuals, squaredResidual = residual^2)
   abgrDbhVariance = gsl_nls(squaredResidual ~ a1 * height^b1, abgrDbhHeteroskedasticity, start = list(a1 = 1, b1 = 1), weight = treeCount / height^1.16)
@@ -1083,13 +1087,13 @@ if (htDiaOptions$includeSetup)
   
   acmaHeightHeteroskedasticity = acma2022 %>% select(treeCount, dbh, isPlantation) %>% mutate(residual = acmaHeightFromDbh$residuals, squaredResidual = residual^2)
   acmaHeightVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * dbh^b1, acmaHeightHeteroskedasticity, start = list(a1 = 0.5, a1p = 0, b1 = 1), weight = treeCount / dbh^0.75)
-  #acmaHeightVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * dbh^(b1 + b1p * isPlantation), acmaHeightHeteroskedasticity, start = list(a1 = 0.5, a1p = 0, b1 = 1, b1p = 0), weight = treeCount / dbh^0.78) # b1p not significant
+  #acmaHeightVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * dbh^(b1 + b1p * isPlantation), acmaHeightHeteroskedasticity, start = list(a1 = 0.5, a1p = 0, b1 = 1, b1p = 0), weight = treeCount / dbh^0.78) # b1p not distinct
   #confint(acmaHeightVariance, level = 0.99)
   acmaDbhHeteroskedasticity = acma2022 %>% select(treeCount, height, isPlantation) %>% mutate(residual = acmaDbhFromHeight$residuals, squaredResidual = residual^2)
   acmaDbhVariance = gsl_nls(squaredResidual ~ a1 * height^b1, acmaDbhHeteroskedasticity, start = list(a1 = 1, b1 = 1), weight = treeCount / height^1.27)
-  #acmaDbhVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * height^b1, acmaDbhHeteroskedasticity, start = list(a1 = 1, a1p = 0, b1 = 1), weight = treeCount / height^1.01) # a1p not significant
-  #acmaDbhVariance = gsl_nls(squaredResidual ~ a1 * height^(b1 + b1p * isPlantation), acmaDbhHeteroskedasticity, start = list(a1 = 1, b1 = 1, b1p = 0), weight = treeCount / height^0.94) # b1p not significant
-  #acmaDbhVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * height^(b1 + b1p * isPlantation), acmaDbhHeteroskedasticity, start = list(a1 = 1, a1p = 0, b1 = 1, b1p = 0), weight = treeCount / height^0.94) # a1p, b1p not significant
+  #acmaDbhVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * height^b1, acmaDbhHeteroskedasticity, start = list(a1 = 1, a1p = 0, b1 = 1), weight = treeCount / height^1.01) # a1p not distinct
+  #acmaDbhVariance = gsl_nls(squaredResidual ~ a1 * height^(b1 + b1p * isPlantation), acmaDbhHeteroskedasticity, start = list(a1 = 1, b1 = 1, b1p = 0), weight = treeCount / height^0.94) # b1p not distinct
+  #acmaDbhVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * height^(b1 + b1p * isPlantation), acmaDbhHeteroskedasticity, start = list(a1 = 1, a1p = 0, b1 = 1, b1p = 0), weight = treeCount / height^0.94) # a1p, b1p not distinct
   #confint(acmaDbhVariance, level = 0.99)
   
   acmaHeightVarianceInterval = crossing(isPlantation = c(TRUE, FALSE), dbh = seq(0, 147)) %>% mutate(measuredOrImputedHeight = as_tibble(predict(acmaHeightVariance, ., interval = "confidence", level = 0.99))) %>% unnest_wider(measuredOrImputedHeight)
@@ -1101,15 +1105,15 @@ if (htDiaOptions$includeSetup)
   #k.check(otherDbhFromHeight)
   
   otherHeightHeteroskedasticity = other2022 %>% select(treeCount, dbh, isPlantation) %>% mutate(residual = otherHeightFromDbh$residuals, squaredResidual = residual^2)
-  otherHeightVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * dbh^b1, otherHeightHeteroskedasticity, start = list(a1 = 0.5, a1p = 0, b1 = 1), weight = treeCount / dbh^0.91) # a1p significant
-  #otherHeightVariance = gsl_nls(squaredResidual ~ a1 * dbh^(b1 + b1p * isPlantation), otherHeightHeteroskedasticity, start = list(a1 = 0.5, b1 = 1, b1p = 0), weight = treeCount / dbh^(0.85 + 0.065 * isPlantation)) # b1p significant but higher error than retaining a1p
-  #otherHeightVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * dbh^(b1 + b1p * isPlantation), otherHeightHeteroskedasticity, start = list(a1 = 0.5, a1p = 0, b1 = 1, b1p = 0), weight = treeCount / dbh^0.78) # a1p, b1p not significant
+  otherHeightVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * dbh^b1, otherHeightHeteroskedasticity, start = list(a1 = 0.5, a1p = 0, b1 = 1), weight = treeCount / dbh^0.91) # a1p distinct
+  #otherHeightVariance = gsl_nls(squaredResidual ~ a1 * dbh^(b1 + b1p * isPlantation), otherHeightHeteroskedasticity, start = list(a1 = 0.5, b1 = 1, b1p = 0), weight = treeCount / dbh^(0.85 + 0.065 * isPlantation)) # b1p distinct but higher error than retaining a1p
+  #otherHeightVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * dbh^(b1 + b1p * isPlantation), otherHeightHeteroskedasticity, start = list(a1 = 0.5, a1p = 0, b1 = 1, b1p = 0), weight = treeCount / dbh^0.78) # a1p, b1p not distinct
   #confint(otherHeightVariance, level = 0.99)
   otherDbhHeteroskedasticity = other2022 %>% select(treeCount, height, isPlantation) %>% mutate(residual = otherDbhFromHeight$residuals, squaredResidual = residual^2)
   otherDbhVariance = gsl_nls(squaredResidual ~ a1 * height^b1, otherDbhHeteroskedasticity, start = list(a1 = 1, b1 = 1), weight = treeCount / height^1.55)
-  #otherDbhVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * height^b1, otherDbhHeteroskedasticity, start = list(a1 = 1, a1p = 0, b1 = 1), weight = treeCount / height^1.59) # a1p not significant
-  #otherDbhVariance = gsl_nls(squaredResidual ~ a1 * height^(b1 + b1p * isPlantation), otherDbhHeteroskedasticity, start = list(a1 = 1, b1 = 1, b1p = 0), weight = treeCount / height^1.53) # b1p not significant
-  #otherDbhVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * height^(b1 + b1p * isPlantation), otherDbhHeteroskedasticity, start = list(a1 = 1, a1p = 0, b1 = 1, b1p = 0), weight = treeCount / height^1.49) # a1p, b1p not significant
+  #otherDbhVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * height^b1, otherDbhHeteroskedasticity, start = list(a1 = 1, a1p = 0, b1 = 1), weight = treeCount / height^1.59) # a1p not distinct
+  #otherDbhVariance = gsl_nls(squaredResidual ~ a1 * height^(b1 + b1p * isPlantation), otherDbhHeteroskedasticity, start = list(a1 = 1, b1 = 1, b1p = 0), weight = treeCount / height^1.53) # b1p not distinct
+  #otherDbhVariance = gsl_nls(squaredResidual ~ (a1 + a1p * isPlantation) * height^(b1 + b1p * isPlantation), otherDbhHeteroskedasticity, start = list(a1 = 1, a1p = 0, b1 = 1, b1p = 0), weight = treeCount / height^1.49) # a1p, b1p not distinct
   #confint(otherDbhVariance, level = 0.99)
   
   otherHeightVarianceInterval = crossing(isPlantation = c(TRUE, FALSE), dbh = seq(0, 117)) %>% mutate(measuredOrImputedHeight = as_tibble(predict(otherHeightVariance, ., interval = "confidence", level = 0.99))) %>% unnest_wider(measuredOrImputedHeight)
