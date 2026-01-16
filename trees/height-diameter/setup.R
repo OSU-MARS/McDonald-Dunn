@@ -104,7 +104,8 @@ create_fit_statistics = function(name, fittingMethod, fitSet = "primary", distin
                             fixedEffects = vector("list", length = 1),
                             training = tibble(.rows = 1), validation = tibble(.rows = 1),
                             isConverged = NA_real_, distinct = distinct,
-                            fitTimeInS = NA_real_))
+                            fitTimeInS = NA_real_,
+                            randomEffect = NA_character_))
 }
 
 # currently supports fixed effect GAMs and mixed GAMs with a single random smooth
@@ -248,7 +249,7 @@ fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOption
                                        trainingData = trainingData, trainingPrediction = fitted(gamModel), estimatedParameters = estimatedParameters, 
                                        validationData = validationData, validationPrediction = validationPrediction,
                                        distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
-    # fitStatistics$fixedEffects not useful to set as GAM object is required
+    # fitStatistics$fixedEffects not very useful to set: GAM object is required for prediction and intercept, parametric guide term multiplier, and smooth coefficients all have to be used together
     fitStatistics$fitTimeInS = get_elapsed_time(startFit)
     progressBar()
     return(get_fit_return_value(gamModel, fitStatistics, returnModel))
@@ -434,7 +435,7 @@ fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start
     allFitStats = get_fit_statistics(name = name, fittingMethod = "nlme", responseVariable = responseVariable, 
                                      trainingData = data, trainingPrediction = fitted(allFitNonlinear), estimatedParameters = length(fixed.effects(allFitNonlinear)) + length(random.effects(allFitNonlinear)), 
                                      validationData = data, validationPrediction = predict(allFitNonlinear, newdata = data, level = 0),
-                                     distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
+                                     distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom, randomEffect = colnames(allFitNonlinear$coefficients$random$stand))
     allFitStats$fixedEffects[[1]] = bind_rows(fixed.effects(allFitNonlinear)) # see remarks on fixed.effects() below
     allFitStats$fitTimeInS = get_elapsed_time(startFit)
     progressBar()
@@ -457,7 +458,7 @@ fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start
     fitStatistics = get_fit_statistics(name = name, fittingMethod = "nlme", responseVariable = responseVariable, 
                                        trainingData = trainingData, trainingPrediction = fitted(nonlinearModel), estimatedParameters = length(fixed.effects(nonlinearModel)) + length(random.effects(nonlinearModel)),
                                        validationData = validationData, validationPrediction = predict(nonlinearModel, validationData, level = 0),
-                                       distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
+                                       distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom, randomEffect = colnames(nonlinearModel$coefficients$random$stand))
     # nlme.coefficients() returns a data frame repeating fixed effects for every random effect level, increasing result .Rds sizes by an order of magnitude
     # If needed, random effects can be persisted as a vector from random.effects().
     fitStatistics$fixedEffects[[1]] = bind_rows(fixed.effects(nonlinearModel))
@@ -578,12 +579,13 @@ get_fit_return_value = function(model, fitStatistics, returnModel)
   }
 }
 
-get_fit_statistics = function(name, fittingMethod, responseVariable, trainingData, trainingPrediction, estimatedParameters, validationData, validationPrediction, fitSet = "primary", isConverged = TRUE, distinct = TRUE, tDegreesOfFreedom = 8)
+get_fit_statistics = function(name, fittingMethod, responseVariable, trainingData, trainingPrediction, estimatedParameters, validationData, validationPrediction, fitSet = "primary", isConverged = TRUE, distinct = TRUE, tDegreesOfFreedom = 8, randomEffect = NA_character_)
 {
   fitStatistics = create_fit_statistics(name = name, fittingMethod = fittingMethod, fitSet = fitSet)
   fitStatistics$estimatedParameters = estimatedParameters
   fitStatistics$isConverged = isConverged
   fitStatistics$distinct = distinct
+  fitStatistics$randomEffect = randomEffect
 
   if (responseVariable == "DBH")
   {
@@ -853,6 +855,18 @@ predict_bootstrap_dbh = function(trees)
                             .default = predict(otherDiameterFromHeightPreferred$gam, trees))))
 }
 
+# called to reset future's workers if one fails with an error
+# If this isn't done, future gets into a bad state and often fails the next cross validation by interrupting itself, sometimes all subsequent cross validations.
+#   Future (<unnamed-113>) of class MultisessionFuture interrupted, while running on 'localhost'
+# If execution continues eventually future fails with
+#   Caught an unexpected error of class simpleError when trying to launch future (<unnamed-524>) on backend of class MultisessionFutureBackend. The reason was: parallel::clusterCall() did not return string 'future-grmall' as expected. Received a character object instead: "future:::requestNode() validation call"
+reset_future = function()
+{
+  futureWorkers = future::nbrOfWorkers()
+  future::plan(future::sequential)
+  future::plan(future::multisession, workers = futureWorkers)
+}
+
 to_fixed_coeffficients = function(crossValidationWithModels)
 {
   return(bind_rows(lapply(crossValidationWithModels$fit, function(fit)
@@ -881,23 +895,23 @@ to_parameter_confidence_intervals = function(crossValidationWithModels)
           arrange(parameter, repetition, fold))
 }
 
-unnest_fixed_effects = function(fit)
+unnest_coefficients = function(fit)
 {
-  # GAM coefficients aren't recorded and random forest lack coefficients, leading to fixedEffects being a column of null lists
-  # In these cases unnest(fixedEffects) creates a NA column named fixedEffects, which has no use; suppress this behavior.
   if (all(fit$fitting %in% c("gam", "gamm", "ranger")))
   {
-    # repetition and fold are only present in cross validated fits
-    fixedEffects = fit %>% select(fitSet, fitting, name, any_of(c("repetition", "fold")), distinct, isConverged)
+    # GAM coefficients aren't recorded and random forest lack coefficients, leading to fixedEffects being a column of null lists
+    # In these cases unnest(fixedEffects) creates a NA column named fixedEffects, which has no use; suppress this behavior.
+    # any_of(repetition, fold) is required as these columns are only present in cross validated fits
+    coefficients = fit %>% select(fitSet, fitting, name, any_of(c("repetition", "fold")), distinct, isConverged)
   } else {
-    fixedEffects = fit %>% select(fitSet, fitting, name, any_of(c("repetition", "fold")), distinct, isConverged, fixedEffects) %>% unnest(fixedEffects)
+    coefficients = fit %>% select(fitSet, fitting, name, any_of(c("repetition", "fold")), distinct, isConverged, fixedEffects, randomEffect) %>% unnest(fixedEffects)
   }
   
   # standardize naming of linear model coefficients, if present
-  fixedEffects %<>% rename(any_of(c(a0 = "(Intercept)", 
+  coefficients %<>% rename(any_of(c(a0 = "(Intercept)", 
                                     a1 = "dbh", a1 = "I(height - 1.37)", a1p = "I(isPlantation * dbh)", a1p = "I(isPlantation * (height - 1.37))",
                                     a2 = "I(dbh^2)", a2 = "I((height - 1.37)^2)", a2p = "I(isPlantation * dbh^2)", a2p = "I(isPlantation * (height - 1.37)^2)")))
-  return(fixedEffects)
+  return(coefficients)
 }
 
 unnest_validation_statistics = function(fit)
@@ -995,6 +1009,7 @@ trees2022 = left_join(left_join(trees2022, stands2022 %>% rename(standArea = are
   #mutate(bootstrapPlotBasalAreaPerHectare = sum(isLive * predictedBasalAreaPerHectare))
   select(-predictedBasalAreaPerHectare) %>% # no longer needed; drop to prevent inadvertent misuse
   ungroup()
+set.seed(NULL) # re-randomize so cross validation will vary from run to run
 
 heightClassBreaks = trees2022 %>% filter(isLiveUnbroken, is.na(height) == FALSE) %>%
   group_by(speciesModel) %>%

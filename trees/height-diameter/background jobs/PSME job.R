@@ -1,6 +1,13 @@
 # processor  cross validation   workers   height runtime   DBH runtime
 # 9900X      10x10              10        9.2 min          2.5 + 2.9 min
 jobStartTime = Sys.time()
+psmeOptions = tibble(fitHeightPrimary = FALSE,
+                     fitHeightMixed = FALSE,
+                     fitDbhPrimary = TRUE,
+                     fitDbhMixed = TRUE,
+                     fitPhysioGams = FALSE,
+                     recalcPreferredModels = FALSE)
+
 source("trees/height-diameter/setup.R")
 progressr::handlers(global = TRUE)
 progressr::handlers("progress")

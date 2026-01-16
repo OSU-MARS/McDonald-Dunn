@@ -1,9 +1,12 @@
-# load data from setup.R, get regressions and summaries from <species>.R
+# setup for results analysis
+# 1) get regressions and summaries from <species>.R by running <species> job.R for Douglas-fir, grand fir, bigleaf maple, and the other species group
+# 2) load functions and forest inventory data by running the first 1000 lines or so of setup.R
+# 3) load regression results and analyze them here
 library(WeightedROC)
 
 progressr::handlers(global = TRUE)
 progressr::handlers("progress")
-future::plan(future::multisession, workers = 4)
+future::plan(future::multisession, workers = 8)
 
 figureDpi = 300
 speciesGroupColors = c("forestgreen", "green3", "blue2", "grey65")
@@ -43,39 +46,38 @@ heightDiameterFitStats = bind_rows(psmeFitStats, abgrFitStats, acmaFitStats, oth
   mutate(deltaAicN = aic/n - min(aic/n, na.rm = TRUE)) %>%
   ungroup()
 # report duplicate naming and fit failures
-heightDiameterFitStats %>% group_by(fitSet, fitting, responseVariable, species, name) %>% summarize(n = n(), distinct = any(distinct), .groups = "drop") %>% filter(n != htDiaOptions$folds * htDiaOptions$repetitions, ((fitting == "gam") & (n == 1) & (distinct == FALSE)) == FALSE)
+heightDiameterFitStats %>% group_by(fitSet, fitting, responseVariable, species, name) %>% summarize(n = n(), distinct = any(distinct), .groups = "drop") %>% filter(n != htDiaOptions$folds * htDiaOptions$repetitions, ((n == 1) & (distinct == FALSE)) == FALSE)
 # report unexpected NA AICs
 #heightDiameterFitStats %>% filter(is.na(deltaAicN)) %>% group_by(fitSet, fitting, responseVariable, species, name) %>% summarize(n = n(), distinct = any(distinct), .groups = "drop") %>% filter(fitting != "ranger", ((fitting == "gam") & (n == 1) & (distinct == FALSE)) == FALSE)
 
 # model coefficients 
-if (exists("psmeFixedEffects") == FALSE) 
+if (exists("psmeCoefficients") == FALSE) 
 { 
-  psmeFixedEffects = readRDS(paste0("trees/height-diameter/data/PSME coefficients ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) 
+  psmeCoefficients = readRDS(paste0("trees/height-diameter/data/PSME coefficients ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) 
 }
-if (exists("abgrFixedEffects") == FALSE) 
+if (exists("abgrCoefficients") == FALSE) 
 { 
-  abgrFixedEffects = readRDS(paste0("trees/height-diameter/data/ABGR coefficients ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) 
+  abgrCoefficients = readRDS(paste0("trees/height-diameter/data/ABGR coefficients ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) 
 }
-if (exists("acmaFixedEffects") == FALSE) 
+if (exists("acmaCoefficients") == FALSE) 
 { 
-  acmaFixedEffects = readRDS(paste0("trees/height-diameter/data/ACMA3 coefficients ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) 
+  acmaCoefficients = readRDS(paste0("trees/height-diameter/data/ACMA3 coefficients ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) 
 }
-#if (exists("abgrFixedEffects") == FALSE) { abgrFixedEffects = readRDS(paste0("trees/height-diameter/data/ABGR coefficients ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) }
-if (exists("otherFixedEffects") == FALSE) 
+if (exists("otherCoefficients") == FALSE) 
 { 
-  otherFixedEffects = readRDS(paste0("trees/height-diameter/data/other coefficients ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) 
+  otherCoefficients = readRDS(paste0("trees/height-diameter/data/other coefficients ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) 
 }
 
-heightDiameterFixedEffects = left_join(bind_rows(psmeFixedEffects, abgrFixedEffects, acmaFixedEffects, otherFixedEffects) %>%
+heightDiameterCoefficients = left_join(bind_rows(psmeCoefficients, abgrCoefficients, acmaCoefficients, otherCoefficients) %>%
                                          mutate(species = factor(species, labels = c("Douglas-fir", "grand fir", "bigleaf maple", "other species"), levels = c("PSME", "ABGR", "ACMA3", "other"))),
                                        heightDiameterFitStats %>% select(fitSet, responseVariable, species, name, fitting, repetition, fold, isBaseForm, hasRelative, hasStand, hasPhysio, n, fitTimeInS, pctOutOfRange, , mab, mapb, mae, mape, rmse, rmspe, aic, deltaAicN, nse, meanAbsolutePlantationEffect,	meanAbsolutePercentPlantationEffect), # join in extracted model flags and supporting properties flowed through fit stats
                                        by = join_by(fitSet, responseVariable, species, name, fitting, repetition, fold)) %>%
   mutate(isConverged = as.logical(isConverged)) %>%
   select(-fixedEffects) %>%
   relocate(responseVariable, species, fitSet, name, distinct, isBaseForm, hasRelative, hasStand, hasPhysio, fitting, repetition, fold, n, fitTimeInS, isConverged, pctOutOfRange, mab, mapb, mae, mape, rmse, rmspe, aic, deltaAicN, nse, meanAbsolutePlantationEffect,	meanAbsolutePercentPlantationEffect, 
-           a0, a1, a1p, a1rd, a1rh, a1ba, a1bal, a1balp, a1e, a1s, a1as, a1ac, a1tr, a1tw, a2, a2p, a3, a3p, b1, b1p, b1rd, b1rh, b1as, b1ac, b1e, b1tw, b2, b2p, b2rd, b2rdp, b2rh, b2ba, b2bal, b2s, b2as, b2ac, b2e, b2tw, b3, b3rd, b3as, b3tr, b4, b4p, any_of("b4rd"), b4ba, b4e, b4s, b4as, b4ac, b4tw, Ha, Hap, d, dp, kU)
-#names(heightDiameterFixedEffects) # check for unordered columns
-#writexl::write_xlsx(heightDiameterFixedEffects %>% filter(fitSet == "primary") %>% select(-fixedEffects), 
+           a0, a1, a1p, a1rd, a1rh, a1bal, a1balr, a1aba, a1aat, a1e, a1s, a1as, a1ac, a1tr, a1tw, a2, a2rd, a2bal, a2balr, a2p, a3, a3p, b1, b1p, b1rd, b1ba, b1bal, b1balr, b1aba, b1abap, b1aat, b1aatp, b1rh, b1as, b1ac, b1e, b1tw, b2, b2p, b2rd, b2rdp, b2rh, b2ba, b2bal, b2balr, b2aba, b2aat, b2s, b2as, b2ac, b2e, b2tw, b3, b3rd, b3bal, b3balr, b3tr, b4, b4p, b4d, b4rd, b4ba, b4bal, b4balr, b4e, b4as, b4ac, b4tw, Ha, Hap, d, dp, kU, randomEffect)
+#names(heightDiameterCoefficients) # check for unordered coefficient columns at end of list
+#writexl::write_xlsx(heightDiameterCoefficients %>% filter(fitSet == "primary") %>% select(-fixedEffects), 
 #                    "trees/height-diameter/data/height-diameter model coefficients.xlsx")
 
 
@@ -285,45 +287,65 @@ preferredForms = full_join(full_join(full_join(heightDiameterModelRanking %>% fi
 
 # summarize predictor variable selection
 # TODO; report selection in GAMs and random forests
-#tibble(parameter = names(heightDiameterFixedEffects)) %>% filter(str_starts(parameter, "b1")) %>% arrange(parameter)
-#tibble(parameter = names(heightDiameterFixedEffects)) %>% filter(str_ends(parameter, "tr")) %>% arrange(parameter)
-predictorVariableResults = heightDiameterFixedEffects %>% 
-  filter(fitSet == "primary", fitting %in% c("gsl_nls", "nlrob")) %>% # exclude GAMs and linear controls
-  mutate(hasPlantation = (is.na(a1p) == FALSE) | (is.na(a1balp) == FALSE) | (is.na(a2p) == FALSE) | (is.na(a3p) == FALSE) | 
-                         (is.na(b1p) == FALSE) | (is.na(b2p) == FALSE) | (is.na(b2rdp) == FALSE) | (is.na(b4p) == FALSE),
-         hasRelDbhOrRelHt = (is.na(a1rd) == FALSE) | (is.na(a1rh) == FALSE) | (is.na(b1rd) == FALSE) | (is.na(b2rd) == FALSE) | (is.na(b3rd) == FALSE) | (is.na(b4rd) == FALSE) |
-                            (is.na(b1rh) == FALSE) | (is.na(b2rh) == FALSE),
+#tibble(parameter = names(heightDiameterCoefficients)) %>% filter(str_starts(parameter, "b1")) %>% arrange(parameter)
+#tibble(parameter = names(heightDiameterCoefficients)) %>% filter(str_ends(parameter, "tr")) %>% arrange(parameter)
+predictorVariableResults = heightDiameterCoefficients %>% 
+  filter(fitSet == "primary", fitting %in% c("gsl_nls")) %>% # exclude GAMs and random forests for now, NLME fits have same fixed effects as GSL NLS fits
+  mutate(hasPlantation = (is.na(a1p) == FALSE) | (is.na(a2p) == FALSE) | (is.na(a3p) == FALSE) | 
+                         (is.na(b1p) == FALSE) | (is.na(b2p) == FALSE) | (is.na(b2rdp) == FALSE) | (is.na(b4p) == FALSE) | (is.na(Hap) == FALSE) | (is.na(dp) == FALSE) |
+                         (is.na(b1abap) == FALSE) | (is.na(b1aatp) == FALSE),
+         hasRelDbhOrRelHt = (is.na(a1rd) == FALSE) | (is.na(a1rh) == FALSE) |
+                            (is.na(a2rd) == FALSE) | 
+                            (is.na(b1rd) == FALSE) | (is.na(b1rh) == FALSE) | 
+                            (is.na(b2rd) == FALSE) | (is.na(b2rh) == FALSE) |
+                            (is.na(b3rd) == FALSE) | 
+                            (is.na(b4rd) == FALSE),
          hasDistinctRelative = hasRelDbhOrRelHt * distinct,
-         distinctRelHtOrDbh = (is.na(a1rd) == FALSE) * distinct + (is.na(a1rh) == FALSE) * distinct + 
-                                 (is.na(b1rd) == FALSE) * distinct + (is.na(b1rh) == FALSE) * distinct + 
-                                 (is.na(b2rd) == FALSE) * distinct + (is.na(b2rh) == FALSE) * distinct + 
-                                 (is.na(b3rd) == FALSE) * distinct + (is.na(b4rd) == FALSE) * distinct,
-         hasBasalArea = (is.na(a1ba) == FALSE) | (is.na(a1bal) == FALSE) | (is.na(b2ba) == FALSE) | (is.na(b2bal) == FALSE) | (is.na(b4ba) == FALSE) |
+         nDistinctRelHtOrDbh = ((is.na(a1rd) == FALSE) + (is.na(a1rh) == FALSE) + 
+                                (is.na(a2rd) == FALSE) + 
+                                (is.na(b1rd) == FALSE) + (is.na(b1rh) == FALSE) + 
+                                (is.na(b2rd) == FALSE) + (is.na(b2rh) == FALSE) + 
+                                (is.na(b3rd) == FALSE) + 
+                                (is.na(b4rd) == FALSE)) * distinct,
+         hasBasalArea = (is.na(b1ba) == FALSE) | (is.na(b2ba) == FALSE) | (is.na(b4ba) == FALSE) | 
+                        (is.na(a1bal) == FALSE) | (is.na(a2bal) == FALSE) | (is.na(b1bal) == FALSE) | (is.na(b2bal) == FALSE) | (is.na(b3bal) == FALSE) | (is.na(b4bal) == FALSE) |
+                        (is.na(a1aba) == FALSE) | (is.na(a1aat) == FALSE) | (is.na(b1aba) == FALSE) | (is.na(b1aat) == FALSE) | (is.na(b2aba) == FALSE) | (is.na(b2aat) == FALSE) |
                         ((responseVariable == "height") & str_detect(name, "(Sharma-Parton|Sharma-Zhang)")),
          hasDistinctBasalArea = hasBasalArea * distinct,
-         distinctBAorAba = (is.na(a1ba) == FALSE) * distinct + (is.na(b2ba) == FALSE) * distinct + (is.na(b4ba) == FALSE) * distinct,
-         distinctBalOrAat = (is.na(a1bal) == FALSE) * distinct + (is.na(b2bal) == FALSE) * distinct,
-         nBasalAreaDistinct = ((is.na(a1ba) == FALSE) + (is.na(b2ba) == FALSE) + # Sharma-Parton and Sharma-Zhang height forms are not counted here as there is no test for whether BA or BAL are distinct predictors (modified Sharma-Parton for DBH does not use basal area)
-                                  (is.na(a1bal) == FALSE) + (is.na(b2bal) == FALSE)) * distinct,
+         nDistinctBAorAba = ((is.na(b1ba) == FALSE) + (is.na(b2ba) == FALSE) + (is.na(b4ba) == FALSE) + 
+                             (is.na(a1aba) == FALSE) + (is.na(b1aba) == FALSE) + (is.na(b2aba) == FALSE)) * distinct,
+         nDistinctBalOrAat = ((is.na(a1bal) == FALSE) + (is.na(a2bal) == FALSE) + (is.na(b1bal) == FALSE) + (is.na(b2bal) == FALSE) + (is.na(b3bal) == FALSE) + (is.na(b4bal) == FALSE) + # a1balr, b1balr, b2balr, ... need not counted as they're always copresent with a1bal, b1bal, ...
+                              (is.na(a1aat) == FALSE) + (is.na(b1aat) == FALSE) + (is.na(b2aat) == FALSE)) * distinct,
+         nBasalAreaDistinct = ((is.na(b1ba) == FALSE) + (is.na(b2ba) == FALSE) + (is.na(b4ba) == FALSE) + # Sharma-Parton and Sharma-Zhang height forms are not counted here as there is no test for whether stand basal area is a distinct predictor (modified Sharma-Parton for DBH does not use basal area)
+                               (is.na(a1bal) == FALSE) + (is.na(a2bal) == FALSE) + (is.na(b1bal) == FALSE) + (is.na(b2bal) == FALSE) + (is.na(b3bal) == FALSE) + (is.na(b4bal) == FALSE) +
+                               (is.na(a1aba) == FALSE) + (is.na(a1aat) == FALSE) + (is.na(b1aba) == FALSE) + (is.na(b1aat) == FALSE) + (is.na(b2aba) == FALSE) + (is.na(b2aat) == FALSE)) * distinct,
          hasPhysio = (is.na(a1e) == FALSE) |  (is.na(b1e) == FALSE) |  (is.na(b2e) == FALSE) |                           (is.na(b4e) == FALSE) | 
-                     (is.na(a1s) == FALSE) |                           (is.na(b2s) == FALSE) |                           (is.na(b4s) == FALSE) | 
-                     (is.na(a1as) == FALSE) | (is.na(b1as) == FALSE) | (is.na(b2as) == FALSE) | (is.na(b3as) == FALSE) | (is.na(b4as) == FALSE) | 
+                     (is.na(a1s) == FALSE) |                           (is.na(b2s) == FALSE) |                           
+                     (is.na(a1as) == FALSE) | (is.na(b1as) == FALSE) | (is.na(b2as) == FALSE) |                          (is.na(b4as) == FALSE) | 
                      (is.na(a1ac) == FALSE) | (is.na(b1ac) == FALSE) | (is.na(b2ac) == FALSE) |                          (is.na(b4ac) == FALSE) | 
                      (is.na(a1tr) == FALSE) |                                                   (is.na(b3tr) == FALSE) | 
                      (is.na(a1tw) == FALSE) | (is.na(b1tw) == FALSE) | (is.na(b2tw) == FALSE) |                          (is.na(b4tw) == FALSE),
          nPhysioDistinct = ((is.na(a1e) == FALSE) +  (is.na(b1e) == FALSE) +  (is.na(b2e) == FALSE) +                           (is.na(b4e) == FALSE) + 
-                               (is.na(a1s) == FALSE) +                           (is.na(b2s) == FALSE) +                           (is.na(b4s) == FALSE) + 
-                               (is.na(a1as) == FALSE) + (is.na(b1as) == FALSE) + (is.na(b2as) == FALSE) + (is.na(b3as) == FALSE) + (is.na(b4as) == FALSE) + 
-                               (is.na(a1ac) == FALSE) + (is.na(b1ac) == FALSE) + (is.na(b2ac) == FALSE) +                          (is.na(b4ac) == FALSE) + 
-                               (is.na(a1tr) == FALSE) +                                                   (is.na(b3tr) == FALSE) + 
-                               (is.na(a1tw) == FALSE) + (is.na(b1tw) == FALSE) + (is.na(b2tw) == FALSE) +                          (is.na(b4tw) == FALSE)) * distinct,
+                            (is.na(a1s) == FALSE) +                           (is.na(b2s) == FALSE) +                           
+                            (is.na(a1as) == FALSE) + (is.na(b1as) == FALSE) + (is.na(b2as) == FALSE) +                          (is.na(b4as) == FALSE) + 
+                            (is.na(a1ac) == FALSE) + (is.na(b1ac) == FALSE) + (is.na(b2ac) == FALSE) +                          (is.na(b4ac) == FALSE) + 
+                            (is.na(a1tr) == FALSE) +                                                   (is.na(b3tr) == FALSE) + 
+                            (is.na(a1tw) == FALSE) + (is.na(b1tw) == FALSE) + (is.na(b2tw) == FALSE) +                          (is.na(b4tw) == FALSE)) * distinct,
          hasDistinctPhysio = hasPhysio * distinct,
-         distinctElevation = (is.na(a1e) == FALSE) * distinct + (is.na(b1e) == FALSE) * distinct + (is.na(b2e) == FALSE) * distinct + (is.na(b4e) == FALSE) * distinct,
-         distinctSlope = (is.na(a1s) == FALSE) * distinct + (is.na(b2s) == FALSE) * distinct + (is.na(b4s) == FALSE) * distinct,
-         distinctSinAspect = (is.na(a1as) == FALSE) * distinct + (is.na(b1as) == FALSE) * distinct + (is.na(b2as) == FALSE) * distinct + (is.na(b3as) == FALSE) * distinct + (is.na(b4as) == FALSE) * distinct,
-         distinctCosAspect = (is.na(a1ac) == FALSE) * distinct + (is.na(b1ac) == FALSE) * distinct + (is.na(b2ac) == FALSE) * distinct + (is.na(b4ac) == FALSE) * distinct,
-         distinctTerrainRoughness = (is.na(a1tr) == FALSE) * distinct + (is.na(b3tr) == FALSE) * distinct,
-         distinctTopographicWetness = (is.na(a1tw) == FALSE) * distinct + (is.na(b1tw) == FALSE) * distinct + (is.na(b2tw) == FALSE) * distinct + (is.na(b4tw) == FALSE) * distinct)
+         hasDistinctSharmaB4d = is.na(b4d) * distinct,
+         nDistinctElevation = ((is.na(a1e) == FALSE) + (is.na(b1e) == FALSE) + (is.na(b2e) == FALSE) + (is.na(b4e) == FALSE)) * distinct,
+         nDistinctSlope = ((is.na(a1s) == FALSE) + (is.na(b2s) == FALSE)) * distinct,
+         nDistinctSinAspect = ((is.na(a1as) == FALSE) + (is.na(b1as) == FALSE) + (is.na(b2as) == FALSE) + (is.na(b4as) == FALSE)) * distinct,
+         nDistinctCosAspect = ((is.na(a1ac) == FALSE) + (is.na(b1ac) == FALSE) + (is.na(b2ac) == FALSE) + (is.na(b4ac) == FALSE)) * distinct,
+         nDistinctTerrainRoughness = ((is.na(a1tr) == FALSE) + (is.na(b3tr) == FALSE)) * distinct,
+         nDistinctTopographicWetness = ((is.na(a1tw) == FALSE) + (is.na(b1tw) == FALSE) + (is.na(b2tw) == FALSE) + (is.na(b4tw) == FALSE)) * distinct)
+# check for missing coefficients
+setdiff(names(heightDiameterCoefficients), c("responseVariable", "species", "fitSet", "name", "distinct", "isBaseForm", "hasRelative", "hasStand", "hasPhysio", "fitting", "repetition", "fold", "n", "fitTimeInS", "isConverged", "pctOutOfRange", "mab", "mapb", "mae", "mape", "rmse", "rmspe", "aic", "deltaAicN", "nse", "meanAbsolutePlantationEffect", "meanAbsolutePercentPlantationEffect", "a0", "a1", "a2", "a3", "b1", "b2", "b3", "b4", "b4d", "Ha", "d", "kU", "randomEffect",
+                                             "a1p", "a2p", "a3p", "b1p", "b1aatp", "b2p", "b2rdp", "b4p", "Hap", "dp",
+                                             "a1rd", "a1rh", "a2rd", "b1rd", "b1rh", "b2rd", "b2rh", "b3rd", "b3rh", "b4rd", "b4rh", 
+                                             "a1bal", "a1balr", "a2bal", "a2balr", "b1ba", "b1bal", "b1balr", "b2ba", "b2balr", "b2bal", "b3bal", "b3balr", "b4ba", "b4bal", "b4balr",
+                                             "a1aba", "a1aat", "b1aba", "b1abap", "b1aat", "b2aba", "b2aat",
+                                             "a1e", "b1e", "b2e", "b4e", "a1s", "b2s", "a1as", "b1as", "b2as", "b4as", "a1ac", "b1ac", "b2ac", "b4ac", "a1tr", "b3tr", "a1tw", "b1tw", "b2tw", "b4tw")) # should be empty
 predictorVariableStats = predictorVariableResults %>% 
   group_by(responseVariable, species) %>%
   summarize(n = n(),
@@ -335,19 +357,19 @@ predictorVariableStats = predictorVariableResults %>%
             hasDistinctPhysio = sum(hasDistinctPhysio),
             nBasalAreaDistinct = sum(nBasalAreaDistinct),
             nPhysioDistinct = sum(nPhysioDistinct),
-            distinctRelHtOrDbh = sum(distinctRelHtOrDbh),
-            distinctBAorAba = sum(distinctBAorAba),
-            distinctBalOrAat = sum(distinctBalOrAat),
-            distinctElevation = sum(distinctElevation),
-            distinctSlope = sum(distinctSlope),
-            distinctSinAspect = sum(distinctSinAspect),
-            distinctCosAspect = sum(distinctCosAspect),
-            distinctTerrainRoughness = sum(distinctTerrainRoughness),
-            distinctTopographicWetness = sum(distinctTopographicWetness),
-            distinct = sum(distinct),
+            nDistinctRelHtOrDbh = sum(nDistinctRelHtOrDbh),
+            nDistinctBAorAba = sum(nDistinctBAorAba),
+            nDistinctBalOrAat = sum(nDistinctBalOrAat),
+            nDistinctElevation = sum(nDistinctElevation),
+            nDistinctSlope = sum(nDistinctSlope),
+            nDistinctSinAspect = sum(nDistinctSinAspect),
+            nDistinctCosAspect = sum(nDistinctCosAspect),
+            nDistinctTerrainRoughness = sum(nDistinctTerrainRoughness),
+            nDistinctTopographicWetness = sum(nDistinctTopographicWetness),
+            nDistinct = sum(distinct),
             plantationPct = 100 * hasPlantation / n, 
-            distinctPct = 100 * distinct / n,
-            distinctRelativePct = 100 * distinctRelHtOrDbh / hasRelDbhOrRelHt,
+            nDistinctPct = 100 * nDistinct / n,
+            nDistinctRelativePct = 100 * nDistinctRelHtOrDbh / hasRelDbhOrRelHt,
             .groups = "drop")
 
 
@@ -473,8 +495,8 @@ heightDiameterModelAucs %>%
 
 # frequency of generalizing predictor selection
 predictorVariableStats %>%
-  mutate(balAat = distinctBalOrAat / hasDistinctBasalArea, baAba = distinctBAorAba / hasDistinctBasalArea,
-         elev = distinctElevation / hasDistinctPhysio, slope = distinctSlope / hasDistinctPhysio, sinAspect = distinctSinAspect / hasDistinctPhysio, cosAspect = distinctCosAspect / hasDistinctPhysio, roughness = distinctTerrainRoughness / hasDistinctPhysio, wetness = distinctTopographicWetness / hasDistinctPhysio) %>%
+  mutate(balAat = nDistinctBalOrAat / hasDistinctBasalArea, baAba = nDistinctBAorAba / hasDistinctBasalArea,
+         elev = nDistinctElevation / hasDistinctPhysio, slope = nDistinctSlope / hasDistinctPhysio, sinAspect = nDistinctSinAspect / hasDistinctPhysio, cosAspect = nDistinctCosAspect / hasDistinctPhysio, roughness = nDistinctTerrainRoughness / hasDistinctPhysio, wetness = nDistinctTopographicWetness / hasDistinctPhysio) %>%
   select(responseVariable, species, balAat, baAba, elev, slope, sinAspect, cosAspect, roughness, wetness) %>%
   arrange(desc(responseVariable)) # since relative DBH and height are singleton groups they are always selected with probability 1 if when distinct
 
@@ -529,7 +551,7 @@ heightDiameterFitStats %>% filter(is.na(distinct)) %>% select(fitSet, responseVa
 # generalization's effects on MAB versus plantation effect sizes
 deltaMapb = heightDiameterFitStats %>% filter(fitSet == "primary", distinct) %>%
   group_by(responseVariable, species, baseName) %>%
-  mutate(deltaMapb = mapb - median(na.omit(if_else(isBaseForm | (name == "Sharma-Parton"), mapb, NA_real_)))) %>% # find MAB relative to median MAB (%) of all base fits
+  mutate(deltaMapb = mapb - median(na.omit(if_else(isBaseForm | (name == "Sharma-Parton"), mapb, NA_real_)))) %>% # find MAB relative to median MAB (%) of all base fits, leaves NAs if a base form is not significant
   filter(isBaseForm == FALSE, baseName %in% c("REML GAM", "Chapman-Richards", "Ruark", "Sharma-Parton", "Sibbesen"))
 print(deltaMapb %>% group_by(responseVariable, species, baseName) %>%
   reframe(quantiles = c(0, 0.25, 0.5, 0.75, 1), deltaMapb = quantile(deltaMapb, probs = quantiles)) %>%
@@ -1278,7 +1300,7 @@ preferredModelFormsInitialDbh = heightDiameterModelRanking %>% filter(responseVa
 
 ## additional info
 # nonphysical predictions
-outOfRange = heightDiameterFixedEffects %>% filter(fitSet == "primary", distinct) %>% 
+outOfRange = heightDiameterCoefficients %>% filter(fitSet == "primary", distinct) %>% 
   group_by(responseVariable, species, name) %>%
   summarize(baseName = if_else(word(name[1]) %in% c("REML", "modified", "unified"), paste(word(name[1], 1), word(name[1], 2)), word(name[1])),
             isBaseForm = isBaseForm[1], pctOutOfRange = mean(pctOutOfRange), .groups = "drop")

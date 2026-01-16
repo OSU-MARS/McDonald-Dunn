@@ -2,6 +2,12 @@
 # 9900X      10x10              10        4.6 + 3.7 min          
 jobStartTime = Sys.time()
 source("trees/height-diameter/setup.R")
+acmaOptions = tibble(fitHeight = FALSE,
+                     fitHeightMixed = FALSE,
+                     fitDbh = TRUE,
+                     fitDbhMixed = FALSE,
+                     recalcPreferredModels = FALSE)
+
 progressr::handlers(global = TRUE)
 progressr::handlers("progress")
 future::plan(future::multisession, workers = 10)

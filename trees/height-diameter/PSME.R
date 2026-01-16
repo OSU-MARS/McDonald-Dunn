@@ -1,11 +1,5 @@
 # load libraries, functions, and psme2022 from setup.R
-
-psmeOptions = tibble(fitHeightPrimary = TRUE,
-                     fitHeightMixed = TRUE,
-                     fitDbhPrimary = TRUE,
-                     fitDbhMixed = TRUE,
-                     fitPhysioGams = TRUE,
-                     recalcPreferredModels = FALSE)
+# psmeOptions from PSME job.R
 
 ## Douglas-fir height regressions
 if (psmeOptions$fitHeightPrimary)
@@ -43,7 +37,7 @@ if (psmeOptions$fitHeightPrimary)
   #psmeHeightFromDiameter$chapmanRichardsRelDbhA1 = fit_gsl_nls("Chapman-Richards RelDbh", height ~ 1.37 + (a1 + a1rd * relativeDiameter) * (1 - exp((b1)*dbh))^(b2), psme2022, start = list(a1 = 72, a1rd = -2.5, b1 = -0.02, b2 = 1.1))
   psmeHeightFromDiameter$chapmanRichardsRelDbhPhysio = fit_gsl_nls("Chapman-Richards RelDbh physio", height ~ 1.37 + (a1) * (1 - exp((b1 + b1ac * cos(3.14159/180 * aspect))*dbh))^(b2 + (b2rd + b2rdp * isPlantation) * relativeDiameter), psme2022, start = list(a1 = 58, b1 = -0.02, b1ac = -0.001, b2 = 1.1, b2rd = 0.1, b2rdp = 0.06))
   psmeHeightFromDiameter$curtis = fit_gsl_nls("Curtis", height ~ 1.37 + (a1 + a1p*isPlantation) * dbh / (1 + dbh)^(b1 + b1p*isPlantation), psme2022, start = list(a1 = 3, a1p = -1.4, b1 = 0.4, b1p = -0.16)) # 10x10 MAE 3.95, AIC 4085
-  #psmeHeightFromDiameter$hossfeld = fit_gsl_nls("Hossfeld IV", height ~ 1.37 + a1 / (1 + (a2) * dbh^(b1 + b1p * isPlantation)), psme2022, start = list(a1 = 73, a2 = 150, b1 = -1.3, b1p = 0.03)) # a1p not significant, a2p-b1p not mutually significant, 10x10 MAE 3.47, AIC 3877
+  psmeHeightFromDiameter$hossfeld = fit_gsl_nls("Hossfeld IV", height ~ 1.37 + a1 / (1 + (a2) * dbh^(b1 + b1p * isPlantation)), psme2022, start = list(a1 = 73, a2 = 150, b1 = -1.3, b1p = 0.03)) # a1p not significant, a2p-b1p not mutually significant, 10x10 MAE 3.47, AIC 3877
   #psmeHeightFromDiameter$hossfeldBal = fit_gsl_nls("Hossfeld IV BA+L", height ~ 1.37 + (a1) / (1 + (a2 + a2bal / (a2balr + basalAreaLarger)) * dbh^(b1)), psme2022, start = list(a1 = 90, a2 = 120, a2bal = 1000, a2balr = 12, b1 = -1.2)) # a2balp, a2balrp not significant, 10x10 MAE 3.07, AIC 3725
   #psmeHeightFromDiameter$hossfeldBal = fit_gsl_nls("Hossfeld IV BA+L", height ~ 1.37 + (a1) / (1 + (a2 + a2bal / (a2balr + basalAreaLarger)) * dbh^(b1 + b1ba / standBasalAreaPerHectare)), psme2022, start = list(a1 = 73, a2 = 140, a2bal = 800, a2balr = 10, b1 = -1.25, b1ba = 0.0), distinct = FALSE) # b1ba not significant, 10x10 MAE 3.08, AIC 3738
   #psmeHeightFromDiameter$hossfeldBaA1 = fit_gsl_nls("Hossfeld IV BA", height ~ 1.37 + (a1 + a1ba * standBasalAreaPerHectare) / (1 + (a2) * dbh^(b1)), psme2022, start = list(a1 = 60, a1ba = 0.3, a2 = 130, b1 = -1.2)) # 10x10 MAE 3.37, AIC 3833
@@ -58,7 +52,7 @@ if (psmeOptions$fitHeightPrimary)
   psmeHeightFromDiameter$korf = fit_gsl_nls("Korf", height ~ 1.37 + a1*exp((b1 + b1p * isPlantation)*dbh^(b2 + b2p * isPlantation)), psme2022, start = list(a1 = 200, b1 = -6.8, b1p = -1.2, b2 = -0.3, b2p = -0.04)) # a1p-b1p not mutually significant, 10x10 MAE 3.53, AIC 3850
   psmeHeightFromDiameter$michaelisMenten = fit_gsl_nls("Michaelis-Menten", height ~ 1.37 + a1*dbh^b1 / (a2 + a2p * isPlantation + dbh^b1), psme2022, start = list(a1 = 75, a2 = 140, a2p = 20, b1 = 1.2)) # a1p, b1p not significant, 10x10 MAE 3.44, AIC 3841
   psmeHeightFromDiameter$michaelisMentenBal = fit_gsl_nls("Michaelis-Menten BA+L", height ~ 1.37 + (a1)*dbh^(b1 + b1ba / standBasalAreaPerHectare) / (a2 + a2bal / (a2balr + basalAreaLarger) + dbh^(b1 + b1ba / standBasalAreaPerHectare)), psme2022, start = list(a1 = 85, a2 = 115, a2bal = 900, a2balr = 10, b1 = 1.2, b1ba = -1)) # a2balp not significant, 10x10 MAE 3.06, AIC 3715
-  psmeHeightFromDiameter$michaelisMentenBalRelDbh = fit_gsl_nls("Michaelis-Menten BA+L", height ~ 1.37 + (a1)*dbh^(b1 + b1ba / standBasalAreaPerHectare) / (a2 + a2rd * relativeDiameter + a2bal / (a2balr + basalAreaLarger) + dbh^(b1 + b1ba / standBasalAreaPerHectare)), psme2022, start = list(a1 = 85, a2 = 115, a2rd = 25, a2bal = 900, a2balr = 10, b1 = 1.2, b1ba = -1), distinct = FALSE) # a1rd, a2rd, b1rd not significant
+  psmeHeightFromDiameter$michaelisMentenBalRelDbh = fit_gsl_nls("Michaelis-Menten RelDbh BA+L", height ~ 1.37 + (a1)*dbh^(b1 + b1ba / standBasalAreaPerHectare) / (a2 + a2rd * relativeDiameter + a2bal / (a2balr + basalAreaLarger) + dbh^(b1 + b1ba / standBasalAreaPerHectare)), psme2022, start = list(a1 = 85, a2 = 115, a2rd = 25, a2bal = 900, a2balr = 10, b1 = 1.2, b1ba = -1), distinct = FALSE) # a1rd, a2rd, b1rd not significant
   #psmeHeightFromDiameter$michaelisMentenBaB1 = fit_gsl_nls("Michaelis-Menten BA", height ~ 1.37 + (a1)*dbh^(b1 + b1ba / standBasalAreaPerHectare) / (a2 + dbh^(b1 + b1ba / standBasalAreaPerHectare)), psme2022, start = list(a1 = 75, a2 = 110, b1 = 1.2, b1ba = -3)) # a1ba+r, b1bar not significant, a2ba+r numerically unstable, 10x10 MAE 3.28, AIC 3833
   #psmeHeightFromDiameter$michaelisMentenBalA2 = fit_gsl_nls("Michaelis-Menten BAL", height ~ 1.37 + (a1)*dbh^(b1) / (a2 + a2bal / (a2balr + basalAreaLarger) + dbh^(b1)), psme2022, start = list(a1 = 90, a2 = 125, a2bal = 1000, a2balr = 12, b1 = 1.2)) # a1bal+r not significant, 10x10 MAE 3.08, AIC 3718
   #psmeHeightFromDiameter$michaelisMentenBalB1 = fit_gsl_nls("Michaelis-Menten BAL", height ~ 1.37 + (a1)*dbh^(b1 + b1bal / (b1balr + basalAreaLarger)) / (a2 + dbh^(b1 + b1bal / (b1balr + standBasalAreaPerHectare))), psme2022, start = list(a1 = 120, a2 = 190, b1 = 1.2, b1bal = -3, b1balr = 25)) # 10x10 MAE 3.14, AIC 3743
@@ -67,11 +61,13 @@ if (psmeOptions$fitHeightPrimary)
   #psmeHeightFromDiameter$michaelisMentenRelDbh = fit_gsl_nls("Michaelis-Menten RelDbh", height ~ 1.37 + (a1)*dbh^b1 / (a2 + (relativeDiameter * dbh)^b1), psme2022, start = list(a1 = 420, a2 = 480, b1 = 0.9)) # 10x10 MAE 3.57, AIC 3944
   #psmeHeightFromDiameter$michaelisMentenRelDbhA1 = fit_gsl_nls("Michaelis-Menten RelDbh", height ~ 1.37 + (a1 + a1rd * relativeDiameter)*dbh^b1 / (a2 + a2p * isPlantation + dbh^b1), psme2022, start = list(a1 = 90, a1rd = -3, a2 = 140, a2p = 15, b1 = 1.2)) # 10x10 MAE 3.36, AIC 3851
   #psmeHeightFromDiameter$michaelisMentenRelDbhB1 = fit_gsl_nls("Michaelis-Menten RelDbh", height ~ 1.37 + (a1)*dbh^(b1 + b1rd * relativeDiameter) / (a2 + dbh^(b1 + b1rd * relativeDiameter)), psme2022, start = list(a1 = 90, a2 = 170, b1 = 1.2, b1rd = -0.02)) # 10x10 MAE 3.41, AIC 3918
-  psmeHeightFromDiameter$prodan = fit_gsl_nls("Prodan", height ~ 1.37 + dbh^2 / (a1*dbh^2 + a2*dbh + a3 + a3p* isPlantation), psme2022, start = list(a1 = 0.012, a2 = 0.9, a3 = 1.4, a3p = 3.5)) # a1p, a2p not significant, 10x10 MAE 3.49, AIC 3989
   psmeHeightFromDiameter$power = fit_gsl_nls("power", height ~ 1.37 + (a1 + a1p * isPlantation)*dbh^(b1 + b1p * isPlantation), psme2022, start = list(a1 = 2.5, a1p = -1, b1 = 0.65, b1p = 0.14)) # 10x10 MAE 4.01, AIC 4047
+  psmeHeightFromDiameter$prodan = fit_gsl_nls("Prodan", height ~ 1.37 + dbh^2 / (a1*dbh^2 + a2*dbh + a3 + a3p* isPlantation), psme2022, start = list(a1 = 0.012, a2 = 0.9, a3 = 1.4, a3p = 3.5)) # a1p, a2p not significant, 10x10 MAE 3.49, AIC 3989
   psmeHeightFromDiameter$ratkowsky = fit_gsl_nls("Ratkowsky", height ~ 1.37 + a1*exp((b1 + b1p * isPlantation)/(dbh + b2)), psme2022, start = list(a1 = 73, b1 = -46, b1p = -3, b2 = 10)) # a1p, b2p not significant, 10x10 MAE 3.44, AIC 3943
-  psmeHeightFromDiameter$richardsW = fit_gsl_nls("unified Richards", height ~ 1.37 + (Ha + Hap*isPlantation) * (1 + ((1.37/(Ha + Hap*isPlantation))^(1 - (d + dp*isPlantation)) - 1) * exp((-kU * dbh)/(d + dp*isPlantation)^((d + dp*isPlantation)/(1 - (d + dp*isPlantation)))))^(1/(1 - (d + dp*isPlantation))), psme2022, start = list(Ha = 55, Hap = -3, d = 0.3, dp = 0.2, kU = 0.013)) # kUp not significant, 10x10 MAE 3.45, AIC 4166
-  psmeHeightFromDiameter$sharmaParton = fit_gsl_nls("Sharma-Parton", height ~ 1.37 + a1*topHeight^b1*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^b3 * dbh))^b4, psme2022, start = list(a1 = 20, b1 = 0.3, b2 = -0.02, b3 = 0, b4 = 1.0)) # a1p, b1p, b2p, b3, b3p, b4p not significant, 10x10 MAE 3.13, AIC 3677
+  psmeHeightFromDiameter$richardsW = tryCatch({ fit_gsl_nls("unified Richards", height ~ 1.37 + (Ha + Hap*isPlantation) * (1 + ((1.37/(Ha + Hap*isPlantation))^(1 - (d + dp*isPlantation)) - 1) * exp((-kU * dbh)/(d + dp*isPlantation)^((d + dp*isPlantation)/(1 - (d + dp*isPlantation)))))^(1/(1 - (d + dp*isPlantation))), psme2022, start = list(Ha = 55, Hap = -3, d = 0.3, dp = 0.2, kU = 0.013)) }, # kUp not significant, 10x10 MAE 3.45, AIC 4166
+                                                error = function(e) { reset_future(); return(create_fit_statistics("unified Richards", fittingMethod = "gsl_nls")) }) # 2x50 NaN-inf
+  #psmeHeightFromDiameter$sharmaParton = fit_gsl_nls("Sharma-Parton", height ~ 1.37 + a1*topHeight^b1*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^b3 * dbh))^b4, psme2022, start = list(a1 = 20, b1 = 0.3, b2 = -0.02, b3 = 0, b4 = 1.0)) # a1p, b1p, b2p, b3, b3p, b4p not significant, 10x10 MAE 3.13, AIC 3677
+  psmeHeightFromDiameter$sharmaPartonB4 = fit_gsl_nls("Sharma-Parton", height ~ 1.37 + (a1)*topHeight^(b1)*(1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3) * dbh^(b4))), psme2022, start = list(a1 = 20, b1 = 0.3, b2 = -0.02, b3 = 0, b4 = 1.0)) # a1p, b1p, b2p, b3, b3p, b4, b4p not significant, 10x10 MAE 3.04, AIC 3695
   psmeHeightFromDiameter$sharmaPartonBal = fit_gsl_nls("Sharma-Parton BA+L", height ~ 1.37 + (a1)*topHeight^(b1) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger)) * dbh))^b4, psme2022, start = list(a1 = 24, b1 = 0.3, b2 = -0.02, b3 = -0.02, b3bal = -2, b3balr = 14, b4 = 1.0)) # 10x10 MAE 2.91, AIC 3705
   #psmeHeightFromDiameter$sharmaPartonBaBal = fit_gsl_nls("Sharma-Parton BA+L", height ~ 1.37 + a1*topHeight^b1 * (1 - exp(b2*(standTreesPerHectare/(standBasalAreaPerHectare + b2balr * basalAreaLarger))^(b3) * dbh))^b4, psme2022, start = list(a1 = 30, b1 = 0.2, b2 = -0.01, b2balr = 35, b3 = -0.05, b4 = 1.0)) # 10x10 MAE 2.95, AIC 3766 but potentially fitting issues with NaN-inf due to b2balr runaway and b2balr not significant, Levenberg scale more stable but lower accuracy, moving b2 into or splitting it within b3 scope leads to loss of significance and numerical issues, large b2balr acts to remove influence of stand basal area but modulation by stand density provides an accuracy edge as expected based on GAM smooths
   #psmeHeightFromDiameter$sharmaParton0.1Ba10Bal = fit_gsl_nls("Sharma-Parton BA+L", height ~ 1.37 + a1*topHeight^b1 * (1 - exp(b2*(standTreesPerHectare/(0.1 * standBasalAreaPerHectare + 10 * basalAreaLarger))^b3 * dbh))^b4, psme2022, start = list(a1 = 30, b1 = 0.2, b2 = -0.01, b3 = -0.05, b4 = 1.0)) # 10x10 MAE 2.95, AIC 3704
@@ -97,7 +93,6 @@ if (psmeOptions$fitHeightPrimary)
   #psmeHeightFromDiameter$sharmaPartonPhysioB4 = fit_gsl_nls("Sharma-Parton physio", height ~ 1.37 + (a1)*topHeight^(b1) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3)*dbh))^(b4 + b4as * sin(3.14159/180 * aspect) + b4ac * cos(3.14159/180 * aspect)), psme2022, start = list(a1 = 20, b1 = 0.3, b2 = -0.02, b3 = 0, b4 = 1.0, b4ac = -0.05, b4as = -0.04))
   psmeHeightFromDiameter$sharmaPartonRelDbh = fit_gsl_nls("Sharma-Parton RelDbh", height ~ 1.37 + a1*topHeight^(b1 + b1rd * relativeDiameter)*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^b3 * dbh))^b4, psme2022, start = list(a1 = 13, b1 = 0.3, b1rd = 0, b2 = -0.02, b3 = 0.02, b4 = 1.0), distinct = FALSE) # a1rd, a1rdp, b1rd, b1rdp, b2rd, b2rdp, b3rd, b3rdp, b4rd, b4rdp not significant
   psmeHeightFromDiameter$sharmaPartonRelDbhPhysio = fit_gsl_nls("Sharma-Parton RelDbh physio", height ~ 1.37 + (a1)*topHeight^(b1 + b1rd * relativeDiameter) * (1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^b3*dbh))^(b4 + b4as * sin(3.14159/180 * aspect) + b4ac * cos(3.14159/180 * aspect)), psme2022, start = list(a1 = 18, b1 = 0.3, b1rd = 0.004, b2 = -0.02, b3 = 0, b4 = 1.0, b4ac = -0.05, b4as = -0.04), distinct = FALSE) # b1rd, b3 not significant
-  #->psmeHeightFromDiameter$sharmaPartonB4 = fit_gsl_nls("Sharma-Parton b₄", height ~ 1.37 + (a1)*topHeight^(b1)*(1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3) * dbh^(b4))), psme2022, start = list(a1 = 20, b1 = 0.3, b2 = -0.02, b3 = 0, b4 = 1.0), distinct = FALSE) # a1p, b1p, b2p, b3, b3p, b4, b4p not significant, 10x10 MAE 3.04, AIC 3695
   #psmeHeightFromDiameter$sharmaPartonB4bal = fit_gsl_nls("Sharma-Parton b₄ BA+L", height ~ 1.37 + (a1)*topHeight^(b1) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger)) * dbh^b4)), psme2022, start = list(a1 = 30, b1 = 0.2, b2 = -0.01, b3 = 0.1, b3bal = -3, b3balr = 15, b4 = 1.1)) # b3, b4 significant, 10x10 MAE 2.93, AIC 3696
   #psmeHeightFromDiameter$sharmaPartonB4balPhysio = fit_gsl_nls("Sharma-Parton b₄ BA+L physio", height ~ 1.37 + (a1 + a1ac * cos(3.14159/180 * aspect))*topHeight^(b1) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger))*dbh^(b4 + b4as * sin(pi/180*aspect)))), psme2022, start = list(a1 = 33, a1ac = 1.3, b1 = 0.2, b2 = -0.01, b3 = 0.1, b3bal = -3, b3balr = 20, b4 = 1.1, b4as = 0.01)) # b4 x { e, s, ac, tw } not significant, 10x10 MAE 2.86, AIC 3652
   #psmeHeightFromDiameter$sharmaPartonB4balPhysioTR = fit_gsl_nls("Sharma-Parton b₄ BA+L physio", height ~ 1.37 + (a1 + a1ac * cos(3.14159/180 * aspect))*topHeight^(b1) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger))*dbh^(b4 + b4tr * terrainRoughness))), psme2022, start = list(a1 = 30, a1ac = 1.1, b1 = 0.2, b2 = -0.01, b3 = 0.1, b3bal = -3, b3balr = 18, b4 = 1.1, b4tr = 0.05)) # 10x10 MAE 2.87, AIC 3704
@@ -107,7 +102,8 @@ if (psmeOptions$fitHeightPrimary)
   #psmeHeightFromDiameter$sharmaPartonB4relDbh = fit_gsl_nls("Sharma-Parton b₄ RelDbh", height ~ 1.37 + a1*topHeight^(b1 + b1rd * relativeDiameter)*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^b3 * dbh^b4)), psme2022, start = list(a1 = 19, b1 = 0.3, b1rd = 0, b2 = -0.02, b3 = 0, b4 = 1.0), distinct = FALSE) # a1rd, b3, b4 not significant
   #psmeHeightFromDiameter$sharmaPartonB4relDbhPhysio = fit_gsl_nls("Sharma-Parton b₄ RelDbh physio", height ~ 1.37 + (a1)*topHeight^(b1 + b1rd * relativeDiameter) * (1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^b3*dbh))^(b4 + b4as * sin(3.14159/180 * aspect) + b4ac * cos(3.14159/180 * aspect)), psme2022, start = list(a1 = 20, b1 = 0.3, b1rd = 0.004, b2 = -0.02, b3 = -0.02, b4 = 1.0, b4ac = -0.05, b4as = -0.04), distinct = FALSE) # b1rd, b3, b4 not significant
   #psmeHeightFromDiameter$sharmaPartonB5 = fit_gsl_nls("Sharma-Parton b₅", height ~ 1.37 + (a1)*topHeight^(b1)*(1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3) * dbh^(b4)))^(b5), psme2022, start = list(a1 = 20, b1 = 0.3, b2 = -0.02, b3 = 0, b4 = 1.0, b5 = 1.0), distinct = FALSE) # b2, b3, b5 not significant
-  psmeHeightFromDiameter$sharmaZhang = fit_gsl_nls("Sharma-Zhang", height ~ 1.37 + (a1 + a1p * isPlantation)*standBasalAreaPerHectare^(b1 + b1p * isPlantation)*(1 - exp(b2*standTreesPerHectare^b3*dbh))^b4, psme2022, start = list(a1 = 45, a1p = -12, b1 = 0.08, b1p = 0.08, b2 = -0.03, b3 = -0.06, b4 = 1.0)) # b2p, b3p, b4p not significant, 10x10 MAE 3.29, AIC 3840
+  #psmeHeightFromDiameter$sharmaZhang = fit_gsl_nls("Sharma-Zhang", height ~ 1.37 + (a1 + a1p * isPlantation)*standBasalAreaPerHectare^(b1 + b1p * isPlantation)*(1 - exp(b2*standTreesPerHectare^b3*dbh))^b4, psme2022, start = list(a1 = 45, a1p = -12, b1 = 0.08, b1p = 0.08, b2 = -0.03, b3 = -0.06, b4 = 1.0)) # b2p, b3p, b4p not significant, 10x10 MAE 3.29, AIC 3840
+  psmeHeightFromDiameter$sharmaZhangB4 = fit_gsl_nls("Sharma-Zhang", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1)*(1 - exp((b2)*standTreesPerHectare^(b3)*dbh^(b4))), psme2022, start = list(a1 = 30, b1 = 0.16, b2 = -0.03, b3 = -0.09, b4 = 1.0)) # a1p, b1p, b2p, b3p, b4p not significant, 10x10 MAE 3.24, AIC 3807
   psmeHeightFromDiameter$sharmaZhangBal = fit_gsl_nls("Sharma-Zhang BA+L", height ~ 1.37 + a1*standBasalAreaPerHectare^b1 * (1 - exp(b2*standTreesPerHectare^b3 * dbh))^(b4 + b4bal / (b4balr + basalAreaLarger)), psme2022, start = list(a1 = 55, b1 = 0.1, b2 = -0.02, b3 = -0.03, b4 = 1.0, b4bal = 4, b4balr = 6)) # a1ba+r, b1, b1ba+r, b3, b3ba+r, b4ba+r not significant, b2ba+r NaN-inf, 10x10 MAE 3.05, AIC 3749
   psmeHeightFromDiameter$sharmaZhangBalRelDbh = fit_gsl_nls("Sharma-Zhang RelDbh BA+L", height ~ 1.37 + a1*standBasalAreaPerHectare^b1 * (1 - exp(b2*standTreesPerHectare^b3 * dbh))^(b4 + b4bal / (b4balr + basalAreaLarger) + b4rd * relativeDiameter), psme2022, start = list(a1 = 55, b1 = 0.1, b2 = -0.02, b3 = -0.03, b4 = 1.0, b4bal = 4, b4balr = 6, b4rd = 0), distinct = FALSE) # b4rd not significant
   #psmeHeightFromDiameter$sharmaZhangBalLinear = fit_gsl_nls("Sharma-Zhang RelDbh BA+L", height ~ 1.37 + (a1 + a1p * isPlantation + a1ba * standBasalAreaPerHectare + a1bal * basalAreaLarger)*standBasalAreaPerHectare^(b1 + b1p * isPlantation) * (1 - exp((b2)*standTreesPerHectare^b3 * dbh))^(b4), psme2022, start = list(a1 = 50, a1p = -10, a1ba = -0.1, a1bal = 0.2, b1 = 0.1, b1p = 0.1, b2 = -0.03, b3 = -0.02, b4 = 1.1)) # a1bap, a1balp, { b1, b3 } x { bal, balp }, b1ba, b3, b4bap, b4balp not significant, b4ba, b4bal also significant, 10x10 MAE 3.05, AIC 3789
@@ -117,13 +113,12 @@ if (psmeOptions$fitHeightPrimary)
   #psmeHeightFromDiameter$sharmaZhangBalB3 = fit_gsl_nls("Sharma-Zhang BA+L", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1) * (1 - exp((b2)*standTreesPerHectare^(b3 + b3bal / (b3balr + basalAreaLarger)) * dbh))^(b4), psme2022, start = list(a1 = 50, b1 = 0.02, b2 = -0.02, b3 = 0, b3bal = -1, b3balr = 15, b4 = 1.1)) # 10x10 MAE 3.06, AIC 3707
   #psmeHeightFromDiameter$sharmaZhangBalB4 = fit_gsl_nls("Sharma-Zhang BA+L", height ~ 1.37 + (a1 + a1p * isPlantation)*standBasalAreaPerHectare^(b1 + b1p * isPlantation) * (1 - exp((b2)*standTreesPerHectare^b3 * dbh))^(b4 + b4ba * standBasalAreaPerHectare + b4bal * basalAreaLarger), psme2022, start = list(a1 = 30, a1p = -10, b1 = 0.1, b1p = 0.1, b2 = -0.03, b3 = -0.02, b4 = 1.1, b4ba = 0.01, b4bal = -0.01))
   psmeHeightFromDiameter$sharmaZhangRelDbh = fit_gsl_nls("Sharma-Zhang RelDbh", height ~ 1.37 + (a1 + a1p * isPlantation)*standBasalAreaPerHectare^(b1 + b1p * isPlantation)*(1 - exp(b2*standTreesPerHectare^b3*dbh))^(b4 + b4rd * relativeDiameter), psme2022, start = list(a1 = 45, a1p = -12, b1 = 0.08, b1p = 0.08, b2 = -0.03, b3 = -0.06, b4 = 1.0, b4rd = 0), distinct = FALSE) # a1rd, b1rd, b2rd, b3rd, b4rd not significant
-  #psmeHeightFromDiameter$sharmaZhangB4 = fit_gsl_nls("Sharma-Zhang b₄", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1)*(1 - exp((b2)*standTreesPerHectare^(b3)*dbh^(b4))), psme2022, start = list(a1 = 30, b1 = 0.16, b2 = -0.03, b3 = -0.09, b4 = 1.0)) # a1p, b1p, b2p, b3p, b4p not significant, 10x10 MAE 3.24, AIC 3807
-  #psmeHeightFromDiameter$sharmaZhangB4bal = fit_gsl_nls("Sharma-Zhang b₄ BA+L", height ~ 1.37 + a1*standBasalAreaPerHectare^b1 * (1 - exp(b2*standTreesPerHectare^b3 * dbh^(b4 + b4bal / (b4balr + basalAreaLarger)))), psme2022, start = list(a1 = 55, b1 = 0.05, b2 = -0.02, b3 = -0.04, b4 = 1.1, b4bal = -2, b4balr = 16)) # 10x10 MAE 3.06, AIC 3757
-  #psmeHeightFromDiameter$sharmaZhangB4balRelDbh = fit_gsl_nls("Sharma-Zhang b₄ RelDbh BA+L", height ~ 1.37 + a1*standBasalAreaPerHectare^b1 * (1 - exp(b2*standTreesPerHectare^b3 * dbh^(b4 + b4bal / (b4balr + basalAreaLarger) + b4rd * relativeDiameter))), psme2022, start = list(a1 = 55, b1 = 0.05, b2 = -0.02, b3 = -0.04, b4 = 1.1, b4bal = -2, b4balr = 16, b4rd = 0), distinct = FALSE) # b4rd not significant
-  #psmeHeightFromDiameter$sharmaZhangB4relDbh = fit_gsl_nls("Sharma-Zhang b₄ RelDbh", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1)*(1 - exp(b2*standTreesPerHectare^b3*dbh))^(b4 + b4rd * relativeDiameter), psme2022, start = list(a1 = 42, b1 = 0.08, b2 = -0.02, b3 = 0.06, b4 = 1.1, b4rd = 0), distinct = FALSE) # a1p, b1p, b3, b4rd not significant
-  #psmeHeightFromDiameter$sharmaZhangB4relDbh = fit_gsl_nls("Sharma-Zhang b₄ RelDbh", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1)*(1 - exp(b2*standTreesPerHectare^b3*(relativeDiameter*dbh)^(b4))), psme2022, start = list(a1 = 16, b1 = 0.3, b2 = -0.8, b3 = -0.4, b4 = 0.5), distinct = FALSE) # 10x10 MAE 3.34, AIC 3873 (3.43, 3876 without relative diameter within b4, accuracy quite poor if dividing by relativeDiameter)
-  #psmeHeightFromDiameter$sharmaZhangB4relDbh = fit_gsl_nls("Sharma-Zhang b₄ RelDbh", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1)*(1 - exp(b2*standTreesPerHectare^b3*dbh^(b4)*relativeDiameter^b5)), psme2022, start = list(a1 = 50, b1 = 0.06, b2 = 0.003, b3 = 0.1, b4 = 1.3, b5 = -0.3), distinct = FALSE) # 10x10 MAE 3.95, AIC 4079
-  #psmeHeightFromDiameter$sharmaZhangB5 = fit_gsl_nls("Sharma-Zhang b₅", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1)*(1 - exp((b2)*standTreesPerHectare^(b3)*dbh^(b4)))^(b5), psme2022, start = list(a1 = 30, b1 = 0.16, b2 = -0.03, b3 = -0.09, b4 = 1.0, b5 = 1.0)) # b2, b4, b5 not significant
+  #psmeHeightFromDiameter$sharmaZhangB4bal = fit_gsl_nls("Sharma-Zhang b₄ BA+L", height ~ 1.37 + a1*standBasalAreaPerHectare^b1 * (1 - exp(b2*standTreesPerHectare^b3 * dbh^(b4d + b4bal / (b4balr + basalAreaLarger)))), psme2022, start = list(a1 = 55, b1 = 0.05, b2 = -0.02, b3 = -0.04, b4d = 1.1, b4bal = -2, b4balr = 16)) # 10x10 MAE 3.06, AIC 3757
+  #psmeHeightFromDiameter$sharmaZhangB4balRelDbh = fit_gsl_nls("Sharma-Zhang b₄ RelDbh BA+L", height ~ 1.37 + a1*standBasalAreaPerHectare^b1 * (1 - exp(b2*standTreesPerHectare^b3 * dbh^(b4d + b4bal / (b4balr + basalAreaLarger) + b4rd * relativeDiameter))), psme2022, start = list(a1 = 55, b1 = 0.05, b2 = -0.02, b3 = -0.04, b4d = 1.1, b4bal = -2, b4balr = 16, b4rd = 0), distinct = FALSE) # b4rd not significant
+  #psmeHeightFromDiameter$sharmaZhangB4relDbh = fit_gsl_nls("Sharma-Zhang b₄ RelDbh", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1)*(1 - exp(b2*standTreesPerHectare^b3*dbh))^(b4d + b4rd * relativeDiameter), psme2022, start = list(a1 = 42, b1 = 0.08, b2 = -0.02, b3 = 0.06, b4d = 1.1, b4rd = 0), distinct = FALSE) # a1p, b1p, b3, b4rd not significant
+  #psmeHeightFromDiameter$sharmaZhangB4relDbh = fit_gsl_nls("Sharma-Zhang b₄ RelDbh", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1)*(1 - exp(b2*standTreesPerHectare^b3*(relativeDiameter*dbh)^(b4d))), psme2022, start = list(a1 = 16, b1 = 0.3, b2 = -0.8, b3 = -0.4, b4d = 0.5), distinct = FALSE) # 10x10 MAE 3.34, AIC 3873 (3.43, 3876 without relative diameter within b4d, accuracy quite poor if dividing by relativeDiameter)
+  #psmeHeightFromDiameter$sharmaZhangB4relDbh = fit_gsl_nls("Sharma-Zhang b₄ RelDbh", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1)*(1 - exp(b2*standTreesPerHectare^b3*dbh^(b4d)*relativeDiameter^b5)), psme2022, start = list(a1 = 50, b1 = 0.06, b2 = 0.003, b3 = 0.1, b4d = 1.3, b5 = -0.3), distinct = FALSE) # 10x10 MAE 3.95, AIC 4079
+  #psmeHeightFromDiameter$sharmaZhangB5 = fit_gsl_nls("Sharma-Zhang b₅", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1)*(1 - exp((b2)*standTreesPerHectare^(b3)*dbh^(b4d)))^(b5), psme2022, start = list(a1 = 30, b1 = 0.16, b2 = -0.03, b3 = -0.09, b4d = 1.0, b5 = 1.0)) # b2, b4d, b5 not significant
   psmeHeightFromDiameter$sibbesen = fit_gsl_nls("Sibbesen", height ~ 1.37 + a1*dbh^((b1 + b1p * isPlantation)*dbh^(b2 + b2p * isPlantation)), psme2022, start = list(a1 = 0.2, b1 = 2.5, b1p = -0.2, b2 = -0.14, b2p = 0.02)) # a1p not significant, 10x10 MAE 3.50, AIC 4012
   #psmeHeightFromDiameter$sibbesen = fit_gsl_nls("Sibbesen", height ~ 1.37 + a1*dbh^((b1 + b1p * isPlantation)*(relativeDiameter*dbh)^(b2 + b2p * isPlantation)), psme2022, start = list(a1 = 0.5, b1 = 1.3, b1p = -0.1, b2 = -0.05, b2p = 0.01)) # 10x10 MAE 3.54, AIC 3948
   #psmeHeightFromDiameter$sibbesen = fit_gsl_nls("Sibbesen", height ~ 1.37 + a1*(relativeDiameter*dbh)^((b1 + b1p * isPlantation)*(dbh)^(b2 + b2p * isPlantation)), psme2022, start = list(a1 = 4.7, b1 = 0.7, b1p = -0.4, b2 = -0.1, b2p = 0.1)) # 10x10 MAE 5.68, AIC 4584
@@ -199,173 +194,253 @@ if (psmeOptions$fitHeightPrimary)
 ## Douglas-fir height mixed regressions
 if (psmeOptions$fitHeightMixed)
 {
-  psmeHeightFromDiameterMixed = list(chapmanRichards = fit_nlme("Chapman-Richards", height ~ 1.37 + (a1 + a1r) *(1 - exp(b1*dbh))^(b2 + b2p * isPlantation), psme2022, # b1r, b2r singularity in backsolve
-                                                                fixedFormula = a1 + b1 + b2 + b2p ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  psmeHeightFromDiameterMixed = list(chapmanRichards = fit_nlme("Chapman-Richards", height ~ 1.37 + (a1 + a1ra) * (1 - exp(b1*dbh))^(b2 + b2p * isPlantation), psme2022, # b1ra, b2ra singularity in backsolve, 10x10 MAE 6.13, AIC 4178
+                                                                fixedFormula = a1 + b1 + b2 + b2p ~ 1, randomFormula = a1ra ~ 1|stand/plot,
                                                                 start = list(fixed = c(a1 = 45, b1 = -0.02, b2 = 1.2, b2p = -0.1))))
+  #psmeHeightFromDiameterMixed = list(chapmanRichards = fit_nlme("Chapman-Richards", height ~ 1.37 + (a1) * (1 + a1rm) * (1 - exp(b1*dbh))^(b2 + b2p * isPlantation), psme2022, # a1rm job leading minor, b1rm, b2rm singularity in backsolve
+  #                                                              fixedFormula = a1 + b1 + b2 + b2p ~ 1, randomFormula = a1rm ~ 1|stand/plot,
+  #                                                              start = list(fixed = c(a1 = 45, b1 = -0.02, b2 = 1.2, b2p = -0.1))))
   # linear BA+L
-  #psmeHeightFromDiameterMixed$chapmanRichardsBal = fit_nlme("Chapman-Richards BA+L", height ~ 1.37 + (a1 + a1r + a1ba * standBasalAreaPerHectare) * (1 - exp(b1*dbh))^(b2 + b2bal * basalAreaLarger), psme2022, # b1r, b2r singularity in backsolve, b2balp not significant
-  #                                                          fixedFormula = a1 + a1ba + b1 + b2 + b2bal ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$chapmanRichardsBal = fit_nlme("Chapman-Richards BA+L", height ~ 1.37 + (a1 + a1ra + a1ba * standBasalAreaPerHectare) * (1 - exp(b1*dbh))^(b2 + b2bal * basalAreaLarger), psme2022, # b1ra, b2ra singularity in backsolve, b2balp not significant
+  #                                                          fixedFormula = a1 + a1ba + b1 + b2 + b2bal ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                          start = list(fixed = c(a1 = 38, a1ba = 0.2, b1 = -0.02, b2 = 1.2, b2bal = -0.003)))
-  #psmeHeightFromDiameterMixed$chapmanRichardsBalRelDbh = fit_nlme("Chapman-Richards RelDbh BA+L", height ~ 1.37 + (a1 + a1r + a1rd * relativeDiameter) * (1 - exp(b1*dbh))^(b2 + b2bal * basalAreaLarger), psme2022,
-  #                                                                fixedFormula = a1 + a1rd + b1 + b2 + b2bal ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$chapmanRichardsBalRelDbh = fit_nlme("Chapman-Richards RelDbh BA+L", height ~ 1.37 + (a1 + a1ra + a1rd * relativeDiameter) * (1 - exp(b1*dbh))^(b2 + b2bal * basalAreaLarger), psme2022,
+  #                                                                fixedFormula = a1 + a1rd + b1 + b2 + b2bal ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                                start = list(fixed = c(a1 = 70, a1rd = -1.7, b1 = -0.015, b2 = 1.3, b2bal = -0.005)))
-  #psmeHeightFromDiameterMixed$chapmanRichardsBalPhysio = fit_nlme("Chapman-Richards BA+L physio", height ~ 1.37 + (a1 + a1r + a1ba * standBasalAreaPerHectare) * (1 - exp((b1 + b1ac * cos(3.14159/180 * aspect))*dbh))^(b2 + b2p * isPlantation + b2bal * basalAreaLarger), psme2022, # b1r, b2r singularity in backsolve, b2balp not significant
-  #                                                                fixedFormula = a1 + a1ba + b1 + b1ac + b2 + b2p + b2bal ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$chapmanRichardsBalPhysio = fit_nlme("Chapman-Richards BA+L physio", height ~ 1.37 + (a1 + a1ra + a1ba * standBasalAreaPerHectare) * (1 - exp((b1 + b1ac * cos(3.14159/180 * aspect))*dbh))^(b2 + b2p * isPlantation + b2bal * basalAreaLarger), psme2022, # b1ra, b2ra singularity in backsolve, b2balp not significant
+  #                                                                fixedFormula = a1 + a1ba + b1 + b1ac + b2 + b2p + b2bal ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                                start = list(fixed = c(a1 = 40, a1ba = 0.3, b1 = -0.03, b1ac = -0.002, b2 = 1.4, b2p = 0.1, b2bal = -0.005)))
-  #psmeHeightFromDiameterMixed$chapmanRichardsBalPhysioRelDbh = fit_nlme("Chapman-Richards RelDbh BA+L physio", height ~ 1.37 + (a1 + a1r) * (1 - exp((b1 + b1ac * cos(3.14159/180 * aspect))*dbh))^(b2 + b2rd * relativeDiameter + b2bal * basalAreaLarger), psme2022, # b1r, b2r singularity in backsolve
-  #                                                                      fixedFormula = a1 + b1 + b1ac + b2 + b2rd + b2bal ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$chapmanRichardsBalPhysioRelDbh = fit_nlme("Chapman-Richards RelDbh BA+L physio", height ~ 1.37 + (a1 + a1ra) * (1 - exp((b1 + b1ac * cos(3.14159/180 * aspect))*dbh))^(b2 + b2rd * relativeDiameter + b2bal * basalAreaLarger), psme2022, # b1ra, b2ra singularity in backsolve
+  #                                                                      fixedFormula = a1 + b1 + b1ac + b2 + b2rd + b2bal ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                                      start = list(fixed = c(a1 = 48, b1 = -0.03, b1ac = -0.001, b2 = 1.3, b2rd = 0.3, b2bal = -0.003)))
   # reciprocal BA+L
-  psmeHeightFromDiameterMixed$chapmanRichardsBal = fit_nlme("Chapman-Richards BA+L", height ~ 1.37 + (a1 + a1r) * (1 - exp((b1)*dbh))^(b2 + b2bal / (b2balr + basalAreaLarger)), psme2022, # b1r, b2r singularity in backsolve
-                                                            fixedFormula = a1 + b1 + b2 + b2bal + b2balr ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  psmeHeightFromDiameterMixed$chapmanRichardsBal = fit_nlme("Chapman-Richards BA+L", height ~ 1.37 + (a1 + a1ra) * (1 - exp((b1)*dbh))^(b2 + b2bal / (b2balr + basalAreaLarger)), psme2022, # b1ra, b2ra singularity in backsolve
+                                                            fixedFormula = a1 + b1 + b2 + b2bal + b2balr ~ 1, randomFormula = a1ra ~ 1|stand/plot,
                                                             start = list(fixed = c(a1 = 62, b1 = -0.02, b2 = 1.0, b2bal = 4, b2balr = 7)))
-  psmeHeightFromDiameterMixed$chapmanRichardsBalRelDbh = fit_nlme("Chapman-Richards RelDbh BA+L", height ~ 1.37 + (a1 + a1rd * relativeDiameter + a1r) * (1 - exp((b1)*dbh))^(b2 + b2bal / (b2balr + basalAreaLarger)), psme2022, # b1r, b2r singularity in backsolve
-                                                                  fixedFormula = a1 + a1rd + b1 + b2 + b2bal + b2balr ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  psmeHeightFromDiameterMixed$chapmanRichardsBalRelDbh = fit_nlme("Chapman-Richards RelDbh BA+L", height ~ 1.37 + (a1 + a1rd * relativeDiameter + a1ra) * (1 - exp((b1)*dbh))^(b2 + b2bal / (b2balr + basalAreaLarger)), psme2022, # b1ra, b2ra singularity in backsolve
+                                                                  fixedFormula = a1 + a1rd + b1 + b2 + b2bal + b2balr ~ 1, randomFormula = a1ra ~ 1|stand/plot,
                                                                   start = list(fixed = c(a1 = 70, a1rd = -1.5, b1 = -0.02, b2 = 1.0, b2bal = 4, b2balr = 8)))
-  psmeHeightFromDiameterMixed$chapmanRichardsBalPhysio = fit_nlme("Chapman-Richards BA+L physio", height ~ 1.37 + (a1 + a1r) * (1 - exp((b1 + b1ac * cos(3.14159/180 * aspect))*dbh))^(b2 + b2bal / (b2balr + basalAreaLarger)), psme2022, # b1r, b2r singularity in backsolve
-                                                                  fixedFormula = a1 + b1 + b1ac + b2 + b2bal + b2balr ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  psmeHeightFromDiameterMixed$chapmanRichardsBalPhysio = fit_nlme("Chapman-Richards BA+L physio", height ~ 1.37 + (a1 + a1ra) * (1 - exp((b1 + b1ac * cos(3.14159/180 * aspect))*dbh))^(b2 + b2bal / (b2balr + basalAreaLarger)), psme2022, # b1ra, b2ra singularity in backsolve
+                                                                  fixedFormula = a1 + b1 + b1ac + b2 + b2bal + b2balr ~ 1, randomFormula = a1ra ~ 1|stand/plot,
                                                                   start = list(fixed = c(a1 = 65, b1 = -0.01, b1ac = -0.001, b2 = 0.9, b2bal = 5, b2balr = 8)))
-  #psmeHeightFromDiameterMixed$chapmanRichardsBalPhysioRelDbh = fit_nlme("Chapman-Richards RelDbh BA+L physio", height ~ 1.37 + (a1 + a1r) * (1 - exp((b1 + b1ac * cos(3.14159/180 * aspect))*dbh))^(b2 + b2rd * relativeDiameter + b2bal / (b2balr + basalAreaLarger)), psme2022,
-  #                                                                      fixedFormula = a1 + b1 + b1ac + b2 + b2rd + b2bal + b2balr ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$chapmanRichardsBalPhysioRelDbh = fit_nlme("Chapman-Richards RelDbh BA+L physio", height ~ 1.37 + (a1 + a1ra) * (1 - exp((b1 + b1ac * cos(3.14159/180 * aspect))*dbh))^(b2 + b2rd * relativeDiameter + b2bal / (b2balr + basalAreaLarger)), psme2022,
+  #                                                                      fixedFormula = a1 + b1 + b1ac + b2 + b2rd + b2bal + b2balr ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                                      start = list(fixed = c(a1 = 61, b1 = -0.02, b1ac = -0.001, b2 = 1.3, b2rd = 0.1, b2bal = 4, b2balr = 8)), distinct = FALSE)
   psmeHeightFromDiameterMixed$chapmanRichardsBalPhysioRelDbh = create_fit_statistics("Chapman-Richards RelDbh BA+L physio", fitting = "nlme", distinct = FALSE)
-  psmeHeightFromDiameterMixed$chapmanRichardsPhysio = fit_nlme("Chapman-Richards physio", height ~ 1.37 + (a1 + a1r) * (1 - exp((b1 + b1ac * cos(3.14159/180 * aspect))*dbh))^(b2 + b2p * isPlantation), psme2022, 
-                                                               fixedFormula = a1 + b1 + b1ac + b2 + b2p ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  psmeHeightFromDiameterMixed$chapmanRichardsPhysio = fit_nlme("Chapman-Richards physio", height ~ 1.37 + (a1 + a1ra) * (1 - exp((b1 + b1ac * cos(3.14159/180 * aspect))*dbh))^(b2 + b2p * isPlantation), psme2022, 
+                                                               fixedFormula = a1 + b1 + b1ac + b2 + b2p ~ 1, randomFormula = a1ra ~ 1|stand/plot,
                                                                start = list(fixed = c(a1 = 45, b1 = -0.02, b1ac = -0.002, b2 = 1.2, b2p = 0.1)))
-  psmeHeightFromDiameterMixed$chapmanRichardsRelDbh = fit_nlme("Chapman-Richards RelDbh", height ~ 1.37 + (a1 + a1r) *(1 - exp(b1*dbh))^(b2 + (b2rd + b2rdp * isPlantation) * relativeDiameter), psme2022, # b1r, b2r singularity in backsolve
-                                                                fixedFormula = a1 + b1 + b2 + b2rd + b2rdp ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  psmeHeightFromDiameterMixed$chapmanRichardsRelDbh = fit_nlme("Chapman-Richards RelDbh", height ~ 1.37 + (a1 + a1ra) *(1 - exp(b1*dbh))^(b2 + (b2rd + b2rdp * isPlantation) * relativeDiameter), psme2022, # b1ra, b2ra singularity in backsolve
+                                                                fixedFormula = a1 + b1 + b2 + b2rd + b2rdp ~ 1, randomFormula = a1ra ~ 1|stand/plot,
                                                                 start = list(fixed = c(a1 = 46, b1 = -0.03, b2 = 1.2, b2rd = 0.4, b2rdp = -0.1)))
-  psmeHeightFromDiameterMixed$chapmanRichardsRelDbhPhysio = fit_nlme("Chapman-Richards RelDbh physio", height ~ 1.37 + (a1 + a1r) *(1 - exp((b1 + b1ac * cos(3.14159/180 * aspect))*dbh))^(b2 + b2rd * relativeDiameter), psme2022, # b1r singularity in backsolve, b2r max iterations, b2rdp not significant
-                                                                     fixedFormula = a1 + b1 + b1ac + b2 + b2rd ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  psmeHeightFromDiameterMixed$chapmanRichardsRelDbhPhysio = fit_nlme("Chapman-Richards RelDbh physio", height ~ 1.37 + (a1 + a1ra) *(1 - exp((b1 + b1ac * cos(3.14159/180 * aspect))*dbh))^(b2 + b2rd * relativeDiameter), psme2022, # b1ra singularity in backsolve, b2ra max iterations, b2rdp not significant
+                                                                     fixedFormula = a1 + b1 + b1ac + b2 + b2rd ~ 1, randomFormula = a1ra ~ 1|stand/plot,
                                                                      start = list(fixed = c(a1 = 46, b1 = -0.03, b1ac = -0.002, b2 = 1.2, b2rd = 0.4)))
-  psmeHeightFromDiameterMixed$curtis = fit_nlme("Curtis", height ~ 1.37 + (a1 + a1p*isPlantation) * dbh / (1 + dbh)^(b1 + b1p*isPlantation + b1r), psme2022, # a1r also viable but slower to converge
-                                                fixedFormula = a1 + a1p + b1 + b1p ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  psmeHeightFromDiameterMixed$curtis = fit_nlme("Curtis", height ~ 1.37 + (a1 + a1p*isPlantation) * dbh / (1 + dbh)^(b1 + b1p*isPlantation + b1ra), psme2022, # a1ra job max iterations, 10x10 RMSE 5.36, AIC 4142
+                                                fixedFormula = a1 + a1p + b1 + b1p ~ 1, randomFormula = b1ra ~ 1|stand/plot,
                                                 start = list(fixed = c(a1 = 3, a1p = -0.8, b1 = 0.4, b1p = -0.1)))
-  psmeHeightFromDiameterMixed$hossfeld = fit_nlme("Hossfeld IV", height ~ 1.37 + (a1) / (1 + (a2) * dbh^(b1 + b1p * isPlantation + b1r)), psme2022, # b1r clearly preferable to a1r
-                                                  fixedFormula = a1 + a2 + b1 + b1p ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$curtis = fit_nlme("Curtis", height ~ 1.37 + (a1 + a1p*isPlantation) * dbh / (1 + dbh)^((b1 + b1p*isPlantation)* (1 + b1rm)), psme2022, # a1rm step halving, 10x10 RMSE 6.28, AIC 4286
+  #                                              fixedFormula = a1 + a1p + b1 + b1p ~ 1, randomFormula = b1rm ~ 1|stand/plot,
+  #                                              start = list(fixed = c(a1 = 3, a1p = -0.6, b1 = 0.4, b1p = -0.04)))
+  psmeHeightFromDiameterMixed$hossfeld = fit_nlme("Hossfeld IV", height ~ 1.37 + (a1) / (1 + (a2) * dbh^((b1 + b1p * isPlantation) * (1 + a1rm))), psme2022, # a1rm computationally singular, a2rm step halving, 10x10 RMSE 4.73, AIC 4006
+                                                  fixedFormula = a1 + a2 + b1 + b1p ~ 1, randomFormula = a1rm ~ 1|stand/plot,
                                                   start = list(fixed = c(a1 = 75, a2 = 80, b1 = -1.1, b1p = 0.05)))
-  #psmeHeightFromDiameterMixed$hossfeldA1 = fit_nlme("Hossfeld IV", height ~ 1.37 + (a1 + a1r) / (1 + (a2) * dbh^(b1 + b1p * isPlantation)), psme2022,
-  #                                                fixedFormula = a1 + a2 + b1 + b1p ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$hossfeldA1 = fit_nlme("Hossfeld IV", height ~ 1.37 + (a1 + a1ra) / (1 + (a2) * dbh^(b1 + b1p * isPlantation)), psme2022, # 10x10 RMSE 5.89, AIC 4144
+  #                                                  fixedFormula = a1 + a2 + b1 + b1p ~ 1, randomFormula = a1ra ~ 1|stand/plot,
+  #                                                  start = list(fixed = c(a1 = 75, a2 = 80, b1 = -1.1, b1p = 0.05)))
+  #psmeHeightFromDiameterMixed$hossfeldB1 = fit_nlme("Hossfeld IV", height ~ 1.37 + (a1) / (1 + (a2) * dbh^(b1 + b1p * isPlantation + b1ra)), psme2022, # 10x10 RMSE 4.96, AIC 4023
+  #                                                  fixedFormula = a1 + a2 + b1 + b1p ~ 1, randomFormula = b1ra ~ 1|stand/plot,
+  #                                                  start = list(fixed = c(a1 = 75, a2 = 80, b1 = -1.1, b1p = 0.05)))
+  #psmeHeightFromDiameterMixed$hossfeldA1 = fit_nlme("Hossfeld IV", height ~ 1.37 + (a1 + a1ra) / (1 + (a2) * dbh^(b1 + b1p * isPlantation)), psme2022,
+  #                                                fixedFormula = a1 + a2 + b1 + b1p ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                start = list(fixed = c(a1 = 50, a2 = 90, b1 = -1.3, b1p = 0.01)))
-  #psmeHeightFromDiameterMixed$hossfeldA2 = fit_nlme("Hossfeld IV", height ~ 1.37 + (a1) / (1 + (a2 + a2r) * dbh^(b1 + b1p * isPlantation)), psme2022, # job false convergence
-  #                                                fixedFormula = a1 + a2 + b1 + b1p ~ 1, randomFormula = a2r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$hossfeldA2 = fit_nlme("Hossfeld IV", height ~ 1.37 + (a1) / (1 + (a2 + a2ra) * dbh^(b1 + b1p * isPlantation)), psme2022, # job false convergence
+  #                                                fixedFormula = a1 + a2 + b1 + b1p ~ 1, randomFormula = a2ra ~ 1|stand/plot,
   #                                                start = list(fixed = c(a1 = 75, a2 = 75, b1 = -1.0, b1p = 0.06)))
-  psmeHeightFromDiameterMixed$korf = fit_nlme("Korf", height ~ 1.37 + (a1 + a1r)*exp((b1 + b1p * isPlantation)*dbh^(b2 + b2p * isPlantation)), psme2022, # b1r max iterations, b2r step halving
-                                              fixedFormula = a1 + b1 + b1p + b2 + b2p ~ 1, randomFormula = a1r ~ 1|stand/plot,
-                                              start = list(fixed = c(a1 = 90, b1 = -8, b1p = 2, b2 = -0.5, b2p = 0.1)))
-  psmeHeightFromDiameterMixed$michaelisMenten = fit_nlme("Michaelis-Menten", height ~ 1.37 + (a1)*dbh^(b1) / (a2 + a2p * isPlantation + a2r + dbh^(b1)), psme2022, # a2r clearly preferable to a1r but still sometimes job false convergence
-                                                         fixedFormula = a1 + a2 + a2p + b1 ~ 1, randomFormula = a2r ~ 1|stand/plot,
-                                                         start = list(fixed = c(a1 = 50, a2 = 100, a2p = -20, b1 = 1.3)))
-  #psmeHeightFromDiameterMixed$michaelisMentenA1 = fit_nlme("Michaelis-Menten", height ~ 1.37 + (a1 + a1r)*dbh^(b1) / (a2 + a2p * isPlantation + dbh^(b1)), psme2022,
-  #                                                         fixedFormula = a1 + a2 + a2p + b1 ~ 1, randomFormula = a1r ~ 1|stand/plot,
-  #                                                         start = list(fixed = c(a1 = 50, a2 = 100, a2p = -17, b1 = 1.3)))
-  #psmeHeightFromDiameterMixed$michaelisMentenB1 = fit_nlme("Michaelis-Menten", height ~ 1.37 + (a1)*dbh^(b1 + b1r) / (a2 + a2p * isPlantation + dbh^(b1 + b1r)), psme2022, # job false convergence
-  #                                                         fixedFormula = a1 + a2 + a2p + b1 ~ 1, randomFormula = b1r ~ 1|stand/plot,
-  #                                                         start = list(fixed = c(a1 = 75, a2 = 65, a2p = 11, b1 = 1.0)))
-  
-  psmeHeightFromDiameterMixed$michaelisMentenBal = fit_nlme("Michaelis-Menten BA+L", height ~ 1.37 + (a1)*dbh^(b1 + b1ba / standBasalAreaPerHectare + b1r) / (a2 + a2bal / (a2balr + basalAreaLarger) + dbh^(b1 + b1ba / standBasalAreaPerHectare + b1r)), psme2022, # a1r step halving, a2r job step halving, b1r job false convergence
-                                                            fixedFormula = a1 + a2 + a2bal + a2balr + b1 + b1ba ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  psmeHeightFromDiameterMixed$korf = fit_nlme("Korf", height ~ 1.37 + (a1)*exp((b1 + b1p * isPlantation)*dbh^((b2 + b2p * isPlantation)*(1 + b2rm))), psme2022, # a1rm job step halving, b1rm singularity in backsolve, 10x10 RMSE 4.98, AIC 4076
+                                              fixedFormula = a1 + b1 + b1p + b2 + b2p ~ 1, randomFormula = b2rm ~ 1|stand/plot,
+                                              start = list(fixed = c(a1 = 140, b1 = -7, b1p = 0.5, b2 = -0.4, b2p = 0.04)))
+  #psmeHeightFromDiameterMixed$korf = fit_nlme("Korf", height ~ 1.37 + (a1 + a1ra)*exp((b1 + b1p * isPlantation)*dbh^(b2 + b2p * isPlantation)), psme2022, # b1ra max iterations, b2ra step halving, 10x10 RMSE 5.48, AIC 4087
+  #                                            fixedFormula = a1 + b1 + b1p + b2 + b2p ~ 1, randomFormula = a1ra ~ 1|stand/plot,
+  #                                            start = list(fixed = c(a1 = 90, b1 = -8, b1p = 2, b2 = -0.5, b2p = 0.1)))
+  psmeHeightFromDiameterMixed$michaelisMenten = tryCatch({ fit_nlme("Michaelis-Menten", height ~ 1.37 + (a1)*dbh^(b1) / (a2 + a2p * isPlantation + a2ra + dbh^(b1)), psme2022, # 10x10 RMSE 4.89, AIC 3932
+                                                                    fixedFormula = a1 + a2 + a2p + b1 ~ 1, randomFormula = a2ra ~ 1|stand/plot,
+                                                                    start = list(fixed = c(a1 = 50, a2 = 100, a2p = -20, b1 = 1.3))) },
+                                                         error = function(e) { reset_future(); return(create_fit_statistics("Michaelis-Menten", fittingMethod = "gsl_nls")) }) # 2x50 leading minor
+  #psmeHeightFromDiameterMixed$michaelisMentenA1 = fit_nlme("Michaelis-Menten", height ~ 1.37 + (a1 + a1ra)*dbh^(b1) / (a2 + a2p * isPlantation + dbh^(b1)), psme2022, # 10x10 RMSE 6.49, AIC 4286
+  #                                                         fixedFormula = a1 + a2 + a2p + b1 ~ 1, randomFormula = a1ra ~ 1|stand/plot,
+  #                                                         start = list(fixed = c(a1 = 50, a2 = 100, a2p = -20, b1 = 1.3)))
+  #psmeHeightFromDiameterMixed$michaelisMentenB1 = fit_nlme("Michaelis-Menten", height ~ 1.37 + (a1)*dbh^(b1 + b1ra) / (a2 + a2p * isPlantation + dbh^(b1 + b1ra)), psme2022, # job false convergence, 10x10 RMSE 4.95, AIC 3988
+  #                                                         fixedFormula = a1 + a2 + a2p + b1 ~ 1, randomFormula = a1ra ~ 1|stand/plot,
+  #                                                         start = list(fixed = c(a1 = 75, a2 = 75, a2p = -8, b1 = 1.0)))
+  #psmeHeightFromDiameterMixed$michaelisMentenB1 = fit_nlme("Michaelis-Menten", height ~ 1.37 + (a1)*dbh^(b1*(1 + a2rm)) / (a2 + dbh^(b1*(1 + a2rm))), psme2022, # a1rm job step halving, a2p not significant, a2rm singularity in backsolve, 10x10 RMSE 4.90, AIC 4021
+  #                                                         fixedFormula = a1 + a2 + b1 ~ 1, randomFormula = a2rm ~ 1|stand/plot,
+  #                                                         start = list(fixed = c(a1 = 70, a2 = 90, b1 = 1.1)))
+  psmeHeightFromDiameterMixed$michaelisMentenBal = fit_nlme("Michaelis-Menten BA+L", height ~ 1.37 + (a1)*dbh^(b1 + b1ba / standBasalAreaPerHectare + b1ra) / (a2 + a2bal / (a2balr + basalAreaLarger) + dbh^(b1 + b1ba / standBasalAreaPerHectare + b1ra)), psme2022, # a1ra step halving, a2ra job step halving, b1ra job false convergence
+                                                            fixedFormula = a1 + a2 + a2bal + a2balr + b1 + b1ba ~ 1, randomFormula = b1ra ~ 1|stand/plot,
                                                             start = list(fixed = c(a1 = 85, a2 = 115, a2bal = 900, a2balr = 10, b1 = 1.2, b1ba = -1)))
-  #psmeHeightFromDiameterMixed$michaelisMentenBalRelDbh = fit_nlme("Michaelis-Menten BA+L", height ~ 1.37 + (a1)*dbh^(b1 + b1ba / standBasalAreaPerHectare) / (a2 + a2rd * relativeDiameter + a2bal / (a2balr + basalAreaLarger) + dbh^(b1 + b1ba / standBasalAreaPerHectare)), psme2022, 
+  #psmeHeightFromDiameterMixed$michaelisMentenBalRelDbh = fit_nlme("Michaelis-Menten RelDbh BA+L", height ~ 1.37 + (a1)*dbh^(b1 + b1ba / standBasalAreaPerHectare) / (a2 + a2rd * relativeDiameter + a2bal / (a2balr + basalAreaLarger) + dbh^(b1 + b1ba / standBasalAreaPerHectare)), psme2022, 
   #                                                                start = list(fixed = c(a1 = 85, a2 = 115, a2rd = 25, a2bal = 900, a2balr = 10, b1 = 1.2, b1ba = -1), distinct = FALSE)
-  psmeHeightFromDiameterMixed$michaelisMentenBalRelDbh = create_fit_statistics("Michaelis-Menten BA+L", fitting = "nlme", distinct = FALSE)
-  psmeHeightFromDiameterMixed$michaelisMentenRelDbh = fit_nlme("Michaelis-Menten RelDbh", height ~ 1.37 + (a1 + a2r)*dbh^b1 / (a2 + a2p * isPlantation + a2rd * relativeDiameter + dbh^b1), psme2022, # a2r singularity in backsolve, b1r computationally singular in both placements
-                                                               fixedFormula = a1 + a2 + a2p + a2rd + b1 ~ 1, randomFormula = a2r ~ 1|stand/plot,
-                                                               start = list(fixed = c(a1 = 80, a2 = 150, a2rd = 25, a2p = 15, b1 = 1.2)))
-  psmeHeightFromDiameterMixed$prodan = fit_nlme("Prodan", height ~ 1.37 + dbh^2 / ((a1)*dbh^2 + (a2 + a2r)*dbh + a3), psme2022, # a3r max iterations, a3, a3p not significant
-                                                fixedFormula = a1 + a2 + a3 ~ 1, randomFormula = a2r ~ 1|stand/plot,
-                                                start = list(fixed = c(a1 = 0.014, a2 = 0.9, a3 = 1)))
-  #psmeHeightFromDiameterMixed$prodanA1 = fit_nlme("Prodan", height ~ 1.37 + dbh^2 / ((a1 + a1r)*dbh^2 + (a2)*dbh + a3), psme2022, # a2r clearly preferable
-  #                                              fixedFormula = a1 + a2 + a3 ~ 1, randomFormula = a1r ~ 1|stand/plot,
-  #                                              start = list(fixed = c(a1 = 0.018, a2 = 0.7, a3 = 2.7)))
-  psmeHeightFromDiameterMixed$power = fit_nlme("power", height ~ 1.37 + (a1 + a1p * isPlantation + a1r)*dbh^(b1 + b1p * isPlantation), psme2022, # a1r, b1r not distinguishable
-                                               fixedFormula = a1 + a1p + b1 + b1p ~ 1, randomFormula = a1r ~ 1|stand/plot,
-                                               start = list(fixed = c(a1 = 1.9, a1p = -0.5, b1 = 0.7, b1p = 0.07)))
-  #psmeHeightFromDiameterMixed$powerB1 = fit_nlme("power", height ~ 1.37 + (a1 + a1p * isPlantation)*dbh^(b1 + b1p * isPlantation + b1r), psme2022,
-  #                                               fixedFormula = a1 + a1p + b1 + b1p ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  psmeHeightFromDiameterMixed$michaelisMentenBalRelDbh = create_fit_statistics("Michaelis-Menten RelDbh BA+L", fitting = "nlme", distinct = FALSE)
+  #psmeHeightFromDiameterMixed$michaelisMentenRelDbh = tryCatch({ fit_nlme("Michaelis-Menten RelDbh", height ~ 1.37 + (a1 + a2ra)*dbh^b1 / (a2 + a2p * isPlantation + a2rd * relativeDiameter + dbh^b1), psme2022, # a2ra singularity in backsolve, b1ra and b1rm computationally singular
+  #                                                                        fixedFormula = a1 + a2 + a2p + a2rd + b1 ~ 1, randomFormula = a2ra ~ 1|stand/plot,
+  #                                                                        start = list(fixed = c(a1 = 80, a2 = 150, a2rd = 25, a2p = 15, b1 = 1.2))) },
+  #                                                             error = function(e) { reset_future(); return(create_fit_statistics("Michaelis-Menten RelDbh", fittingMethod = "gsl_nls")) }) # 10x10 and 2x50 step halving
+  psmeHeightFromDiameterMixed$michaelisMentenRelDbh = create_fit_statistics("Michaelis-Menten RelDbh", fitting = "nlme")
+  psmeHeightFromDiameterMixed$power = fit_nlme("power", height ~ 1.37 + (a1 + a1p * isPlantation)*dbh^((b1 + b1p * isPlantation)*(1 + b1rm)), psme2022, # 10x10 MAE 4.08, AIC 4117
+                                               fixedFormula = a1 + a1p + b1 + b1p ~ 1, randomFormula = b1rm ~ 1|stand/plot,
+                                               start = list(fixed = c(a1 = 2.0, a1p = -0.6, b1 = 0.7, b1p = 0.08)))
+  #psmeHeightFromDiameterMixed$powerA1 = fit_nlme("power", height ~ 1.37 + (a1 + a1p * isPlantation + a1ra)*dbh^(b1 + b1p * isPlantation), psme2022, # 10x10 MAE 4.18, AIC 4152 vs 4.01, 4047 in fixed effects
+  #                                               fixedFormula = a1 + a1p + b1 + b1p ~ 1, randomFormula = a1ra ~ 1|stand/plot,
+  #                                               start = list(fixed = c(a1 = 1.9, a1p = -0.5, b1 = 0.7, b1p = 0.07)))
+  #psmeHeightFromDiameterMixed$powerA1 = fit_nlme("power", height ~ 1.37 + (a1 + a1p * isPlantation)*(1 + a1ra)*dbh^(b1 + b1p * isPlantation), psme2022, # step halving on (a1) * ((1 + a1ra) * dbh)^(b1), 10x10 MAE 4.17, AIC 4239
+  #                                             fixedFormula = a1 + a1p + b1 + b1p ~ 1, randomFormula = a1ra ~ 1|stand/plot,
+  #                                             start = list(fixed = c(a1 = 2.6, a1p = -0.9, b1 = 0.6, b1p = 0.07)))
+  #psmeHeightFromDiameterMixed$powerB1 = fit_nlme("power", height ~ 1.37 + (a1 + a1p * isPlantation)*dbh^(b1 + b1p * isPlantation + b1ra), psme2022, # 10x10 MAE 4.10, AIC 4135
+  #                                               fixedFormula = a1 + a1p + b1 + b1p ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                               start = list(fixed = c(a1 = 2.2, a1p = -0.7, b1 = 0.67, b1p = 0.08)))
-  psmeHeightFromDiameterMixed$ratkowsky = fit_nlme("Ratkowsky", height ~ 1.37 + (a1)*exp((b1 + b1p * isPlantation + b1r)/(dbh + b2)), psme2022, # b1r clearly preferable
-                                                   fixedFormula = a1 + b1 + b1p + b2 ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  psmeHeightFromDiameterMixed$prodan = fit_nlme("Prodan", height ~ 1.37 + dbh^2 / ((a1)*dbh^2 + (a2 + a2ra)*dbh + a3), psme2022, # a3ra max iterations, a3, a3p not significant, 10x10 RMSE 5.31, AIC 4074
+                                                fixedFormula = a1 + a2 + a3 ~ 1, randomFormula = a2ra ~ 1|stand/plot,
+                                                start = list(fixed = c(a1 = 0.014, a2 = 0.9, a3 = 1)))
+  #psmeHeightFromDiameterMixed$prodanA1 = fit_nlme("Prodan", height ~ 1.37 + dbh^2 / ((a1 + a1ra)*dbh^2 + (a2)*dbh + a3), psme2022, # 10x10 RMSE 6.67, AIC 4235
+  #                                                fixedFormula = a1 + a2 + a3 ~ 1, randomFormula = a1ra ~ 1|stand/plot,
+  #                                                start = list(fixed = c(a1 = 0.018, a2 = 0.7, a3 = 2.6)))
+  #psmeHeightFromDiameterMixed$prodanA2 = fit_nlme("Prodan", height ~ 1.37 + dbh^2 / ((a1)*(1 + a2rm)*dbh^2 + (a2)*dbh + a3), psme2022, # a2rm step halving, 10x10 RMSE 5.92, AIC 4412
+  #                                                fixedFormula = a1 + a2 + a3 ~ 1, randomFormula = a2rm ~ 1|stand/plot,
+  #                                                start = list(fixed = c(a1 = 0.02, a2 = 0.7, a3 = 3)))
+  #psmeHeightFromDiameterMixed$prodanA1 = fit_nlme("Prodan", height ~ 1.37 + dbh^2 / ((a1 + a1ra)*dbh^2 + (a2)*dbh + a3), psme2022, # a2ra clearly preferable
+  #                                              fixedFormula = a1 + a2 + a3 ~ 1, randomFormula = a1ra ~ 1|stand/plot,
+  #                                              start = list(fixed = c(a1 = 0.018, a2 = 0.7, a3 = 2.7)))
+  psmeHeightFromDiameterMixed$ratkowsky = fit_nlme("Ratkowsky", height ~ 1.37 + (a1)*exp((b1 + b1p * isPlantation + b1ra)/(dbh + b2)), psme2022, # 10x10 MAE 3.67, AIC 3972
+                                                   fixedFormula = a1 + b1 + b1p + b2 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
                                                    start = list(fixed = c(a1 = 63, b1 = -35, b1p = -4, b2 = 8)))
-  #psmeHeightFromDiameterMixed$ratkowskyA1 = fit_nlme("Ratkowsky", height ~ 1.37 + (a1 + a1r)*exp((b1 + b1p * isPlantation)/(dbh + b2)), psme2022,
-  #                                                   fixedFormula = a1 + b1 + b1p + b2 ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$ratkowskyA1 = fit_nlme("Ratkowsky", height ~ 1.37 + (a1 + a1ra)*exp((b1 + b1p * isPlantation)/(dbh + b2)), psme2022, # 10x10 MAE 5.18, AIC 4393
+  #                                                   fixedFormula = a1 + b1 + b1p + b2 ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                   start = list(fixed = c(a1 = 53, b1 = -29, b1p = 3, b2 = 5)))
-  psmeHeightFromDiameterMixed$richardsW = fit_nlme("unified Richards", height ~ 1.37 + (Ha + Hap*isPlantation + Har) * (1 + ((1.37/(Ha + Hap*isPlantation + Har))^(1 - d) - 1) * exp((-kU * dbh)/d^(d/(1 - d))))^(1/(1 - d)), psme2022, # kUr max iterations, dr step halving, dp not significant
-                                                   fixedFormula = Ha + Hap + d + kU ~ 1, randomFormula = Har ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$ratkowsky = fit_nlme("Ratkowsky", height ~ 1.37 + (a1)*exp((b1)*(1 + b1rm)/(dbh + b2)), psme2022, # a1rm, b1rm, b2rm step halving, dbh * (1 + b2rm) singularity in backsolve, 10x10 MAE 
+  #                                                 fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b1rm ~ 1|stand/plot,
+  #                                                 start = list(fixed = c(a1 = 63, b1 = -35, b2 = 8)))
+  psmeHeightFromDiameterMixed$richardsW = fit_nlme("unified Richards", height ~ 1.37 + (Ha + Hap*isPlantation) * (1 + Harm) * (1 + ((1.37/((Ha + Hap*isPlantation) * (1 + Harm)))^(1 - d) - 1) * exp((-kU * dbh)/d^(d/(1 - d))))^(1/(1 - d)), psme2022, # drm step halving, kUrm job singularity in backsolve, 10x10 MAE 3.76, AIC 4175
+                                                   fixedFormula = Ha + Hap + d + kU ~ 1, randomFormula = Harm ~ 1|stand/plot,
                                                    start = list(fixed = c(Ha = 47, Hap = -5, d = 0.4, kU = 0.018)))
-  psmeHeightFromDiameterMixed$sharmaParton = fit_nlme("Sharma-Parton", height ~ 1.37 + a1*topHeight^(b1 + b1r)*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3)*dbh))^b4, psme2022, # a1r, b2r, b4r singularity in backsolve, b3 not significant
-                                                      fixedFormula = a1 + b1 + b2 + b3 + b4 ~ 1, randomFormula = b1r ~ 1|stand/plot,
-                                                      start = list(fixed = c(a1 = 20, b1 = 0.3, b2 = -0.02, b3 = 0.02, b4 = 1.0)))
-  #psmeHeightFromDiameterMixed$sharmaPartonB3 = fit_nlme("Sharma-Parton", height ~ 1.37 + a1*topHeight^(b1)*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3r)*dbh))^b4, psme2022, # false convergence
-  #                                                    fixedFormula = a1 + b1 + b2 + b3 + b4 ~ 1, randomFormula = b3r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$richardsWha = fit_nlme("unified Richards", height ~ 1.37 + (Ha + Hap*isPlantation + Hara) * (1 + ((1.37/(Ha + Hap*isPlantation + Hara))^(1 - d) - 1) * exp((-kU * dbh)/d^(d/(1 - d))))^(1/(1 - d)), psme2022, # kUra max iterations, dra step halving, dp not significant, 10x10 MAE 4.02, AIC 4186
+  #                                                   fixedFormula = Ha + Hap + d + kU ~ 1, randomFormula = Hara ~ 1|stand/plot,
+  #                                                   start = list(fixed = c(Ha = 47, Hap = -5, d = 0.4, kU = 0.018)))
+  psmeHeightFromDiameterMixed$sharmaPartonB4 = tryCatch({ fit_nlme("Sharma-Parton", height ~ 1.37 + (a1)*topHeight^(b1)*(1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3) * dbh^(b4d*(1 + b4rm)))), psme2022, # b3 not significant, 10x10 MAE 3.10, AIC 3775
+                                                                   fixedFormula = a1 + b1 + b2 + b3 + b4d ~ 1, randomFormula = b4rm ~ 1|stand/plot,
+                                                                   start = list(fixed = c(a1 = 24, b1 = 0.3, b2 = -0.02, b3 = 0, b4d = 1.0))) },
+                                                        error = function(e) { reset_future(); return(create_fit_statistics("Sharma-Parton", fittingMethod = "gsl_nls")) }) # 2x50 max iterations
+  #psmeHeightFromDiameterMixed$sharmaParton = fit_nlme("Sharma-Parton", height ~ 1.37 + a1 * (1 + a1rm) * topHeight^((b1))*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3)*dbh))^b4, psme2022, # b1rm, b3rm, b4m step halving, 10x10 MAE 3.14, AIC 3819
+  #                                                    fixedFormula = a1 + b1 + b2 + b3 + b4 ~ 1, randomFormula = a1rm ~ 1|stand/plot,
+  #                                                    start = list(fixed = c(a1 = 20, b1 = 0.3, b2 = -0.02, b3 = 0, b4 = 1.0)))
+  #psmeHeightFromDiameterMixed$sharmaPartonB4 = fit_nlme("Sharma-Parton", height ~ 1.37 + (a1)*(1 + a1rm)*topHeight^(b1)*(1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3) * dbh^(b4d))), psme2022, # b1rm step halving, b3 not significant, b3rm leading minor, 10x10 MAE 3.16, AIC 3753
+  #                                                      fixedFormula = a1 + b1 + b2 + b3 + b4d ~ 1, randomFormula = a1rm ~ 1|stand/plot,
+  #                                                      start = list(fixed = c(a1 = 27, b1 = 0.3, b2 = -0.02, b3 = 0, b4d = 1.0)))
+  #psmeHeightFromDiameterMixed$sharmaPartonB4 = fit_nlme("Sharma-Parton", height ~ 1.37 + (a1)*topHeight^(b1)*(1 - exp((b2)*(1 + b2rm)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3) * dbh^(b4d))), psme2022, # b3 not significant, 10x10 MAE 3.18, AIC 3779
+  #                                                      fixedFormula = a1 + b1 + b2 + b3 + b4d ~ 1, randomFormula = b2rm ~ 1|stand/plot,
+  #                                                      start = list(fixed = c(a1 = 20, b1 = 0.3, b2 = -0.02, b3 = 0, b4d = 1.0)))
+  #psmeHeightFromDiameterMixed$sharmaPartonB1 = fit_nlme("Sharma-Parton", height ~ 1.37 + a1*topHeight^(b1 + b1ra)*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3)*dbh))^b4d, psme2022, # a1ra, b2ra, b4ra singularity in backsolve, b3 not significant, 10x10 MAE 3.24, AIC 3814
+  #                                                      fixedFormula = a1 + b1 + b2 + b3 + b4d ~ 1, randomFormula = b1ra ~ 1|stand/plot,
+  #                                                      start = list(fixed = c(a1 = 20, b1 = 0.3, b2 = -0.02, b3 = 0.02, b4d = 1.0)))
+  #psmeHeightFromDiameterMixed$sharmaPartonB2 = fit_nlme("Sharma-Parton", height ~ 1.37 + a1 * topHeight^((b1))*(1 - exp(b2 * (1 + b2rm) * (standTreesPerHectare/standBasalAreaPerHectare)^(b3)*dbh))^b4d, psme2022, # 10x10 MAE 3.22, AIC 3809
+  #                                                      fixedFormula = a1 + b1 + b2 + b3 + b4d ~ 1, randomFormula = b2rm ~ 1|stand/plot,
+  #                                                      start = list(fixed = c(a1 = 22, b1 = 0.3, b2 = -0.02, b3 = -0.01, b4d = 1.0)))
+  #psmeHeightFromDiameterMixed$sharmaPartonB3 = fit_nlme("Sharma-Parton", height ~ 1.37 + a1*topHeight^(b1)*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3ra)*dbh))^b4, psme2022, # false convergence
+  #                                                    fixedFormula = a1 + b1 + b2 + b3 + b4 ~ 1, randomFormula = b3ra ~ 1|stand/plot,
   #                                                    start = list(fixed = c(a1 = 20, b1 = 0.3, b2 = -0.02, b3 = 0.02, b4 = 1.0)))
-  psmeHeightFromDiameterMixed$sharmaPartonBal = fit_nlme("Sharma-Parton BA+L", height ~ 1.37 + (a1)*topHeight^(b1 + b1r) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger)) * dbh))^b4, psme2022, # a1r, b4r singularity in backsolve, b2r step halving, 10x10 MAE 3.01, AIC 3669
-                                                         fixedFormula = a1 + b1 + b2 + b3 + b3bal + b3balr + b4 ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  psmeHeightFromDiameterMixed$sharmaPartonBal = fit_nlme("Sharma-Parton BA+L", height ~ 1.37 + (a1) * (1 + a1rm) * topHeight^(b1) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger)) * dbh))^b4, psme2022, # 10x10 MAE 2.98, AIC 3709
+                                                         fixedFormula = a1 + b1 + b2 + b3 + b3bal + b3balr + b4 ~ 1, randomFormula = a1rm ~ 1|stand/plot,
                                                          start = list(fixed = c(a1 = 24, b1 = 0.3, b2 = -0.02, b3 = -0.02, b3bal = -2, b3balr = 14, b4 = 1.0)))
-  #psmeHeightFromDiameterMixed$sharmaPartonBalB3 = fit_nlme("Sharma-Parton BA+L", height ~ 1.37 + (a1)*topHeight^(b1) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger) + b3r) * dbh))^b4, psme2022, # 10x10 MAE 3.05, AIC 3727
-  #                                                         fixedFormula = a1 + b1 + b2 + b3 + b3bal + b3balr + b4 ~ 1, randomFormula = b3r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$sharmaPartonBalA1 = fit_nlme("Sharma-Parton BA+L", height ~ 1.37 + (a1)*topHeight^(b1 + b1ra) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger)) * dbh))^b4, psme2022, # a1ra, b4ra singularity in backsolve, b2ra step halving, 10x10 MAE 3.01, AIC 3669
+  #                                                         fixedFormula = a1 + b1 + b2 + b3 + b3bal + b3balr + b4 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                         start = list(fixed = c(a1 = 24, b1 = 0.3, b2 = -0.02, b3 = -0.02, b3bal = -2, b3balr = 14, b4 = 1.0)))
-  #psmeHeightFromDiameterMixed$sharmaPartonBal = fit_nlme("Sharma-Parton BA+L", height ~ 1.37 + (a1)*topHeight^(b1 + b1r) * (1 - exp(b2*(standTreesPerHectare/(standBasalAreaPerHectare + basalAreaLarger))^(b3)*dbh))^b4, psme2022, # a1r, b2r, b4r singularity in backsolve
-  #                                                       fixedFormula = a1 + b1 + b2 + b3 + b4 ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$sharmaPartonBalB3 = fit_nlme("Sharma-Parton BA+L", height ~ 1.37 + (a1)*topHeight^(b1) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger) + b3ra) * dbh))^b4, psme2022, # 10x10 MAE 3.05, AIC 3727
+  #                                                         fixedFormula = a1 + b1 + b2 + b3 + b3bal + b3balr + b4 ~ 1, randomFormula = b3ra ~ 1|stand/plot,
+  #                                                         start = list(fixed = c(a1 = 24, b1 = 0.3, b2 = -0.02, b3 = -0.02, b3bal = -2, b3balr = 14, b4 = 1.0)))
+  #psmeHeightFromDiameterMixed$sharmaPartonBalB1 = fit_nlme("Sharma-Parton BA+L", height ~ 1.37 + (a1)*topHeight^(b1 + b1ra) * (1 - exp(b2*(standTreesPerHectare/(standBasalAreaPerHectare + basalAreaLarger))^(b3)*dbh))^b4, psme2022, # a1ra, b2ra, b4ra singularity in backsolve
+  #                                                         fixedFormula = a1 + b1 + b2 + b3 + b4 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
+  #                                                         start = list(fixed = c(a1 = 40, b1 = 0.1, b2 = -0.02, b3 = -0.02, b4 = 1.0)))
+  #psmeHeightFromDiameterMixed$sharmaPartonBalB3 = fit_nlme("Sharma-Parton BA+L", height ~ 1.37 + (a1)*topHeight^(b1) * (1 - exp(b2*(standTreesPerHectare/(standBasalAreaPerHectare + basalAreaLarger))^(b3 + b3ra)*dbh))^b4, psme2022, # b1ra clearly preferable
+  #                                                       fixedFormula = a1 + b1 + b2 + b3 + b4 ~ 1, randomFormula = b3ra ~ 1|stand/plot,
   #                                                       start = list(fixed = c(a1 = 40, b1 = 0.1, b2 = -0.02, b3 = -0.02, b4 = 1.0)))
-  #psmeHeightFromDiameterMixed$sharmaPartonBalB3 = fit_nlme("Sharma-Parton BA+L", height ~ 1.37 + (a1)*topHeight^(b1) * (1 - exp(b2*(standTreesPerHectare/(standBasalAreaPerHectare + basalAreaLarger))^(b3 + b3r)*dbh))^b4, psme2022, # b1r clearly preferable
-  #                                                       fixedFormula = a1 + b1 + b2 + b3 + b4 ~ 1, randomFormula = b3r ~ 1|stand/plot,
-  #                                                       start = list(fixed = c(a1 = 40, b1 = 0.1, b2 = -0.02, b3 = -0.02, b4 = 1.0)))
-  
-  psmeHeightFromDiameterMixed$sharmaPartonBalPhysio = fit_nlme("Sharma-Parton BA+L physio", height ~ 1.37 + (a1 + a1ac * cos(3.14159/180 * aspect))*topHeight^(b1 + b1r) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger))*dbh))^(b4 + b4e * elevation), # a1r step halving, b2r, b4r singularity in backsolve
-                                                               fixedFormula = a1 + a1ac + b1 + b2 + b3 + b3bal + b3balr + b4 + b4e ~ 1, randomFormula = b1r ~ 1|stand/plot,
-                                                               psme2022, start = list(fixed = c(a1 = 30, a1ac = 1.0, b1 = 0.2, b2 = -0.02, b3 = 0.1, b3bal = -2, b3balr = 14, b4 = 1.0, b4e = 0.0001)))
-  #psmeHeightFromDiameterMixed$sharmaPartonBalPhysioB3 = fit_nlme("Sharma-Parton BA+L physio", height ~ 1.37 + (a1 + a1ac * cos(3.14159/180 * aspect))*topHeight^(b1) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger))*dbh) + b3r)^(b4 + b4e * elevation), # job singularity in backsolve
-  #                                                               fixedFormula = a1 + a1ac + b1 + b2 + b3 + b3bal + b3balr + b4 + b4e ~ 1, randomFormula = b3r ~ 1|stand/plot,
+  psmeHeightFromDiameterMixed$sharmaPartonBalPhysio = fit_nlme("Sharma-Parton BA+L physio", height ~ 1.37 + (a1 + a1ac * cos(3.14159/180 * aspect)) * (1 + a1ra) * topHeight^(b1) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger))*dbh))^(b4 + b4e * elevation), # 10x10 MAE 2.86, AIC 3688
+                                                               fixedFormula = a1 + a1ac + b1 + b2 + b3 + b3bal + b3balr + b4 + b4e ~ 1, randomFormula = a1ra ~ 1|stand/plot,
+                                                               psme2022, start = list(fixed = c(a1 = 38, a1ac = 1.7, b1 = 0.2, b2 = -0.02, b3 = 0.2, b3bal = -7, b3balr = 30, b4 = 1.1, b4e = 0.0002)))
+  #psmeHeightFromDiameterMixed$sharmaPartonBalPhysio = fit_nlme("Sharma-Parton BA+L physio", height ~ 1.37 + (a1 + a1ac * cos(3.14159/180 * aspect))*topHeight^(b1 + b1ra) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger))*dbh))^(b4 + b4e * elevation), # a1ra step halving, b2ra, b4ra singularity in backsolve, 10x10 MAE 2.89, AIC 3679
+  #                                                             fixedFormula = a1 + a1ac + b1 + b2 + b3 + b3bal + b3balr + b4 + b4e ~ 1, randomFormula = b1ra ~ 1|stand/plot,
+  #                                                             psme2022, start = list(fixed = c(a1 = 30, a1ac = 1.0, b1 = 0.2, b2 = -0.02, b3 = 0.1, b3bal = -2, b3balr = 14, b4 = 1.0, b4e = 0.0001)))
+  #psmeHeightFromDiameterMixed$sharmaPartonBalPhysioB3 = fit_nlme("Sharma-Parton BA+L physio", height ~ 1.37 + (a1 + a1ac * cos(3.14159/180 * aspect))*topHeight^(b1) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger))*dbh) + b3ra)^(b4 + b4e * elevation), # job singularity in backsolve
+  #                                                               fixedFormula = a1 + a1ac + b1 + b2 + b3 + b3bal + b3balr + b4 + b4e ~ 1, randomFormula = b3ra ~ 1|stand/plot,
   #                                                               psme2022, start = list(fixed = c(a1 = 30, a1ac = 1.0, b1 = 0.2, b2 = -0.02, b3 = 0.1, b3bal = -2, b3balr = 14, b4 = 1.0, b4e = 0.0001)))
-  #psmeHeightFromDiameterMixed$sharmaPartonBalPhysio = fit_nlme("Sharma-Parton BA+L physio", height ~ 1.37 + (a1 + a1ac * cos(3.14159/180 * aspect))*topHeight^(b1 + b1r) * (1 - exp(b2*(standTreesPerHectare/(standBasalAreaPerHectare + basalAreaLarger))^(b3)*dbh))^(b4 + b4e * elevation), psme2022, # a1r, b24, b4r singularity in backsolve
-  #                                                             fixedFormula = a1 + a1ac + b1 + b2 + b3 + b4 + b4e ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$sharmaPartonBalPhysio = fit_nlme("Sharma-Parton BA+L physio", height ~ 1.37 + (a1 + a1ac * cos(3.14159/180 * aspect))*topHeight^(b1 + b1ra) * (1 - exp(b2*(standTreesPerHectare/(standBasalAreaPerHectare + basalAreaLarger))^(b3)*dbh))^(b4 + b4e * elevation), psme2022, # a1ra, b24, b4ra singularity in backsolve
+  #                                                             fixedFormula = a1 + a1ac + b1 + b2 + b3 + b4 + b4e ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                             start = list(fixed = c(a1 = 40, a1ac = 1.5, b1 = 0.1, b2 = -0.03, b3 = -0.1, b4 = 1.0, b4e = 0.0003)))
-  #psmeHeightFromDiameterMixed$sharmaPartonBalPhysioB3 = fit_nlme("Sharma-Parton BA+L physio", height ~ 1.37 + (a1 + a1ac * cos(3.14159/180 * aspect))*topHeight^(b1) * (1 - exp(b2*(standTreesPerHectare/(standBasalAreaPerHectare + basalAreaLarger))^(b3 + b3r)*dbh))^(b4 + b4e * elevation), psme2022, # inclination to a1-b1 evaporation
-  #                                                             fixedFormula = a1 + a1ac + b1 + b2 + b3 + b4 + b4e ~ 1, randomFormula = b3r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$sharmaPartonBalPhysioB3 = fit_nlme("Sharma-Parton BA+L physio", height ~ 1.37 + (a1 + a1ac * cos(3.14159/180 * aspect))*topHeight^(b1) * (1 - exp(b2*(standTreesPerHectare/(standBasalAreaPerHectare + basalAreaLarger))^(b3 + b3ra)*dbh))^(b4 + b4e * elevation), psme2022, # inclination to a1-b1 evaporation
+  #                                                             fixedFormula = a1 + a1ac + b1 + b2 + b3 + b4 + b4e ~ 1, randomFormula = b3ra ~ 1|stand/plot,
   #                                                             start = list(fixed = c(a1 = 25, a1ac = 0.8, b1 = 0.3, b2 = -0.02, b3 = -0.04, b4 = 1.0, b4e = 0.0002)))
   #psmeHeightFromDiameterMixed$sharmaPartonBalPhysioRelDbh = fit_gsl_nls("Sharma-Parton RelDbh BA+L physio", height ~ 1.37 + (a1 + a1rd * relativeDiameter)*topHeight^(b1 + b1as * sin(3.14159/180 * aspect) + b1ac * cos(3.14159/180 * aspect)) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger))*dbh))^(b4), psme2022,
-  #                                                                      fixedFormula = a1 + a1ac + b1 + b2 + b3 + b3bal + b3balr + b4 + b4e ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  #                                                                      fixedFormula = a1 + a1ac + b1 + b2 + b3 + b3bal + b3balr + b4 + b4e ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                                      start = list(a1 = 30, a1rd = 0, b1 = 0.2, b1as = -0.04, b1ac = 0.01, b2 = -0.02, b3 = 0.1, b3bal = -2, b3balr = 14, b4 = 1.0), distinct = FALSE)
   psmeHeightFromDiameterMixed$sharmaPartonBalPhysioRelDbh = create_fit_statistics("Sharma-Parton RelDbh BA+L physio", fitting = "nlme", distinct = FALSE)
-  #psmeHeightFromDiameterMixed$sharmaPartonBalPhysioRelDbh = fit_nlme("Sharma-Parton RelDbh BA+L physio", height ~ 1.37 + (a1)*topHeight^(b1 + b1r + b1rd * relativeDiameter + b1as * sin(3.14159/180 * aspect) + b1ac * cos(3.14159/180 * aspect)) * (1 - exp(b2*(standTreesPerHectare/(standBasalAreaPerHectare + basalAreaLarger))^(b3)*dbh))^(b4), psme2022, # a1r, b2r, b4r singularity in backsolve, b3r max iterations, a1rd not significant, b2rd, b3rd, b4rd all slow to converge compared to b1rd
-  #                                                                   fixedFormula = a1 + b1 + b1rd + b1as + b1ac + b2 + b3 + b4 ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$sharmaPartonBalPhysioRelDbh = fit_nlme("Sharma-Parton RelDbh BA+L physio", height ~ 1.37 + (a1)*topHeight^(b1 + b1ra + b1rd * relativeDiameter + b1as * sin(3.14159/180 * aspect) + b1ac * cos(3.14159/180 * aspect)) * (1 - exp(b2*(standTreesPerHectare/(standBasalAreaPerHectare + basalAreaLarger))^(b3)*dbh))^(b4), psme2022, # a1ra, b2ra, b4ra singularity in backsolve, b3ra max iterations, a1rd not significant, b2rd, b3rd, b4rd all slow to converge compared to b1rd
+  #                                                                   fixedFormula = a1 + b1 + b1rd + b1as + b1ac + b2 + b3 + b4 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                                   start = list(fixed = c(a1 = 35, b1 = 0.1, b1rd = 0.002, b1as = 0.005, b1ac = 0.01, b2 = -0.02, b3 = -0.15, b4 = 1.0)))
-  #psmeHeightFromDiameterMixed$sharmaPartonBalRelDbh = fit_nlme("Sharma-Parton RelDbh BA+L", height ~ 1.37 + (a1 + a1rd * relativeDiameter)*topHeight^(b1 + b1r) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger)) * dbh))^(b4), psme2022, 
-  #                                                             fixedFormula = a1 + a1rd + b1 + b2 + b3 + b3bal + b3balr + b4 ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$sharmaPartonBalRelDbh = fit_nlme("Sharma-Parton RelDbh BA+L", height ~ 1.37 + (a1 + a1rd * relativeDiameter)*topHeight^(b1 + b1ra) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger)) * dbh))^(b4), psme2022, 
+  #                                                             fixedFormula = a1 + a1rd + b1 + b2 + b3 + b3bal + b3balr + b4 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                             start = list(fixed = c(a1 = 30, a1rd = 0, b1 = 0.2, b2 = -0.02, b3 = 0.1, b3bal = -2, b3balr = 15, b4 = 1.0)), distinct = FALSE)
   psmeHeightFromDiameterMixed$sharmaPartonBalRelDbh = create_fit_statistics("Sharma-Parton RelDbh BA+L", fitting = "nlme", distinct = FALSE)
-  #psmeHeightFromDiameterMixed$sharmaPartonBalRelDbh = fit_nlme("Sharma-Parton RelDbh BA+L", height ~ 1.37 + (a1)*topHeight^(b1 + b1r) * (1 - exp((b2)*(standTreesPerHectare/(standBasalAreaPerHectare + basalAreaLarger))^(b3)*dbh))^(b4 + b4rd * relativeDiameter), psme2022, # b2r max iterations, b3r, b4r singularity in backsolve, a1rd not significant
-  #                                                             fixedFormula = a1 + b1 + b2 + b3 + b4 + b4rd ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$sharmaPartonBalRelDbh = fit_nlme("Sharma-Parton RelDbh BA+L", height ~ 1.37 + (a1)*topHeight^(b1 + b1ra) * (1 - exp((b2)*(standTreesPerHectare/(standBasalAreaPerHectare + basalAreaLarger))^(b3)*dbh))^(b4 + b4rd * relativeDiameter), psme2022, # b2ra max iterations, b3ra, b4ra singularity in backsolve, a1rd not significant
+  #                                                             fixedFormula = a1 + b1 + b2 + b3 + b4 + b4rd ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                             start = list(fixed = c(a1 = 40, b1 = 0.1, b2 = -0.02, b3 = -0.2, b4 = 1.0, b4rd = -0.03)))
-  psmeHeightFromDiameterMixed$sharmaPartonPhysio = fit_nlme("Sharma-Parton physio", height ~ 1.37 + a1*topHeight^(b1 + b1r) * (1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3)*dbh))^(b4 + b4as * sin(3.14159/180 * aspect) + b4ac * cos(3.14159/180 * aspect)), psme2022, # a1r, b4r singularity in backsolve, b2r step halving, b3 not significant
-                                                            fixedFormula = a1 + b1 + b2 + b3 + b4 + b4ac + b4as ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  psmeHeightFromDiameterMixed$sharmaPartonPhysio = fit_nlme("Sharma-Parton physio", height ~ 1.37 + a1*topHeight^(b1 + b1ra) * (1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3)*dbh))^(b4 + b4as * sin(3.14159/180 * aspect) + b4ac * cos(3.14159/180 * aspect)), psme2022, # a1ra, b4ra singularity in backsolve, b2ra step halving, b3 not significant, 10x10 MAE 3.19, AIC 3856
+                                                            fixedFormula = a1 + b1 + b2 + b3 + b4 + b4ac + b4as ~ 1, randomFormula = b1ra ~ 1|stand/plot,
                                                             start = list(fixed = c(a1 = 20, b1 = 0.3, b2 = -0.02, b3 = 0, b4 = 1.0, b4ac = -0.05, b4as = -0.04)))
-  #psmeHeightFromDiameterMixed$sharmaPartonPhysioB3 = fit_nlme("Sharma-Parton physio", height ~ 1.37 + a1*topHeight^(b1) * (1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3r)*dbh))^(b4 + b4as * sin(3.14159/180 * aspect) + b4ac * cos(3.14159/180 * aspect)), psme2022, # job false convergence
-  #                                                          fixedFormula = a1 + b1 + b2 + b3 + b4 + b4ac + b4as ~ 1, randomFormula = b3r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$sharmaPartonPhysio = fit_nlme("Sharma-Parton physio", height ~ 1.37 + a1*topHeight^(b1 + b1ra) * (1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3)*dbh))^(b4 + b4as * sin(3.14159/180 * aspect) + b4ac * cos(3.14159/180 * aspect)), psme2022, # 10x10 MAE 3.22, AIC 3750
+  #                                                          fixedFormula = a1 + b1 + b2 + b3 + b4 + b4ac + b4as ~ 1, randomFormula = b1ra ~ 1|stand/plot,
+  #                                                          start = list(fixed = c(a1 = 18, b1 = 0.3, b2 = -0.02, b3 = -0.03, b4 = 1.0, b4ac = -0.05, b4as = -0.05)))
+  #psmeHeightFromDiameterMixed$sharmaPartonPhysioB3 = fit_nlme("Sharma-Parton physio", height ~ 1.37 + a1*topHeight^(b1) * (1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3ra)*dbh))^(b4 + b4as * sin(3.14159/180 * aspect) + b4ac * cos(3.14159/180 * aspect)), psme2022, # job false convergence
+  #                                                          fixedFormula = a1 + b1 + b2 + b3 + b4 + b4ac + b4as ~ 1, randomFormula = b3ra ~ 1|stand/plot,
   #                                                          start = list(fixed = c(a1 = 20, b1 = 0.3, b2 = -0.02, b3 = 0, b4 = 1.0, b4ac = -0.05, b4as = -0.04)))
-  #psmeHeightFromDiameterMixed$sharmaPartonRelDbh = fit_nlme("Sharma-Parton RelDbh", height ~ 1.37 + a1*topHeight^(b1 + b1r + b1rd * relativeDiameter)*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3)*dbh))^b4, psme2022, # fixed effects not significant
-  #                                                          fixedFormula = a1 + b1 + b1rd + b2 + b3 + b4 ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$sharmaPartonRelDbh = fit_nlme("Sharma-Parton RelDbh", height ~ 1.37 + a1*topHeight^(b1 + b1ra + b1rd * relativeDiameter)*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3)*dbh))^b4, psme2022, # fixed effects not significant
+  #                                                          fixedFormula = a1 + b1 + b1rd + b2 + b3 + b4 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                          start = list(fixed = c(a1 = 13, b1 = 0.3, b1rd = 0, b2 = -0.02, b3 = 0.02, b4 = 1.0)))
   psmeHeightFromDiameterMixed$sharmaPartonRelDbh = create_fit_statistics("Sharma-Parton RelDbh", fitting = "nlme", distinct = FALSE)
-  #psmeHeightFromDiameterMixed$sharmaPartonRelDbhPhysio = fit_nlme("Sharma-Parton RelDbh physio", height ~ 1.37 + a1*topHeight^(b1 + b1r + b1rd * relativeDiameter)*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3)*dbh))^(b4 + b4as * sin(3.14159/180 * aspect) + b4ac * cos(3.14159/180 * aspect)), psme2022, # fixed effects not significant
-  #                                                                fixedFormula = a1 + b1 + b1rd + b2 + b3 + b4 + b4as + b4ac ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$sharmaPartonRelDbhPhysio = fit_nlme("Sharma-Parton RelDbh physio", height ~ 1.37 + a1*topHeight^(b1 + b1ra + b1rd * relativeDiameter)*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3)*dbh))^(b4 + b4as * sin(3.14159/180 * aspect) + b4ac * cos(3.14159/180 * aspect)), psme2022, # fixed effects not significant
+  #                                                                fixedFormula = a1 + b1 + b1rd + b2 + b3 + b4 + b4as + b4ac ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                                start = list(fixed = c(a1 = 18, b1 = 0.3, b1rd = 0.004, b2 = -0.02, b3 = 0, b4 = 1.0, b4ac = -0.05, b4as = -0.04)))
   psmeHeightFromDiameterMixed$sharmaPartonRelDbhPhysio = create_fit_statistics("Sharma-Parton RelDbh physio", fitting = "nlme", distinct = FALSE)
-  psmeHeightFromDiameterMixed$sharmaZhang = fit_nlme("Sharma-Zhang", height ~ 1.37 + a1*standBasalAreaPerHectare^(b1 + b1p * isPlantation)*(1 - exp(b2*standTreesPerHectare^(b3 + b3r)*dbh))^(b4), psme2022, # a1r, b4r singularity in backsolve, b2r step halving, a1p not significant
-                                                     fixedFormula = a1 + b1 + b1p + b2 + b3 + b4 ~ 1, randomFormula = b3r ~ 1|stand/plot,
+  psmeHeightFromDiameterMixed$sharmaZhang = fit_nlme("Sharma-Zhang", height ~ 1.37 + a1*standBasalAreaPerHectare^(b1 + b1p * isPlantation)*(1 - exp(b2*standTreesPerHectare^(b3 + b3ra)*dbh))^(b4), psme2022, # a1ra, b4ra singularity in backsolve, b2ra step halving, a1p not significant, 10x10 MAE 3.26, AIC 3874
+                                                     fixedFormula = a1 + b1 + b1p + b2 + b3 + b4 ~ 1, randomFormula = b3ra ~ 1|stand/plot,
                                                      start = list(fixed = c(a1 = 35, b1 = 0.1, b1p = 0.08, b2 = -0.03, b3 = -0.06, b4 = 1.0)))
-  #psmeHeightFromDiameterMixed$sharmaZhangB1 = fit_nlme("Sharma-Zhang", height ~ 1.37 + (a1 + a1p * isPlantation)*standBasalAreaPerHectare^(b1 + b1p * isPlantation + b1r)*(1 - exp(b2*standTreesPerHectare^(b3)*dbh))^(b4), psme2022, # b3r preferable
-  #                                                   fixedFormula = a1 + a1p + b1 + b1p + b2 + b3 + b4 ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$sharmaZhangB4 = fit_nlme("Sharma-Zhang", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1 + b1ra)*(1 - exp((b2)*standTreesPerHectare^(b3)*dbh^(b4d))), psme2022, # a1ra job step halving, b2ra step halving, 10x10 MAE 3.43, AIC 3801
+  #                                                     fixedFormula = a1 + b1 + b2 + b3 + b4d ~ 1, randomFormula = b1ra ~ 1|stand/plot,
+  #                                                     start = list(fixed = c(a1 = 23, b1 = 0.2, b2 = -0.04, b3 = -0.1, b4d = 1.0)))
+  #psmeHeightFromDiameterMixed$sharmaZhangB4 = fit_nlme("Sharma-Zhang", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1)*(1 - exp((b2)*standTreesPerHectare^(b3 + b3ra)*dbh^(b4d))), psme2022, # 10x10 MAE 3.38, AIC 3803
+  #                                                     fixedFormula = a1 + b1 + b2 + b3 + b4d ~ 1, randomFormula = b3ra ~ 1|stand/plot,
+  #                                                     start = list(fixed = c(a1 = 37, b1 = 0.14, b2 = -0.04, b3 = -0.1, b4d = 0.9)))
+  #psmeHeightFromDiameterMixed$sharmaZhangB4 = fit_nlme("Sharma-Zhang", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1)*(1 - exp((b2)*standTreesPerHectare^(b3)*dbh^(b4d + b4ra))), psme2022, # 10x10 MAE 3.27, AIC 3847
+  #                                                     fixedFormula = a1 + b1 + b2 + b3 + b4d ~ 1, randomFormula = b4ra ~ 1|stand/plot,
+  #                                                     start = list(fixed = c(a1 = 33, b1 = 0.15, b2 = -0.04, b3 = -0.1, b4d = 0.9)))
+  #psmeHeightFromDiameterMixed$sharmaZhangB4 = fit_nlme("Sharma-Zhang", height ~ 1.37 + (a1)*(1 + a1rm)*standBasalAreaPerHectare^(b1)*(1 - exp((b2)*standTreesPerHectare^(b3)*dbh^(b4d))), psme2022, # b1rm, b2rm step halving, b3rm singularity in backsolve, 10x10 MAE 3.40, AIC 3874
+  #                                                     fixedFormula = a1 + b1 + b2 + b3 + b4d ~ 1, randomFormula = a1rm ~ 1|stand/plot,
+  #                                                     start = list(fixed = c(a1 = 23, b1 = 0.2, b2 = -0.03, b3 = -0.1, b4d = 1.0)))
+  #psmeHeightFromDiameterMixed$sharmaZhangB4 = fit_nlme("Sharma-Zhang", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1)*(1 - exp((b2)*standTreesPerHectare^(b3)*dbh^(b4d*(1 + b4rm)))), psme2022, # 10x10 MAE 3.30, AIC 3822
+  #                                                     fixedFormula = a1 + b1 + b2 + b3 + b4d ~ 1, randomFormula = b4rm ~ 1|stand/plot,
+  #                                                     start = list(fixed = c(a1 = 33, b1 = 0.15, b2 = -0.03, b3 = -0.1, b4 = 1.0)))
+  #psmeHeightFromDiameterMixed$sharmaZhang = fit_nlme("Sharma-Zhang", height ~ 1.37 + a1*(1 + a1rm)*standBasalAreaPerHectare^(b1)*(1 - exp(b2*standTreesPerHectare^(b3)*dbh))^(b4), psme2022, # b1p not significant, b1rm, b2rm, b3rm, b4rm singularity in backsolve, 10x10 MAE 3.40, AIC 3921
+  #                                                   fixedFormula = a1 + b1 + b2 + b3 + b4 ~ 1, randomFormula = a1rm ~ 1|stand/plot,
+  #                                                   start = list(fixed = c(a1 = 24, b1 = 0.2, b2 = -0.03, b3 = -0.09, b4 = 1.0)))
+  #psmeHeightFromDiameterMixed$sharmaZhangB1 = fit_nlme("Sharma-Zhang", height ~ 1.37 + (a1 + a1p * isPlantation)*standBasalAreaPerHectare^(b1 + b1p * isPlantation + b1ra)*(1 - exp(b2*standTreesPerHectare^(b3)*dbh))^(b4), psme2022, # b3ra preferable
+  #                                                   fixedFormula = a1 + a1p + b1 + b1p + b2 + b3 + b4 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                   start = list(fixed = c(a1 = 35, a1p = -10, b1 = 0.1, b1p = 0.08, b2 = -0.03, b3 = -0.06, b4 = 1.0)))
-  psmeHeightFromDiameterMixed$sharmaZhangBal = fit_nlme("Sharma-Zhang BA+L", height ~ 1.37 + a1*standBasalAreaPerHectare^(b1) * (1 - exp(b2*standTreesPerHectare^(b3 + b3r) * dbh))^(b4 + b4bal / (b4balr + basalAreaLarger)), psme2022, # a1r, b2r, b4r singularity in backsolve, 10x10 MAE 3.12, AIC 3760
-                                                        fixedFormula = a1 + b1 + b2 + b3 + b4 + b4bal + b4balr ~ 1, randomFormula = b3r ~ 1|stand/plot,
+  psmeHeightFromDiameterMixed$sharmaZhangBal = fit_nlme("Sharma-Zhang BA+L", height ~ 1.37 + a1*standBasalAreaPerHectare^(b1) * (1 - exp(b2*standTreesPerHectare^(b3 + b3ra) * dbh))^(b4 + b4bal / (b4balr + basalAreaLarger)), psme2022, # a1ra, b2ra, b4ra singularity in backsolve, 10x10 MAE 3.12, AIC 3760
+                                                        fixedFormula = a1 + b1 + b2 + b3 + b4 + b4bal + b4balr ~ 1, randomFormula = b3ra ~ 1|stand/plot,
                                                         start = list(fixed = c(a1 = 55, b1 = 0.1, b2 = -0.02, b3 = -0.03, b4 = 1.0, b4bal = 4, b4balr = 6)))
-  #psmeHeightFromDiameterMixed$sharmaZhangBalB1 = fit_nlme("Sharma-Zhang BA+L", height ~ 1.37 + a1*standBasalAreaPerHectare^(b1 + b1r) * (1 - exp(b2*standTreesPerHectare^(b3) * dbh))^(b4 + b4bal / (b4balr + basalAreaLarger)), psme2022, # 10x10 MAE 3.21, AIC 3757
-  #                                                        fixedFormula = a1 + b1 + b2 + b3 + b4 + b4bal + b4balr ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$sharmaZhangBalB1 = fit_nlme("Sharma-Zhang BA+L", height ~ 1.37 + a1*standBasalAreaPerHectare^(b1 + b1ra) * (1 - exp(b2*standTreesPerHectare^(b3) * dbh))^(b4 + b4bal / (b4balr + basalAreaLarger)), psme2022, # 10x10 MAE 3.21, AIC 3757
+  #                                                        fixedFormula = a1 + b1 + b2 + b3 + b4 + b4bal + b4balr ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                        start = list(fixed = c(a1 = 55, b1 = 0.1, b2 = -0.02, b3 = -0.03, b4 = 1.0, b4bal = 4, b4balr = 6)))
-  #psmeHeightFromDiameterMixed$sharmaZhangBal = fit_nlme("Sharma-Zhang BA+L", height ~ 1.37 + (a1 + a1p * isPlantation + a1ba * standBasalAreaPerHectare + a1bal * basalAreaLarger) * standBasalAreaPerHectare^(b1 + b1p * isPlantation + b1r) * (1 - exp(b2 * standTreesPerHectare^(b3)*dbh))^(b4), psme2022, # a1r, b4r singularity in backsolve, b2r step halving, b2ba, b2bap not significant
-  #                                                      fixedFormula = a1 + a1p + a1ba + a1bal + b1 + b1p + b2 + b3 + b4 ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$sharmaZhangBal = fit_nlme("Sharma-Zhang BA+L", height ~ 1.37 + (a1 + a1p * isPlantation + a1ba * standBasalAreaPerHectare + a1bal * basalAreaLarger) * standBasalAreaPerHectare^(b1 + b1p * isPlantation + b1ra) * (1 - exp(b2 * standTreesPerHectare^(b3)*dbh))^(b4), psme2022, # a1ra, b4ra singularity in backsolve, b2ra step halving, b2ba, b2bap not significant
+  #                                                      fixedFormula = a1 + a1p + a1ba + a1bal + b1 + b1p + b2 + b3 + b4 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                      start = list(fixed = c(a1 = 50, a1p = -70, a1ba = 40, a1bal = 11, b1 = -0.9, b1p = 0.01, b2 = -0.02, b3 = -0.03, b4 = 1.04)))
   #psmeHeightFromDiameterMixed$sharmaZhangBalRelDbh = fit_gsl_nls("Sharma-Zhang RelDbh BA+L", height ~ 1.37 + a1*standBasalAreaPerHectare^b1 * (1 - exp(b2*standTreesPerHectare^b3 * dbh))^(b4 + b4bal / (b4balr + basalAreaLarger) + b4rd * relativeDiameter), psme2022, 
   #                                                               start = list(fixed = c(a1 = 55, b1 = 0.1, b2 = -0.02, b3 = -0.03, b4 = 1.0, b4bal = 4, b4balr = 6, b4rd = 0)), distinct = FALSE)
@@ -373,24 +448,29 @@ if (psmeOptions$fitHeightMixed)
   #psmeHeightFromDiameterMixed$sharmaZhangRelDbh = fit_gsl_nls("Sharma-Zhang RelDbh", height ~ 1.37 + (a1 + a1p * isPlantation)*standBasalAreaPerHectare^(b1 + b1p * isPlantation)*(1 - exp(b2*standTreesPerHectare^b3*dbh))^(b4 + b4rd * relativeDiameter), psme2022, 
   #                                                            start = list(fixed = c(a1 = 45, a1p = -12, b1 = 0.08, b1p = 0.08, b2 = -0.03, b3 = -0.06, b4 = 1.0, b4rd = 0)), distinct = FALSE)
   psmeHeightFromDiameterMixed$sharmaZhangRelDbh = create_fit_statistics("Sharma-Zhang RelDbh", fitting = "nlme", distinct = FALSE)
-  
-  psmeHeightFromDiameterMixed$sibbesen = fit_nlme("Sibbesen", height ~ 1.37 + (a1)*dbh^((b1 + b1p * isPlantation + b1r)*dbh^b2), psme2022, # a1r step halving, b2p not significant
-                                                  fixedFormula = a1 + b1 + b1p + b2 ~ 1, randomFormula = b1r ~ 1|stand/plot,
-                                                  start = list(fixed = c(a1 = 0.5, b1 = 1.8, b1p = -0.05, b2 = -0.13)))
-  #psmeHeightFromDiameterMixed$sibbesenB2 = fit_nlme("Sibbesen", height ~ 1.37 + (a1)*dbh^((b1 + b1p * isPlantation)*dbh^(b2 + b2r)), psme2022, # b1r preferable
-  #                                                fixedFormula = a1 + b1 + b1p + b2 ~ 1, randomFormula = b2r ~ 1|stand/plot,
+  psmeHeightFromDiameterMixed$sibbesen = fit_nlme("Sibbesen", height ~ 1.37 + (a1)*dbh^((b1 + b1p * isPlantation)*(1 + b1rm)*dbh^b2), psme2022, # a1rm job step halving, b2rm max iterations, 10x10 MAE 4.02, AIC 4016
+                                                  fixedFormula = a1 + b1 + b1p + b2 ~ 1, randomFormula = b1rm ~ 1|stand/plot,
+                                                  start = list(fixed = c(a1 = 0.09, b1 = 3.0, b1p = -0.06, b2 = -0.17)))
+  #psmeHeightFromDiameterMixed$sibbesen = fit_nlme("Sibbesen", height ~ 1.37 + (a1)*dbh^((b1 + b1p * isPlantation + b1ra)*dbh^b2), psme2022, # a1ra step halving, b2p not significant, 10x10 MAE 4.09, AIC 4082
+  #                                                fixedFormula = a1 + b1 + b1p + b2 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                start = list(fixed = c(a1 = 0.5, b1 = 1.8, b1p = -0.05, b2 = -0.13)))
-  psmeHeightFromDiameterMixed$weibull = fit_nlme("Weibull", height ~ 1.37 + (a1 + a1r)*(1 - exp((b1 + b1p * isPlantation)*dbh^b2)), psme2022, # b1r, b2r max iterations
-                                                 fixedFormula = a1 + b1 + b1p + b2 ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  psmeHeightFromDiameterMixed$weibull = fit_nlme("Weibull", height ~ 1.37 + (a1 + a1ra)*(1 - exp((b1 + b1p * isPlantation)*dbh^b2)), psme2022, # b1ra, b2ra max iterations, 10x10 MAE 4.67, AIC 4262
+                                                 fixedFormula = a1 + b1 + b1p + b2 ~ 1, randomFormula = a1ra ~ 1|stand/plot,
                                                  start = list(fixed = c(a1 = 45, b1 = -0.01, b1p = 0.001, b2 = 1.1)))
-  psmeHeightFromDiameterMixed$weibullBal = fit_nlme("Weibull BA+L", height ~ 1.37 + (a1) * (1 - exp((b1 + b1ba / standBasalAreaPerHectare)*dbh^(b2 + b2bal * basalAreaLarger + b2r))), psme2022,
-                                                    fixedFormula = a1 + b1 + b1ba + b2 + b2bal ~ 1, randomFormula = b2r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$weibull = fit_nlme("Weibull", height ~ 1.37 + (a1)*(1 - exp((b1 + b1p * isPlantation)*(1 + b1rm)*dbh^b2)), psme2022, # a1rm job step halving, b1p not significant, b1rm job step halving, b2rm max iterations, 10x10 MAE 
+  #                                               fixedFormula = a1 + b1 + b1p + b2 ~ 1, randomFormula = b1rm ~ 1|stand/plot,
+  #                                               start = list(fixed = c(a1 = 60, b1 = -0.02, b1p = 0.002, b2 = 1.0)))
+  #psmeHeightFromDiameterMixed$sibbesenB2 = fit_nlme("Sibbesen", height ~ 1.37 + (a1)*dbh^((b1 + b1p * isPlantation)*dbh^(b2 + b2ra)), psme2022, # b1ra preferable
+  #                                                fixedFormula = a1 + b1 + b1p + b2 ~ 1, randomFormula = b2ra ~ 1|stand/plot,
+  #                                                start = list(fixed = c(a1 = 0.5, b1 = 1.8, b1p = -0.05, b2 = -0.13)))
+  psmeHeightFromDiameterMixed$weibullBal = fit_nlme("Weibull BA+L", height ~ 1.37 + (a1) * (1 - exp((b1 + b1ba / standBasalAreaPerHectare)*dbh^(b2 + b2bal * basalAreaLarger + b2ra))), psme2022,
+                                                    fixedFormula = a1 + b1 + b1ba + b2 + b2bal ~ 1, randomFormula = b2ra ~ 1|stand/plot,
                                                     start = list(fixed = c(a1 = 64, b1 = -0.01, b1ba = 0.03, b2 = 1.0, b2bal = 0.002)))
-  #psmeHeightFromDiameterMixed$weibullBalA1 = fit_nlme("Weibull BA+L", height ~ 1.37 + (a1 + a1r) * (1 - exp((b1 + b1ba / standBasalAreaPerHectare)*dbh^(b2 + b2bal * basalAreaLarger))), psme2022, # b1r step halving, job false convergence
-  #                                                    fixedFormula = a1 + b1 + b1ba + b2 + b2bal ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$weibullBalA1 = fit_nlme("Weibull BA+L", height ~ 1.37 + (a1 + a1ra) * (1 - exp((b1 + b1ba / standBasalAreaPerHectare)*dbh^(b2 + b2bal * basalAreaLarger))), psme2022, # b1ra step halving, job false convergence
+  #                                                    fixedFormula = a1 + b1 + b1ba + b2 + b2bal ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                    start = list(fixed = c(a1 = 64, b1 = -0.01, b1ba = 0.03, b2 = 1.0, b2bal = 0.002)))
-  #psmeHeightFromDiameterMixed$weibullBal = fit_nlme("Weibull BA+L", height ~ 1.37 + (a1) * (1 - exp(b1*dbh^(b2 + b2bal * basalAreaLarger + b2r))), psme2022, # a1r max iterations, b1r step halving
-  #                                                  fixedFormula = a1 + b1 + b2 + b2bal ~ 1, randomFormula = b2r ~ 1|stand/plot,
+  #psmeHeightFromDiameterMixed$weibullBal = fit_nlme("Weibull BA+L", height ~ 1.37 + (a1) * (1 - exp(b1*dbh^(b2 + b2bal * basalAreaLarger + b2ra))), psme2022, # a1ra max iterations, b1ra step halving
+  #                                                  fixedFormula = a1 + b1 + b2 + b2bal ~ 1, randomFormula = b2ra ~ 1|stand/plot,
   #                                                  start = list(fixed = c(a1 = 100, b1 = -0.01, b2 = 0.9, b2bal = 0.003)))
   #to_fixed_coeffficients(psmeHeightFromDiameterMixed$weibullBal)
   #print(to_parameter_confidence_intervals(psmeHeightFromDiameterMixed$sharmaZhang), n = 40)
@@ -429,11 +509,11 @@ if (psmeOptions$fitDbhPrimary)
   psmeDiameterFromHeight$chapmanReplaceAbat = fit_gsl_nls("Chapman-Richards replace ABA+T", dbh ~ (a1 + a1p * isPlantation)*(exp((b1 + b1aba * bootstrapStandBasalAreaPerHectare + b1aat * basalAreaTaller)*(height - 1.37)) - 1)^(b2), psme2022, start = list(a1 = 50, a1p = -3, b1 = 0.03, b1aba = -0.0001, b1aat = -0.0001, b2 = 0.9)) # a1aat+r, b1aatp, b1aat+r, b1abap, b2aat+r not significant, 10x10 RMSE 14.5, AIC 5301
   #psmeDiameterFromHeight$chapmanReplaceAbatA1 = fit_gsl_nls("Chapman-Richards replace ABA+T", dbh ~ (a1 + a1p * isPlantation + a1aat * basalAreaTaller)*(exp((b1 + b1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)) - 1)^(b2), psme2022, start = list(a1 = 50, a1p = -3, a1aat = -0.1, b1 = 0.03, b1aba = -0.0001, b2 = 0.9)) # 10x10 RMSE 14.5, AIC 5300
   #psmeDiameterFromHeight$chapmanReplaceAba = fit_gsl_nls("Chapman-Richards replace ABA+T", dbh ~ (a1 + a1p * isPlantation)*(exp((b1 + b1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)) - 1)^(b2), psme2022, start = list(a1 = 40, a1p = -3, b1 = 0.02, b1aba = -0.0001, b2 = 0.9)) # 10x0 RMSE 14.8, AIC 5223
-  #psmeDiameterFromHeight$chapmanReplaceAbatA1aba = fit_gsl_nls("Chapman-Richards replace ABA+T", dbh ~ (a1 + a1p * isPlantation + a1aba * bootstrapStandBasalAreaPerHectare)*(exp((b1)*(height - 1.37)) - 1)^(b2), psme2022, start = list(a1 = 50, a1p = -3, a1aba = -0.1, b1 = 0.02, b2 = 0.9)) # b2bat not significant, 10x0 RMSE 14.7, AIC 5161
+  #psmeDiameterFromHeight$chapmanReplaceAbatA1aba = fit_gsl_nls("Chapman-Richards replace ABA+T", dbh ~ (a1 + a1p * isPlantation + a1aba * bootstrapStandBasalAreaPerHectare)*(exp((b1)*(height - 1.37)) - 1)^(b2), psme2022, start = list(a1 = 50, a1p = -3, a1aba = -0.1, b1 = 0.02, b2 = 0.9)) # b2aat not significant, 10x0 RMSE 14.7, AIC 5161
   #psmeDiameterFromHeight$chapmanReplaceAbatB2aba = fit_gsl_nls("Chapman-Richards replace ABA+T", dbh ~ (a1 + a1p * isPlantation)*(exp((b1)*(height - 1.37)) - 1)^(b2 + b2aba * bootstrapStandBasalAreaPerHectare), psme2022, start = list(a1 = 150, a1p = -10, b1 = 0.01, b2 = 0.9, b2aba = 0.003)) # 10x0 RMSE 14.8, AIC 5189
-  #psmeDiameterFromHeight$chapmanReplaceAbatA1bat = fit_gsl_nls("Chapman-Richards replace ABA+T", dbh ~ (a1 + a1p * isPlantation + a1bat * basalAreaTaller)*(exp((b1)*(height - 1.37)) - 1)^(b2), psme2022, start = list(a1 = 55, a1p = -3, a1bat = -0.3, b1 = 0.02, b2 = 0.9)) # 10x0 RMSE 14.6, AIC 5203
-  #psmeDiameterFromHeight$chapmanReplaceAbatB1bat = fit_gsl_nls("Chapman-Richards replace ABA+T", dbh ~ (a1 + a1p * isPlantation)*(exp((b1 + b1bat * basalAreaTaller)*(height - 1.37)) - 1)^(b2), psme2022, start = list(a1 = 55, a1p = -3, b1 = 0.02, b1bat = -0.0001, b2 = 0.9)) # 10x0 RMSE 14.8, AIC 5213
-  #psmeDiameterFromHeight$chapmanReplaceAbatA1batB1aba = fit_gsl_nls("Chapman-Richards replace ABA+T", dbh ~ (a1 + a1p * isPlantation + a1bat * basalAreaTaller)*(exp((b1 + b1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)) - 1)^(b2), psme2022, start = list(a1 = 50, a1p = -3, a1bat = -0.1, b1 = 0.02, b1aba = -0.00005, b2 = 0.9)) # 10x0 RMSE 14.7, AIC 5168
+  #psmeDiameterFromHeight$chapmanReplaceAbatA1bat = fit_gsl_nls("Chapman-Richards replace ABA+T", dbh ~ (a1 + a1p * isPlantation + a1aat * basalAreaTaller)*(exp((b1)*(height - 1.37)) - 1)^(b2), psme2022, start = list(a1 = 55, a1p = -3, a1aat = -0.3, b1 = 0.02, b2 = 0.9)) # 10x0 RMSE 14.6, AIC 5203
+  #psmeDiameterFromHeight$chapmanReplaceAbatB1bat = fit_gsl_nls("Chapman-Richards replace ABA+T", dbh ~ (a1 + a1p * isPlantation)*(exp((b1 + b1aat * basalAreaTaller)*(height - 1.37)) - 1)^(b2), psme2022, start = list(a1 = 55, a1p = -3, b1 = 0.02, b1aat = -0.0001, b2 = 0.9)) # 10x0 RMSE 14.8, AIC 5213
+  #psmeDiameterFromHeight$chapmanReplaceAbatA1batB1aba = fit_gsl_nls("Chapman-Richards replace ABA+T", dbh ~ (a1 + a1p * isPlantation + a1aat * basalAreaTaller)*(exp((b1 + b1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)) - 1)^(b2), psme2022, start = list(a1 = 50, a1p = -3, a1aat = -0.1, b1 = 0.02, b1aba = -0.00005, b2 = 0.9)) # 10x0 RMSE 14.7, AIC 5168
   psmeDiameterFromHeight$chapmanReplaceRelHt = fit_gsl_nls("Chapman-Richards replace RelHt", dbh ~ (a1)*(exp((b1 + b1rh * relativeHeight)*(height - 1.37)) - 1)^(b2), psme2022, start = list(a1 = 45, b1 = 0.03, b1rh = 0.002, b2 = 0.8)) # b2rh not significant, a1p-b1rh not mutually significant, 10x10 RMSE 14.7, AIC 5227
   #psmeDiameterFromHeight$chapmanReplaceRelHtA1 = fit_gsl_nls("Chapman-Richards replace RelHt", dbh ~ (a1 + a1rh * relativeHeight)*(exp((b1)*(height - 1.37)) - 1)^(b2), psme2022, start = list(a1 = 35, a1rh = 5, b1 = 0.03, b2 = 0.8)) # 10x10 RMSE 15.2, AIC 5318
   psmeDiameterFromHeight$chapmanRichards = fit_gsl_nls("Chapman-Richards inverse", dbh ~ a1*log(1 - pmin((b1*(height - 1.37))^b2, 0.9999)), psme2022, start = list(a1 = -100, b1 = 0.012, b2 = 0.9)) # a1p, b1p, b2p not significant
@@ -445,10 +525,10 @@ if (psmeOptions$fitDbhPrimary)
   #psmeDiameterFromHeight$chapmanRichardsAbatB1 = fit_gsl_nls("Chapman-Richards inverse ABA+T", dbh ~ (a1)*log(1 - pmin(((b1 + (b1aba + b1abap * isPlantation) * bootstrapStandBasalAreaPerHectare + b1aat * basalAreaTaller)*(height - 1.37))^(b2), 0.9999)), psme2022, start = list(a1 = -100, b1 = 0.01, b1aba = -0.00002, b1abap = -0.00001, b1aat = -0.00002, b2 = 1.0)) # 10x10 RMSE 14.6, AIC 5193
   #psmeDiameterFromHeight$chapmanRichardsAbatA1aba = fit_gsl_nls("Chapman-Richards inverse ABA+T", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare)*log(1 - pmin(((b1)*(height - 1.37))^(b2), 0.9999)), psme2022, start = list(a1 = -115, a1aba = 0.2, b1 = 0.01, b2 = 1.0)) # 10x10 RMSE 14.9, AIC 5239
   #psmeDiameterFromHeight$chapmanRichardsAbatB2aba = fit_gsl_nls("Chapman-Richards inverse ABA+T", dbh ~ (a1)*log(1 - pmin(((b1)*(height - 1.37))^(b2 + b2aba * bootstrapStandBasalAreaPerHectare), 0.9999)), psme2022, start = list(a1 = -115, b1 = 0.01, b2 = 0.9, b2aba = 0.002)) # 10x10 RMSE 14.8, AIC 5179
-  #psmeDiameterFromHeight$chapmanRichardsAbatA1bat = fit_gsl_nls("Chapman-Richards inverse ABA+T", dbh ~ (a1 + a1bat * basalAreaTaller)*log(1 - pmin(((b1)*(height - 1.37))^(b2), 0.9999)), psme2022, start = list(a1 = -110, a1bat = 0.4, b1 = 0.01, b2 = 0.9)) # 10x10 RMSE 150, AIC 5283
-  #psmeDiameterFromHeight$chapmanRichardsAbatB1bat = fit_gsl_nls("Chapman-Richards inverse ABA+T", dbh ~ (a1)*log(1 - pmin(((b1 + b1bat * basalAreaTaller)*(height - 1.37))^(b2), 0.9999)), psme2022, start = list(a1 = -110, b1 = 0.01, b1bat = -0.00004, b2 = 1.0)) # 10x10 RMSE 14.9, AIC 5259
-  #psmeDiameterFromHeight$chapmanRichardsAbatB2bat = fit_gsl_nls("Chapman-Richards inverse ABA+T", dbh ~ (a1)*log(1 - pmin(((b1)*(height - 1.37))^(b2 + b2bat * basalAreaTaller), 0.9999)), psme2022, start = list(a1 = -100, b1 = 0.01, b2 = 0.9, b2bat = 0.003)) # 10x10 RMSE 15.0, AIC 5291
-  #psmeDiameterFromHeight$chapmanRichardsAbatB1aba = fit_gsl_nls("Chapman-Richards inverse ABA+T", dbh ~ (a1 + a1bat * basalAreaTaller)*log(1 - pmin(((b1 + b1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37))^(b2), 0.9999)), psme2022, start = list(a1 = -100, a1bat = 0.3, b1 = 0.01, b1aba = -0.00002, b2 = 1.0)) # 10x10 RMSE 14.9, AIC 5121
+  #psmeDiameterFromHeight$chapmanRichardsAbatA1bat = fit_gsl_nls("Chapman-Richards inverse ABA+T", dbh ~ (a1 + a1aat * basalAreaTaller)*log(1 - pmin(((b1)*(height - 1.37))^(b2), 0.9999)), psme2022, start = list(a1 = -110, a1aat = 0.4, b1 = 0.01, b2 = 0.9)) # 10x10 RMSE 150, AIC 5283
+  #psmeDiameterFromHeight$chapmanRichardsAbatB1bat = fit_gsl_nls("Chapman-Richards inverse ABA+T", dbh ~ (a1)*log(1 - pmin(((b1 + b1aat * basalAreaTaller)*(height - 1.37))^(b2), 0.9999)), psme2022, start = list(a1 = -110, b1 = 0.01, b1aat = -0.00004, b2 = 1.0)) # 10x10 RMSE 14.9, AIC 5259
+  #psmeDiameterFromHeight$chapmanRichardsAbatB2bat = fit_gsl_nls("Chapman-Richards inverse ABA+T", dbh ~ (a1)*log(1 - pmin(((b1)*(height - 1.37))^(b2 + b2aat * basalAreaTaller), 0.9999)), psme2022, start = list(a1 = -100, b1 = 0.01, b2 = 0.9, b2aat = 0.003)) # 10x10 RMSE 15.0, AIC 5291
+  #psmeDiameterFromHeight$chapmanRichardsAbatB1aba = fit_gsl_nls("Chapman-Richards inverse ABA+T", dbh ~ (a1 + a1aat * basalAreaTaller)*log(1 - pmin(((b1 + b1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37))^(b2), 0.9999)), psme2022, start = list(a1 = -100, a1aat = 0.3, b1 = 0.01, b1aba = -0.00002, b2 = 1.0)) # 10x10 RMSE 14.9, AIC 5121
   psmeDiameterFromHeight$chapmanRichardsPhysio = fit_gsl_nls("Chapman-Richards inverse physio", dbh ~ (a1 + a1p * isPlantation)*log(1 - pmin((b1*(height - 1.37))^(b2 + b2tw * topographicWetnessFD8f), 0.9999)), psme2022, start = list(a1 = 40, a1p = -1, b1 = 0.03, b2 = 0.8, b2tw = 0), distinct = FALSE) # { a1, b1, b2 } x { e, s, a, tr, tw } not significant
   # no clear differentiation between a1rh, b1rh, b2rh forms, b2rh maybe somewhat more accurate
   psmeDiameterFromHeight$chapmanRichardsRelHt = fit_gsl_nls("Chapman-Richards inverse RelHt", dbh ~ (a1)*log(1 - pmin(((b1)*(height - 1.37))^(b2 + b2rh * relativeHeight), 0.9999)), psme2022, start = list(a1 = -90, b1 = 0.012, b2 = 0.9, b2rh = -0.07)) # a1rh, b1rh also significant
@@ -474,11 +554,11 @@ if (psmeOptions$fitDbhPrimary)
   # a1*(height - 1.37)^(b1*topHeight^b2) not significant since b2 not significant
   # a1*(height - 1.37)^(b1*((height - 1.37)/relativeHeight)^b2) not significant since b2 not significant, seems logical since greater relative height implies larger rather than smaller DBH
   psmeDiameterFromHeight$power = fit_gsl_nls("power", dbh ~ (a1 + a1p*isPlantation)*(height - 1.37)^(b1 + b1p*isPlantation), psme2022, start = list(a1 = 0.7, a1p = 0.6, b1 = 1.2, b1p = -0.2)) # 10x10 RMSE 15.1, AIC 5311
-  psmeDiameterFromHeight$powerAbat = fit_gsl_nls("power ABA+T", dbh ~ (a1 + a1bat * basalAreaTaller)*(height - 1.37)^(b1 + b1p*isPlantation), psme2022, start = list(a1 = 1.2, a1bat = -0.01, b1 = 1.1, b1p = -0.2)) # a1p, a1batp not significant, 10x10 RMSE 14.8, AIC 5241
+  psmeDiameterFromHeight$powerAbat = fit_gsl_nls("power ABA+T", dbh ~ (a1 + a1aat * basalAreaTaller)*(height - 1.37)^(b1 + b1p*isPlantation), psme2022, start = list(a1 = 1.2, a1aat = -0.01, b1 = 1.1, b1p = -0.2)) # a1p, a1aatp not significant, 10x10 RMSE 14.8, AIC 5241
   #psmeDiameterFromHeight$powerAbatA1aba = fit_gsl_nls("power ABA+T", dbh ~ (a1 + a1p * isPlantation + a1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b1 + b1p*isPlantation), psme2022, start = list(a1 = 0.7, a1p = 0.6, a1aba = 0, b1 = 1.2, b1p = -0.2)) # 10x10 RMSE 14.9, AIC 5291
   #psmeDiameterFromHeight$powerAbatB1aba = fit_gsl_nls("power ABA+T", dbh ~ (a1)*(height - 1.37)^(b1 + b1p*isPlantation + b1aba * bootstrapStandBasalAreaPerHectare), psme2022, start = list(a1 = 1.0, b1 = 1.2, b1p = -0.02, b1aba = -0.001)) # a1p not significant, 10x10 RMSE 15.2, AIC 5273
-  #psmeDiameterFromHeight$powerAbatB1bat = fit_gsl_nls("power ABA+T", dbh ~ (a1)*(height - 1.37)^(b1 + b1p*isPlantation + b1bat * basalAreaTaller), psme2022, start = list(a1 = 1.2, b1 = 1.1, b1p = -0.03, b1bat = -0.002)) # a1p not significant, 10x10 RMSE 14.9, AIC 5205
-  #psmeDiameterFromHeight$powerAbatA1abaBat = fit_gsl_nls("power ABA+T", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare + a1bat * basalAreaTaller)*(height - 1.37)^(b1 + b1p*isPlantation), psme2022, start = list(a1 = 0.7, a1aba = 0, a1bat = -0.01, b1 = 1.2, b1p = -0.2), distinct = FALSE) # a1p not significant, a1aba-a1bat not mutually significant
+  #psmeDiameterFromHeight$powerAbatB1bat = fit_gsl_nls("power ABA+T", dbh ~ (a1)*(height - 1.37)^(b1 + b1p*isPlantation + b1aat * basalAreaTaller), psme2022, start = list(a1 = 1.2, b1 = 1.1, b1p = -0.03, b1aat = -0.002)) # a1p not significant, 10x10 RMSE 14.9, AIC 5205
+  #psmeDiameterFromHeight$powerAbatA1abaBat = fit_gsl_nls("power ABA+T", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare + a1aat * basalAreaTaller)*(height - 1.37)^(b1 + b1p*isPlantation), psme2022, start = list(a1 = 0.7, a1aba = 0, a1aat = -0.01, b1 = 1.2, b1p = -0.2), distinct = FALSE) # a1p not significant, a1aba-a1aat not mutually significant
   psmeDiameterFromHeight$powerPhysio = fit_gsl_nls("power physio", dbh ~ (a1 + a1p * isPlantation)*(height - 1.37)^(b1 + b1p * isPlantation + b1e * elevation), psme2022, start = list(a1 = 0.7, a1p = 0.6, b1 = 1.2, b1p = -0.2, b1e = 0), distinct = FALSE) # { a1, b1 } x { e, s, a, tr, tw } not significant
   psmeDiameterFromHeight$powerRelHt = fit_gsl_nls("power RelHt", dbh ~ (a1 + a1p*isPlantation)*(height - 1.37)^(b1 + b1p * isPlantation + b1rh * relativeHeight), psme2022, start = list(a1 = 1.1, a1p = 0.4, b1 = 1.1, b1p = -0.1, b1rh = 0.05)) # a1p-a1rh not mutually significant, 10x10 RMSE 14.9, AIC 5277 (1.70, 5498 if multiplying height by relative height)
   psmeDiameterFromHeight$ruark = fit_gsl_nls("Ruark", dbh ~ a1*(height - 1.37)^(b1) * exp((b2 + b2p * isPlantation) * (height - 1.37)), psme2022, start = list(a1 = 2, b1 = 0.8, b2 = 0.01, b2p = -0.001)) # a1p not significant, b1p-b2p not mutually significant, 10x10 RMSE 14.9, AIC 5247
@@ -510,10 +590,10 @@ if (psmeOptions$fitDbhPrimary)
   psmeDiameterFromHeight$sibbesenReplaceAbat = fit_gsl_nls("Sibbesen replace ABA+T", dbh ~ (a1)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2aba * bootstrapStandBasalAreaPerHectare)), psme2022, start = list(a1 = 2.0, b1 = 0.7, b2 = 0.1, b2p = -0.007, b2aba = -0.0002)) # a1p, a1aat+r, b1aat+r, b2abap, b2aat+r not significant, 10x10 RMSE 14.6, AIC 5136
   #psmeDiameterFromHeight$sibbesenReplaceAbatA1aba = fit_gsl_nls("Sibbesen replace ABA", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b1*(height - 1.37)^(b2 + b2p * isPlantation)), psme2022, start = list(a1 = 2.1, a1aba = -0.006, b1 = 0.7, b2 = 0.1, b2p = -0.005)) # a1p not significant, 10x10 RMSE 14.6, AIC 5241
   #psmeDiameterFromHeight$sibbesenReplaceAbatB1aba = fit_gsl_nls("Sibbesen replace ABA", dbh ~ (a1 + a1p * isPlantation)*(height - 1.37)^((b1 + b1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b2 + b2p * isPlantation)), psme2022, start = list(a1 = 1.6, a1p = 0.3, b1 = 0.7, b1aba = -0.001, b2 = 0.1, b2p = 0.02)) # 10x10 RMSE 14.9, AIC 5276
-  #psmeDiameterFromHeight$sibbesenReplaceAbatA1bat = fit_gsl_nls("Sibbesen replace ABAT", dbh ~ (a1 + a1bat * basalAreaTaller)*(height - 1.37)^(b1*(height - 1.37)^(b2 + b2p * isPlantation)), psme2022, start = list(a1 = 2.0, a1bat = -0.01, b1 = 0.7, b2 = 0.08, b2p = -0.005)) # a1p not significant, 10x10 RMSE 14.7, AIC 5264
-  #psmeDiameterFromHeight$sibbesenReplaceAbatB1bat = fit_gsl_nls("Sibbesen replace ABAT", dbh ~ (a1)*(height - 1.37)^((b1 + b1bat * basalAreaTaller)*(height - 1.37)^(b2 + b2p * isPlantation)), psme2022, start = list(a1 = 2.0, b1 = 0.8, b1bat = -0.001, b2 = 0.07, b2p = 0.006)) # a1p not significant, 10x10 RMSE 14.8, AIC 5180
-  #psmeDiameterFromHeight$sibbesenReplaceAbatB2bat = fit_gsl_nls("Sibbesen replace ABA+T", dbh ~ (a1)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2bat * basalAreaTaller)), psme2022, start = list(a1 = 1.9, b1 = 0.7, b2 = 0.07, b2p = -0.005, b2bat = -0.0005)) # a1p not significant, 10x10 RMSE 15.0, AIC 5268
-  #psmeDiameterFromHeight$sibbesenReplaceAbatB2abaA1bat = fit_gsl_nls("Sibbesen replace ABA+T", dbh ~ (a1 + a1bat * basalAreaTaller)*(height - 1.37)^(b1*(height - 1.37)^(b2 + b2p * isPlantation + b2aba * bootstrapStandBasalAreaPerHectare)), psme2022, start = list(a1 = 2.0, a1bat = -0.01, b1 = 0.7, b2 = 0.09, b2p = -0.007, b2aba = -0.0002)) # a1p not significant, 10x10 RMSE 14.7, AIC 5274
+  #psmeDiameterFromHeight$sibbesenReplaceAbatA1bat = fit_gsl_nls("Sibbesen replace ABAT", dbh ~ (a1 + a1aat * basalAreaTaller)*(height - 1.37)^(b1*(height - 1.37)^(b2 + b2p * isPlantation)), psme2022, start = list(a1 = 2.0, a1aat = -0.01, b1 = 0.7, b2 = 0.08, b2p = -0.005)) # a1p not significant, 10x10 RMSE 14.7, AIC 5264
+  #psmeDiameterFromHeight$sibbesenReplaceAbatB1bat = fit_gsl_nls("Sibbesen replace ABAT", dbh ~ (a1)*(height - 1.37)^((b1 + b1aat * basalAreaTaller)*(height - 1.37)^(b2 + b2p * isPlantation)), psme2022, start = list(a1 = 2.0, b1 = 0.8, b1aat = -0.001, b2 = 0.07, b2p = 0.006)) # a1p not significant, 10x10 RMSE 14.8, AIC 5180
+  #psmeDiameterFromHeight$sibbesenReplaceAbatB2bat = fit_gsl_nls("Sibbesen replace ABA+T", dbh ~ (a1)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2aat * basalAreaTaller)), psme2022, start = list(a1 = 1.9, b1 = 0.7, b2 = 0.07, b2p = -0.005, b2aat = -0.0005)) # a1p not significant, 10x10 RMSE 15.0, AIC 5268
+  #psmeDiameterFromHeight$sibbesenReplaceAbatB2abaA1bat = fit_gsl_nls("Sibbesen replace ABA+T", dbh ~ (a1 + a1aat * basalAreaTaller)*(height - 1.37)^(b1*(height - 1.37)^(b2 + b2p * isPlantation + b2aba * bootstrapStandBasalAreaPerHectare)), psme2022, start = list(a1 = 2.0, a1aat = -0.01, b1 = 0.7, b2 = 0.09, b2p = -0.007, b2aba = -0.0002)) # a1p not significant, 10x10 RMSE 14.7, AIC 5274
   psmeDiameterFromHeight$sibbesenReplaceAbatPhysio = fit_gsl_nls("Sibbesen replace ABA+T physio", dbh ~ (a1 + a1p * isPlantation)*(height - 1.37)^(b1*(height - 1.37)^(b2 + b2p * isPlantation + b2aba * bootstrapStandBasalAreaPerHectare + b2ac * cos(3.14159/180 * aspect))), psme2022, start = list(a1 = 1.6, a1p = 0.4, b1 = 0.7, b2 = 0.1, b2p = -0.02, b2aba = -0.0002, b2ac = -0.003))
   psmeDiameterFromHeight$sibbesenReplaceAbatRelHt = fit_gsl_nls("Sibbesen replace RelHt ABA+T", dbh ~ (a1)*(height - 1.37)^(b1*(height - 1.37)^(b2 + b2p * isPlantation + b2rh * relativeHeight + b2aba * bootstrapStandBasalAreaPerHectare)), psme2022, start = list(a1 = 2, b1 = 0.8, b2 = 0.05, b2p = -0.006, b2rh = 0.01, b2aba = -0.0002))
   psmeDiameterFromHeight$sibbesenReplaceAbatRelHtPhysio = fit_gsl_nls("Sibbesen replace RelHt ABA+T physio", dbh ~ (a1)*(height - 1.37)^(b1*(height - 1.37)^(b2 + b2p * isPlantation + b2rh * relativeHeight + b2aba * bootstrapStandBasalAreaPerHectare + b2ac * cos(3.14159/180 * aspect))), psme2022, start = list(a1 = 2, b1 = 0.8, b2 = 0.05, b2p = -0.006, b2rh = 0.01, b2aba = -0.0002, b2ac = -0.003))
@@ -521,18 +601,18 @@ if (psmeOptions$fitDbhPrimary)
   psmeDiameterFromHeight$sibbesenReplacePhysio = fit_gsl_nls("Sibbesen replace physio", dbh ~ (a1 + a1p * isPlantation)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2ac * cos(pi/180*aspect))), psme2022, start = list(a1 = 1.6, a1p = 0.4, b1 = 0.7, b2 = 0.1, b2p = -0.02, b2ac = -0.003)) # { a1, b1, b2 } x { e, s, as, tr, tw } not significant, a1ac also significant
   #psmeDiameterFromHeight$sibbesenReplacePhysioA1 = fit_gsl_nls("Sibbesen replace physio", dbh ~ (a1 + a1p * isPlantation + a1ac * cos(pi/180*aspect))*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation)), psme2022, start = list(a1 = 1.6, a1p = 0.4, a1ac = -0.07, b1 = 0.7, b2 = 0.1, b2p = -0.02)) # { a1, b1, b2 } x { e, s, as, tr, tw } not significant, a1ac also significant
   # a1rh, b1rh, b2rh not clearly separable
-  psmeDiameterFromHeight$sibbesenReplaceRelHt = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ (a1)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2rh * relativeHeight)), psme2022, start = list(a1 = 2, b1 = 0.8, b2 = 0.05, b2p = -0.002, b2rh = 0.01)) # a1p not significant, a1rh, b1rh also significant, 10x10 RMSE 14.8, AIC 5243
+  #psmeDiameterFromHeight$sibbesenReplaceRelHt = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ (a1)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2rh * relativeHeight)), psme2022, start = list(a1 = 2, b1 = 0.8, b2 = 0.05, b2p = -0.002, b2rh = 0.01)) # a1p not significant, a1rh, b1rh also significant, 10x10 RMSE 14.8, AIC 5243
   #psmeDiameterFromHeight$sibbesenReplaceRelHt = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ (a1)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2rh * if_else(relativeHeight < 1.2, 0, relativeHeight - 1.2))), psme2022, start = list(a1 = 2, b1 = 0.8, b2 = 0.05, b2p = -0.002, b2rh = 0.01)) # 10x10 RMSE 14.8, AIC 5267
   #psmeDiameterFromHeight$sibbesenReplaceRelHtA1 = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ (a1 + a1rh * relativeHeight)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation)), psme2022, start = list(a1 = 2, a1rh = 0.4, b1 = 0.7, b2 = 0.07, b2p = -0.006))
   #psmeDiameterFromHeight$sibbesenReplaceRelHtB1 = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ (a1)*(height - 1.37)^((b1 + b1rh * relativeHeight)*(height - 1.37)^(b2 + b2p * isPlantation)), psme2022, start = list(a1 = 2, b1 = 0.8, b1rh = 0.03, b2 = 0.06, b2p = -0.006))
   psmeDiameterFromHeight$sibbesenReplaceRelHtPhysio = fit_gsl_nls("Sibbesen replace RelHt physio", dbh ~ (a1)*(height - 1.37)^(b1*(height - 1.37)^(b2 + b2p * isPlantation + b2rh * relativeHeight + b2ac * cos(pi/180*aspect))), psme2022, start = list(a1 = 2, b1 = 0.8, b2 = 0.05, b2p = -0.002, b2rh = 0.01, b2ac = -0.003)) # a1p not significant
   # (a1 + a1p*isPlantation)^(b1*topHeight^b2) numerically tractable but dramatically less accurate than power, Ruark, and Sibbesen replace
-  psmeDiameterFromHeight$sibbesenReplaceRelHt = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ (a1)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2rh * relativeHeight)), psme2022, start = list(a1 = 2, b1 = 0.8, b2 = 0.05, b2p = -0.002, b2rh = 0.01)) # 10x10 MAE 14.8, AIC 5254
+  #psmeDiameterFromHeight$sibbesenReplaceRelHt = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ (a1)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2rh * relativeHeight)), psme2022, start = list(a1 = 2, b1 = 0.8, b2 = 0.05, b2p = -0.002, b2rh = 0.01)) # 10x10 MAE 14.8, AIC 5254
   #psmeDiameterFromHeight$sibbesenReplaceRelHtA1 = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ (a1 + a1p * isPlantation)*(relativeHeight * (height - 1.37))^((b1)*((height - 1.37))^(b2)), psme2022, start = list(a1 = 5.2, a1p = -0.7, b1 = 0.4, b2 = 0.1)) # 10x10 MAE 15.6, AIC 5346
   #psmeDiameterFromHeight$sibbesenReplaceRelHtB1 = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ (a1)*(relativeHeight * (height - 1.37))^((b1 + b1p * isPlantation)*((height - 1.37))^(b2)), psme2022, start = list(a1 = 4.7, b1 = 0.5, b1p = -0.2, b2 = 0.12)) # 10x10 MAE 15.7, AIC 5423
   #psmeDiameterFromHeight$sibbesenReplaceRelHtB2 = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ (a1)*(relativeHeight * (height - 1.37))^((b1)*((height - 1.37))^(b2 + b2p * isPlantation)), psme2022, start = list(a1 = 4.7, b1 = 0.4, b2 = 0.13, b2p = -0.01)) # 10x10 MAE 15.8, AIC 344
   #psmeDiameterFromHeight$sibbesenReplaceRelHtA1p = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ (a1 + a1p * isPlantation)*(height - 1.37)^((b1)*(relativeHeight * (height - 1.37))^(b2)), psme2022, start = list(a1 = 2.1, a1p = -0.1, b1 = 0.8, b2 = 0.06)) # 10x10 RMSE 14.7, AIC 5233
-  #->psmeDiameterFromHeight$sibbesenReplaceRelHtB1p = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ (a1)*(height - 1.37)^((b1 + b1p * isPlantation)*(relativeHeight * (height - 1.37))^(b2)), psme2022, start = list(a1 = 2.0, b1 = 0.8, b1p = -0.01, b2 = 0.05)) # a1p-b1p, b1p-b2p not mutually significant, 10x10 RMSE 14.6, AIC 5312
+  psmeDiameterFromHeight$sibbesenReplaceRelHt = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ (a1)*(height - 1.37)^((b1 + b1p * isPlantation)*(relativeHeight * (height - 1.37))^(b2)), psme2022, start = list(a1 = 2.0, b1 = 0.8, b1p = -0.01, b2 = 0.05)) # a1p-b1p, b1p-b2p not mutually significant, 10x10 RMSE 14.6, AIC 5312
   #psmeDiameterFromHeight$sibbesenReplaceRelHtB2p = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ (a1)*(height - 1.37)^((b1)*(relativeHeight * (height - 1.37))^(b2 + b2p * isPlantation)), psme2022, start = list(a1 = 2.0, b1 = 0.8, b2 = 0.06, b2p = -0.004)) # 10x10 RMSE 14.8, AIC 5313
   #psmeDiameterFromHeight$sibbesenReplaceRelHtA1p = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ (a1 + a1p * isPlantation)*(relativeHeight*(height - 1.37))^((b1)*(height - 1.37)^(b2)), psme2022, start = list(a1 = 5.2, a1p = -0.6, b1 = 0.4, b2 = 0.1)) # b1p, b2p not significant, 10x10 RMSE 15.8, AIC 5439
   psmeDiameterFromHeight$weibull = fit_gsl_nls("Weibull inverse", dbh ~ (a1*log(1 - pmin(b1*(height - 1.37), 0.9999)))^b2, psme2022, start = list(a1 = -140, b1 = 0.01, b2 = 0.9)) # a1p, b1p, b2p not significant
@@ -543,13 +623,17 @@ if (psmeOptions$fitDbhPrimary)
   # all GAM forms NaN with Γ link
   psmeDiameterFromHeight$gam = fit_gam("REML GAM", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, bs = "ts", by = as.factor(isPlantation), k = 6), data = psme2022, threads = 4) # 10x10 RMSE 15.0, AIC 5233
   #psmeDiameterFromHeight$gamRuark = fit_gam("REML GAM", dbh ~ I(1.92785 * (height - 1.37)^(0.84484) * exp((0.01328 - 0.00111 * isPlantation) * (height - 1.37))) + s(height, bs = "ts", by = as.factor(isPlantation), k = 6), data = psme2022, threads = 2) # 10x10 RMSE 15.1, AIC 5297
-  #psmeDiameterFromHeight$gamAbat = fit_gam("REML GAM ABA+T", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, basalAreaTaller, bootstrapStandBasalAreaPerHectare, bs = "ts", by = as.factor(isPlantation), k = 28), data = psme2022, threads = 4)
+  psmeDiameterFromHeight$gamAbat = fit_gam("REML GAM ABA+T", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, basalAreaTaller, bs = "ts", by = as.factor(isPlantation), k = 9), data = psme2022, threads = 4) # 10x10 RMSE 14.7, AIC 5263
+  #psmeDiameterFromHeight$gamAbat = fit_gam("REML GAM ABA+T", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, bootstrapStandBasalAreaPerHectare, bs = "ts", by = as.factor(isPlantation), k = 12), data = psme2022, threads = 4) # 10x10 RMSE 14.7, AIC 5287
+  #psmeDiameterFromHeight$gamAbat = fit_gam("REML GAM ABA+T", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, basalAreaTaller, bootstrapStandBasalAreaPerHectare, bs = "ts", by = as.factor(isPlantation), k = 11), data = psme2022, threads = 4, distinct = FALSE) # min k = 11, 10x10 RMSE 14.9, AIC 5266
   psmeDiameterFromHeight$gamRelHt = fit_gam("REML GAM RelHt", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, relativeHeight, bs = "ts", k = 4), data = psme2022, threads = 4) # 10x10 RMSE 15.4, AIC 5243, relative height marginally significant, plantation not significant
   
   if (psmeOptions$fitPhysioGams)
   {
-    #psmeDiameterFromHeight$gamAbatPhysio = fit_gam("REML GAM ABA+T physio", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, basalAreaTaller, bootstrapStandBasalAreaPerHectare, elevation, sin(3.14159/180 * aspect), cos(3.14159/180 * aspect), terrainRoughness, bs = "ts", by = as.factor(isPlantation), k = 331), data = psme2022, threads = 2)
-    #psmeDiameterFromHeight$gamAbatPhysioRelHt = fit_gam("REML GAM RelHt ABA+T physio", dbh ~ I(height^) + s(height, basalAreaTaller, bootstrapStandBasalAreaPerHectare, elevation, sin(3.14159/180 * aspect), cos(3.14159/180 * aspect), terrainRoughness, relativeHeight, bs = "ts", by = as.factor(isPlantation), k = 496), data = psme2022, threads = 2)
+    psmeDiameterFromHeight$gamAbatPhysio = fit_gam("REML GAM ABA+T physio", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, basalAreaTaller, bootstrapStandBasalAreaPerHectare, cos(3.14159/180 * aspect), bs = "ts", by = as.factor(isPlantation), k = 17), data = psme2022, threads = 4) # 10x10 RMSE 14.5, AIC 5260
+    psmeDiameterFromHeight$gamAbatPhysioRelHt = fit_gam("REML GAM RelHt ABA+T physio", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, relativeHeight, bootstrapStandBasalAreaPerHectare, cos(3.14159/180 * aspect), bs = "ts", by = as.factor(isPlantation), k = 16), data = psme2022, threads = 4) # min k = 16, 10x10 RMSE 14.4, AIC 5173
+    #psmeDiameterFromHeight$gamAbaPhysioRelHt = fit_gam("REML GAM RelHt ABA+T physio", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, relativeHeight, basalAreaTaller, cos(3.14159/180 * aspect), bs = "ts", by = as.factor(isPlantation), k = 16), data = psme2022, threads = 4) # min k = 16, 10x10 RMSE 14.6, AIC 5295
+    #psmeDiameterFromHeight$gamAbatPhysioRelHt = fit_gam("REML GAM RelHt ABA+T physio", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, relativeHeight, basalAreaTaller, bootstrapStandBasalAreaPerHectare, cos(3.14159/180 * aspect), bs = "ts", by = as.factor(isPlantation), k = 57), data = psme2022, threads = 4, distinct = FALSE) # min k 57 > 40
     # plausible but modest improvement with any physiographic predictor but all predictor min k = 331 > ~150 -> drop elevation + cos(aspect) on highest RMSE min k = 57 > ~42 -> drop slope
     #psmeDiameterFromHeight$gamElevation = fit_gam("REML GAM elevation", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, elevation, bs = "ts", by = as.factor(isPlantation), k = 4), data = psme2022, threads = 4) # 10x10 RMSE 15.4, AIC 5269
     #psmeDiameterFromHeight$gamSlope = fit_gam("REML GAM slope", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, slope, bs = "ts", by = as.factor(isPlantation), k = 9), data = psme2022, threads = 4) # 10x10 RMSE 15.0, AIC 5309
@@ -591,195 +675,254 @@ if (psmeOptions$fitDbhPrimary)
 
 if (psmeOptions$fitDbhMixed)
 {
-  #psmeDiameterFromHeightMixed = list(chapmanReplace = fit_nlme("Chapman-Richards replace", dbh ~ (a1 + a1p * isPlantation) * (exp((b1)*(height - 1.37)) - 1)^(b2 + b2r), psme2022, # a1r, b2r max iterations, b1r singularity in backsolve
-  #                                                             fixedFormula = a1 + a1p + b1 + b2 ~ 1, randomFormula = b2r ~ 1|stand/plot, # |stand, |uniquePlotID max iterations
+  #psmeDiameterFromHeightMixed = list(chapmanReplace = fit_nlme("Chapman-Richards replace", dbh ~ (a1 + a1p * isPlantation) * (exp((b1)*(height - 1.37)) - 1)^(b2 + b2ra), psme2022, # a1ra, b2ra max iterations, b1ra singularity in backsolve
+  #                                                             fixedFormula = a1 + a1p + b1 + b2 ~ 1, randomFormula = b2ra ~ 1|stand/plot, # |stand, |uniquePlotID max iterations
   #                                                             start = list(fixed = c(a1 = 40, a1p = -1, b1 = 0.03, b2 = 0.8))))
   psmeDiameterFromHeightMixed = list(chapmanReplace = create_fit_statistics(name = "Chapman-Richards replace", fitting = "nlme"))
-  #psmeDiameterFromHeightMixed$chapmanReplaceAbat = fit_nlme("Chapman-Richards replace ABA+T", dbh ~ (a1 + a1p * isPlantation + a1r)*(exp((b1 + b1aba * bootstrapStandBasalAreaPerHectare + b1aat * basalAreaTaller)*(height - 1.37)) - 1)^(b2), psme2022, # a1r, b1r singularity in backsolve, b2r max iterations
-  #                                                          fixedFormula = a1 + a1p + b1 + b1aba + b1aat + b2 ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$chapmanReplaceAbat = fit_nlme("Chapman-Richards replace ABA+T", dbh ~ (a1 + a1p * isPlantation + a1ra)*(exp((b1 + b1aba * bootstrapStandBasalAreaPerHectare + b1aat * basalAreaTaller)*(height - 1.37)) - 1)^(b2), psme2022, # a1ra, b1ra singularity in backsolve, b2ra max iterations
+  #                                                          fixedFormula = a1 + a1p + b1 + b1aba + b1aat + b2 ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                          start = list(fixed = c(a1 = 50, a1p = -3, b1 = 0.03, b1aba = -0.0001, b1aat = -0.0001, b2 = 0.9)))
   psmeDiameterFromHeightMixed$chapmanReplaceAbat = create_fit_statistics(name = "Chapman-Richards replace ABA+T", fitting = "nlme")
   #psmeDiameterFromHeightMixed$chapmanReplaceRelHt = fit_nlme("Chapman-Richards replace RelHt", dbh ~ (a1)*(exp((b1 + b1rh * relativeHeight)*(height - 1.37)) - 1)^(b2), psme2022,
-  #                                                           fixedFormula = a1 + b1 + b2 + b2rh ~ 1, randomFormula = b2r ~ 1|stand/plot,
+  #                                                           fixedFormula = a1 + b1 + b2 + b2rh ~ 1, randomFormula = b2ra ~ 1|stand/plot,
   #                                                           start = list(fixed = c(a1 = 45, b1 = 0.03, b1rh = 0.002, b2 = 0.8)), distinct = FALSE)
   psmeDiameterFromHeightMixed$chapmanReplaceRelHt = create_fit_statistics(name = "Chapman-Richards replace RelHt", fitting = "nlme", distinct = FALSE)
-  #psmeDiameterFromHeightMixed$chapmanRichards = fit_nlme("Chapman-Richards inverse", dbh ~ (a1 + a1p * isPlantation + a1r)*log(1 - pmin((b1*(height - 1.37))^b2, 0.9999)), psme2022, # a1r job step halving, b1r singular precision, b2r step halving
-  #                                                       fixedFormula = a1 + a1p + b1 + b2 ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$chapmanRichards = fit_nlme("Chapman-Richards inverse", dbh ~ (a1 + a1p * isPlantation + a1ra)*log(1 - pmin((b1*(height - 1.37))^b2, 0.9999)), psme2022, # a1ra job step halving, b1ra singular precision, b2ra step halving
+  #                                                       fixedFormula = a1 + a1p + b1 + b2 ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                       start = list(fixed = c(a1 = -10, a1p = -1, b1 = 0.03, b2 = 0.3)))
   psmeDiameterFromHeightMixed$chapmanRichards = create_fit_statistics(name = "Chapman-Richards inverse", fitting = "nlme")
-  #psmeDiameterFromHeightMixed$chapmanRichardsAbat = fit_nlme("Chapman-Richards inverse ABA+T", dbh ~ (a1 + a1r)*log(1 - pmin(((b1 + (b1aba + b1abap * isPlantation) * bootstrapStandBasalAreaPerHectare)*(height - 1.37))^b2, 0.9999)), psme2022, # a1r false convergence, b1r, b2r singularity in backsolve
-  #                                                           fixedFormula = a1 + b1 + b1aba + b1abap + b2 ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$chapmanRichardsAbat = fit_nlme("Chapman-Richards inverse ABA+T", dbh ~ (a1 + a1ra)*log(1 - pmin(((b1 + (b1aba + b1abap * isPlantation) * bootstrapStandBasalAreaPerHectare)*(height - 1.37))^b2, 0.9999)), psme2022, # a1ra false convergence, b1ra, b2ra singularity in backsolve
+  #                                                           fixedFormula = a1 + b1 + b1aba + b1abap + b2 ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                           start = list(fixed = c(a1 = -100, b1 = 0.01, b1aba = -0.00002, b1abap = -0.00001, b2 = 1.0)))
   psmeDiameterFromHeightMixed$chapmanRichardsAbat = create_fit_statistics(name = "Chapman-Richards inverse ABA+T", fitting = "nlme")
-  #psmeDiameterFromHeightMixed$chapmanRichardsPhysio = fit_nlme("Chapman-Richards inverse physio", dbh ~ (a1 + a1r + a1p * isPlantation)*log(1 - pmin(((b1)*(height - 1.37))^(b2 + b2tw * topographicWetnessFD8f), 0.9999)), psme2022, # fixed effects not significant
-  #                                                             fixedFormula = a1 + a1p + b1 + b2 + b2tw ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$chapmanRichardsPhysio = fit_nlme("Chapman-Richards inverse physio", dbh ~ (a1 + a1ra + a1p * isPlantation)*log(1 - pmin(((b1)*(height - 1.37))^(b2 + b2tw * topographicWetnessFD8f), 0.9999)), psme2022, # fixed effects not significant
+  #                                                             fixedFormula = a1 + a1p + b1 + b2 + b2tw ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                             start = list(fixed = c(a1 = 40, a1p = -1, b1 = 0.03, b2 = 0.8, b2tw = 0)), distinct = FALSE)
   psmeDiameterFromHeightMixed$chapmanRichardsPhysio = create_fit_statistics(name = "Chapman-Richards inverse physio", fitting = "nlme", distinct = FALSE)
-  psmeDiameterFromHeightMixed$chapmanRichardsRelHt = tryCatch({ fit_nlme("Chapman-Richards inverse RelHt", dbh ~ (a1 + a1r)*log(1 - pmin((b1*(height - 1.37))^(b2 + b2rh * relativeHeight), 0.9999)), psme2022, # a1r 2x50 job, b1r step halving, b2r singularity in backsolve
-                                                                         fixedFormula = a1 + b1 + b2 + b2rh ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  psmeDiameterFromHeightMixed$chapmanRichardsRelHt = tryCatch({ fit_nlme("Chapman-Richards inverse RelHt", dbh ~ (a1 + a1ra)*log(1 - pmin((b1*(height - 1.37))^(b2 + b2rh * relativeHeight), 0.9999)), psme2022, # a1ra 2x50 job, b1ra step halving, b2ra singularity in backsolve
+                                                                         fixedFormula = a1 + b1 + b2 + b2rh ~ 1, randomFormula = a1ra ~ 1|stand/plot,
                                                                          start = list(fixed = c(a1 = -20, b1 = 0.018, b2 = 0.5, b2rh = -0.3))) },
-                                                              error = function(e) { return(create_fit_statistics("Chapman-Richards BA+L", fittingMethod = "nlme")) })
-  psmeDiameterFromHeightMixed$michaelisMentenReplace = fit_nlme("Michaelis-Menten replace", dbh ~ (a1) * (height - 1.37)^(b1 + b1p * isPlantation + b1r) / (a2 - (height - 1.37)^(b1 + b1p * isPlantation + b1r)), psme2022, # a1r step halving, a2r singularity in backsolve
-                                                                fixedFormula = a1 + a2 + b1 + b1p ~ 1, randomFormula = b1r ~ 1|stand/plot,
-                                                                start = list(fixed = c(a1 = 40, a2 = 18, b1 = 0.6, b1p = 0.008)))
-  #psmeDiameterFromHeightMixed$michaelisMentenReplaceAbat = fit_nlme("Michaelis-Menten replace ABA+T", dbh ~ (a1 + a1r) * (height - 1.37)^(b1 + b1p * isPlantation + b1aba * bootstrapStandBasalAreaPerHectare) / (a2 - (height - 1.37)^(b1 + b1p * isPlantation + b1aba * bootstrapStandBasalAreaPerHectare)), psme2022, # a1r, b1r step halving, a2r singularity in backsolve
-  #                                                                  fixedFormula = a1 + a2 + b1 + b1p + b1aba ~ 1, randomFormula = a1r ~ 1|stand/plot,
+                                                              error = function(e) { reset_future(); return(create_fit_statistics("Chapman-Richards BA+L", fittingMethod = "nlme")) })
+  psmeDiameterFromHeightMixed$michaelisMentenReplace = fit_nlme("Michaelis-Menten replace", dbh ~ (a1) * (1 + a1rm) * (height - 1.37)^(b1) / (a2 - (height - 1.37)^(b1)), psme2022, # b1p not significant, lower height step halving, lower height power max iterations, upper height power singular precision, both heights max iterations, 10x10 RMSE 16.4, AIC 5404
+                                                                fixedFormula = a1 + a2 + b1 ~ 1, randomFormula = a1rm ~ 1|stand/plot,
+                                                                start = list(fixed = c(a1 = 150, a2 = 90, b1 = 0.9)))
+  #psmeDiameterFromHeightMixed$michaelisMentenReplaceB1 = fit_nlme("Michaelis-Menten replace", dbh ~ (a1) * (height - 1.37)^(b1 + b1ra) / (a2 - (height - 1.37)^(b1 + b1ra)), psme2022, # a1ra step halving, a2ra singularity in backsolve, b1p not significant, 10x10 RMSE 26.0, AIC 5539 vs 14.9, 5224 fixed effect
+  #                                                                fixedFormula = a1 + a2 + b1 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
+  #                                                                start = list(fixed = c(a1 = 40, a2 = 22, b1 = 0.7)))
+  #psmeDiameterFromHeightMixed$michaelisMentenReplaceB1 = fit_nlme("Michaelis-Menten replace", dbh ~ (a1) * (height - 1.37)^(b1 * (1 + b1rm)) / (a2 - (height - 1.37)^(b1 * (1 + b1rm))), psme2022, # b1p not significant, 10x10 RMSE 18.2, AIC 5416
+  #                                                                fixedFormula = a1 + a2 + b1 ~ 1, randomFormula = b1rm ~ 1|stand/plot,
+  #                                                                start = list(fixed = c(a1 = 80, a2 = 45, b1 = 0.8)))
+  #psmeDiameterFromHeightMixed$michaelisMentenReplaceAbat = fit_nlme("Michaelis-Menten replace ABA+T", dbh ~ (a1 + a1ra) * (height - 1.37)^(b1 + b1p * isPlantation + b1aba * bootstrapStandBasalAreaPerHectare) / (a2 - (height - 1.37)^(b1 + b1p * isPlantation + b1aba * bootstrapStandBasalAreaPerHectare)), psme2022, # a1ra, a1rm, b1ra step halving, a2ra singularity in backsolve
+  #                                                                  fixedFormula = a1 + a2 + b1 + b1p + b1aba ~ 1, randomFormula = a1ra ~ 1|stand/plot,
+  #                                                                  start = list(fixed = c(a1 = 120, a2 = 70, b1 = 0.9, b1aba = -0.0005, b1p = -0.01)))
+  #psmeDiameterFromHeightMixed$michaelisMentenReplaceAbat = fit_nlme("Michaelis-Menten replace ABA+T", dbh ~ (a1) * (1 + a1rm) * (height - 1.37)^(b1 + b1p * isPlantation + b1aba * bootstrapStandBasalAreaPerHectare) / (a2 - (height - 1.37)^(b1 + b1p * isPlantation + b1aba * bootstrapStandBasalAreaPerHectare)), psme2022, # a1rm, b1rm step halving
+  #                                                                  fixedFormula = a1 + a2 + b1 + b1p + b1aba ~ 1, randomFormula = a1rm ~ 1|stand/plot,
   #                                                                  start = list(fixed = c(a1 = 120, a2 = 70, b1 = 0.9, b1aba = -0.0005, b1p = -0.01)))
   psmeDiameterFromHeightMixed$michaelisMentenReplaceAbat = create_fit_statistics(name = "Michaelis-Menten replace ABA+T", fitting = "nlme")
-  #psmeDiameterFromHeightMixed$michaelisMentenReplaceAbatRelHt = fit_nlme("Michaelis-Menten replace RelHt ABA+T", dbh ~ (a1 + a1rh * relativeHeight + a1r) * (height - 1.37)^(b1 + b1p * isPlantation + b1aba * bootstrapStandBasalAreaPerHectare) / (a2 - (height - 1.37)^(b1 + b1p * isPlantation + b1aba * bootstrapStandBasalAreaPerHectare)), psme2022, # a1r maximum iterations, a2r, b1r step halving
-  #                                                                       fixedFormula = a1 + a1rh + a2 + b1 + b1p + b1aba ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$michaelisMentenReplaceAbatRelHt = fit_nlme("Michaelis-Menten replace RelHt ABA+T", dbh ~ (a1 + a1rh * relativeHeight) * (1 + a1rm) * (height - 1.37)^(b1 + b1aba * bootstrapStandBasalAreaPerHectare) / (a2 - (height - 1.37)^(b1 + b1aba * bootstrapStandBasalAreaPerHectare)), psme2022, # 
+  #                                                                     fixedFormula = a1 + a1rh + a2 + b1 + b1aba ~ 1, randomFormula = a1rm ~ 1|stand/plot,
+  #                                                                     start = list(fixed = c(a1 = 110, a1rh = 10, a2 = 60, b1 = 0.9, b1aba = -0.0005)), distinct = FALSE) # b1aba not significant
+  #psmeDiameterFromHeightMixed$michaelisMentenReplaceAbatRelHt = fit_nlme("Michaelis-Menten replace RelHt ABA+T", dbh ~ (a1 + a1rh * relativeHeight + a1ra) * (height - 1.37)^(b1 + b1p * isPlantation + b1aba * bootstrapStandBasalAreaPerHectare) / (a2 - (height - 1.37)^(b1 + b1p * isPlantation + b1aba * bootstrapStandBasalAreaPerHectare)), psme2022, # a1ra maximum iterations, a2ra, b1ra step halving
+  #                                                                       fixedFormula = a1 + a1rh + a2 + b1 + b1p + b1aba ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                                       start = list(fixed = c(a1 = 110, a1rh = 10, a2 = 60, b1 = 0.9, b1aba = -0.0005, b1p = -0.01)))
   psmeDiameterFromHeightMixed$michaelisMentenReplaceAbatRelHt = create_fit_statistics(name = "Michaelis-Menten replace RelHt ABA+T", fitting = "nlme")
-  #psmeDiameterFromHeightMixed$michaelisMentenReplaceRelHt = fit_nlme("Michaelis-Menten replace RelHt", dbh ~ (a1 + a1rh * relativeHeight + a1r) * (height - 1.37)^(b1 + b1p * isPlantation) / (a2 - (height - 1.37)^(b1 + b1p * isPlantation)), psme2022, # a1r, a2r singularity in backsolve
-  #                                                                   fixedFormula = a1 + a1rh + a2 + b1 + b1p ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$michaelisMentenReplaceRelHt = fit_nlme("Michaelis-Menten replace RelHt", dbh ~ (a1 + a1rh * relativeHeight + a1ra) * (height - 1.37)^(b1 + b1p * isPlantation) / (a2 - (height - 1.37)^(b1 + b1p * isPlantation)), psme2022, # a1ra, a2ra singularity in backsolve
+  #                                                                   fixedFormula = a1 + a1rh + a2 + b1 + b1p ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                                   start = list(fixed = c(a1 = 130, a1rh = 20, a2 = 70, b1 = 0.9, b1p = -0.01)))
-  psmeDiameterFromHeightMixed$michaelisMentenReplaceRelHt = create_fit_statistics(name = "Michaelis-Menten replace RelHt", fitting = "nlme")
-  psmeDiameterFromHeightMixed$naslund = fit_nlme("Näslund inverse", dbh ~ (a1 + a1r + a1p * isPlantation) * sqrt(height - 1.37) / (1 + (a2 + a2p * isPlantation) * sqrt(height - 1.37)), psme2022, # a2r also tractable but false convergence with both a1r and a2r
-                                                 fixedFormula = a1 + a1p + a2 + a2p ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  psmeDiameterFromHeightMixed$michaelisMentenReplaceRelHt = fit_nlme("Michaelis-Menten replace RelHt", dbh ~ (a1 + a1rh * relativeHeight) * (1 + a1rm) * (height - 1.37)^(b1) / (a2 - (height - 1.37)^(b1)), psme2022, # b1p not significant, b1rm step halving, 10x10 RMSE 15.8, AIC 5422
+                                                                     fixedFormula = a1 + a1rh + a2 + b1 ~ 1, randomFormula = a1rm ~ 1|stand/plot,
+                                                                     start = list(fixed = c(a1 = 130, a1rh = 25, a2 = 70, b1 = 0.9)))
+  psmeDiameterFromHeightMixed$naslund = fit_nlme("Näslund inverse", dbh ~ (a1 + a1ra + a1p * isPlantation) * sqrt(height - 1.37) / (1 + (a2 + a2p * isPlantation) * sqrt(height - 1.37)), psme2022, # a2ra also tractable but false convergence with both a1ra and a2ra, 10x10 RMSE 17.6, AIC 5518 vs 15.6, 5514 fixed effect
+                                                 fixedFormula = a1 + a1p + a2 + a2p ~ 1, randomFormula = a1ra ~ 1|stand/plot,
                                                  start = list(fixed = c(a1 = 4.0, a1p = -0.6, a2 = -0.1, a2p = -0.006)))
-  #psmeDiameterFromHeightMixed$naslundA2 = fit_nlme("Näslund inverse", dbh ~ (a1 + a1p * isPlantation) * sqrt(height - 1.37) / (1 + (a2 + a2p * isPlantation + a2r) * sqrt(height - 1.37)), psme2022, # 30x higher RMSE than a1r
-  #                                                 fixedFormula = a1 + a1p + a2 + a2p ~ 1, randomFormula = a2r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$naslund = fit_nlme("Näslund inverse", dbh ~ (a1 + a1p * isPlantation) * (1 + a1rm) * sqrt(height - 1.37) / (1 + (a2 + a2p * isPlantation) * sqrt(height - 1.37)), psme2022, # a2rm max iterations, 10x10 RMSE 18.0, AIC 5606
+  #                                               fixedFormula = a1 + a1p + a2 + a2p ~ 1, randomFormula = a1rm ~ 1|stand/plot,
+  #                                               start = list(fixed = c(a1 = 4.3, a1p = -0.6, a2 = -0.1, a2p = -0.01)))
+  #psmeDiameterFromHeightMixed$naslundA2 = fit_nlme("Näslund inverse", dbh ~ (a1 + a1p * isPlantation) * sqrt(height - 1.37) / (1 + (a2 + a2p * isPlantation + a2ra) * sqrt(height - 1.37)), psme2022, # 30x higher RMSE than a1ra
+  #                                                 fixedFormula = a1 + a1p + a2 + a2p ~ 1, randomFormula = a2ra ~ 1|stand/plot,
   #                                                 start = list(fixed = c(a1 = 4.0, a1p = -0.6, a2 = -0.1, a2p = -0.006)))
-  psmeDiameterFromHeightMixed$power = fit_nlme("power", dbh ~ (a1 + a1p*isPlantation)*(height - 1.37)^(b1 + b1p*isPlantation + b1r), psme2022, # a1r also tractable
-                                               fixedFormula = a1 + a1p + b1 + b1p ~ 1, randomFormula = b1r ~ 1|stand/plot,
-                                               start = list(fixed = c(a1 = 0.7, a1p = 0.4, b1 = 1.2, b1p = -0.2)))
-  #psmeDiameterFromHeightMixed$powerA1 = fit_nlme("power", dbh ~ (a1 + a1p*isPlantation + a1r)*(height - 1.37)^(b1 + b1p*isPlantation), psme2022, # false convergence but possibly lower mean or median error
-  #                                               fixedFormula = a1 + a1p + b1 + b1p ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  psmeDiameterFromHeightMixed$power = fit_nlme("power", dbh ~ (a1 + a1p*isPlantation)*(height - 1.37)^((b1 + b1p*isPlantation)*(1 + b1rm)), psme2022, # 10x10 RMSE 15.1, AIC 5346
+                                               fixedFormula = a1 + a1p + b1 + b1p ~ 1, randomFormula = b1rm ~ 1|stand/plot,
+                                               start = list(fixed = c(a1 = 0.6, a1p = 0.5, b1 = 1.3, b1p = -0.2)))
+  #psmeDiameterFromHeightMixed$power = fit_nlme("power", dbh ~ (a1 + a1p*isPlantation)*(height - 1.37)^(b1 + b1p*isPlantation + b1ra), psme2022, # a1ra also tractable, 10x10 RMSE 15.3, AIC 5321 vs 15.1, 5311 fixed
+  #                                             fixedFormula = a1 + a1p + b1 + b1p ~ 1, randomFormula = b1ra ~ 1|stand/plot,
+  #                                             start = list(fixed = c(a1 = 0.7, a1p = 0.4, b1 = 1.2, b1p = -0.2)))
+  #psmeDiameterFromHeightMixed$power = fit_nlme("power", dbh ~ (a1 + a1p*isPlantation)*(1 + a1ra)*(height - 1.37)^(b1), psme2022, # a1p-b1p not mutually significant, step halving or singularity in backsolve with (a1)*((1 + a1ra)*(height - 1.37))^(b1) regardess of a1p or b1p, 10x10 RMSE 16.4, AIC 5424
+  #                                             fixedFormula = a1 + a1p + b1 ~ 1, randomFormula = a1ra ~ 1|stand/plot,
+  #                                             start = list(fixed = c(a1 = 1.2, a1p = -0.1, b1 = 1.1)))
+  #psmeDiameterFromHeightMixed$power = fit_nlme("power", dbh ~ (a1)*(1 + a1ra)*(height - 1.37)^(b1 + b1p*isPlantation), psme2022, # 10x10 RMSE 16.4, AIC 5352
+  #                                             fixedFormula = a1 + b1 + b1p ~ 1, randomFormula = a1ra ~ 1|stand/plot,
+  #                                             start = list(fixed = c(a1 = 1.1, b1 = 1.2, b1p = -0.02)))
+  #psmeDiameterFromHeightMixed$powerA1 = fit_nlme("power", dbh ~ (a1 + a1p*isPlantation + a1ra)*(height - 1.37)^(b1 + b1p*isPlantation), psme2022, # false convergence but possibly lower mean or median error
+  #                                               fixedFormula = a1 + a1p + b1 + b1p ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                               start = list(fixed = c(a1 = 0.7, a1p = 0.4, b1 = 1.2, b1p = -0.2)))
-  psmeDiameterFromHeightMixed$powerAbat = fit_nlme("power ABA+T", dbh ~ (a1 + a1bat * basalAreaTaller + a1r)*(height - 1.37)^(b1 + b1p*isPlantation), psme2022, # 10x10 RMSE 14.8, AIC 5338
-                                                   fixedFormula = a1 + a1bat + b1 + b1p ~ 1, randomFormula = a1r ~ 1|stand/plot,
-                                                   start = list(fixed = c(a1 = 1.2, a1bat = -0.01, b1 = 1.1, b1p = -0.2)))
-  #psmeDiameterFromHeightMixed$powerAbatB1 = fit_nlme("power ABA+T", dbh ~ (a1 + a1bat * basalAreaTaller)*(height - 1.37)^(b1 + b1p*isPlantation + b1r), psme2022, # 10x10 RMSE 15.1, AIC 5403
-  #                                                   fixedFormula = a1 + a1bat + b1 + b1p ~ 1, randomFormula = b1r ~ 1|stand/plot,
-  #                                                   start = list(fixed = c(a1 = 1.2, a1bat = -0.01, b1 = 1.1, b1p = -0.2)))
-  #psmeDiameterFromHeightMixed$powerPhysio = fit_nlme("power physio", dbh ~ (a1 + a1r + a1p * isPlantation + a1ac * cos(3.14159/180 * aspect))*(height - 1.37)^(b1 + b1p * isPlantation), psme2022, # fixed effects not significant
-  #                                                   fixedFormula = a1 + a1p + a1ac + b1 + b1p ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  psmeDiameterFromHeightMixed$powerAbat = fit_nlme("power ABA+T", dbh ~ (a1 + a1aat * basalAreaTaller)*(height - 1.37)^((b1 + b1p*isPlantation)*(1 + b1rm)), psme2022, # 10x10 RMSE 15.0, AIC 5266, maybe lower AIC than a1ra
+                                                   fixedFormula = a1 + a1aat + b1 + b1p ~ 1, randomFormula = b1rm ~ 1|stand/plot,
+                                                   start = list(fixed = c(a1 = 1.2, a1aat = -0.01, b1 = 1.1, b1p = -0.2)))
+  #psmeDiameterFromHeightMixed$powerAbatA1 = fit_nlme("power ABA+T", dbh ~ (a1 + a1aat * basalAreaTaller + a1ra)*(height - 1.37)^(b1 + b1p*isPlantation), psme2022, # 10x10 RMSE 14.8, AIC 5338
+  #                                                   fixedFormula = a1 + a1aat + b1 + b1p ~ 1, randomFormula = a1ra ~ 1|stand/plot,
+  #                                                   start = list(fixed = c(a1 = 1.2, a1aat = -0.01, b1 = 1.1, b1p = -0.2)))
+  #psmeDiameterFromHeightMixed$powerAbatB1 = fit_nlme("power ABA+T", dbh ~ (a1 + a1aat * basalAreaTaller)*(height - 1.37)^(b1 + b1p*isPlantation + b1ra), psme2022, # 10x10 RMSE 15.1, AIC 5403
+  #                                                   fixedFormula = a1 + a1aat + b1 + b1p ~ 1, randomFormula = b1ra ~ 1|stand/plot,
+  #                                                   start = list(fixed = c(a1 = 1.2, a1aat = -0.01, b1 = 1.1, b1p = -0.2)))
+  #psmeDiameterFromHeightMixed$powerPhysio = fit_nlme("power physio", dbh ~ (a1 + a1ra + a1p * isPlantation + a1ac * cos(3.14159/180 * aspect))*(height - 1.37)^(b1 + b1p * isPlantation), psme2022, # fixed effects not significant
+  #                                                   fixedFormula = a1 + a1p + a1ac + b1 + b1p ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                   start = list(fixed = c(a1 = 0.7, a1p = 0.6, b1 = 1.2, b1p = -0.2, a1ac = 0)), distinct = FALSE)
   psmeDiameterFromHeightMixed$powerPhysio = create_fit_statistics(name = "power physio", fitting = "nlme", distinct = FALSE)
-  psmeDiameterFromHeightMixed$powerRelHt = fit_nlme("power RelHt", dbh ~ (a1 + a1p * isPlantation)*(height - 1.37)^(b1 + b1p * isPlantation + b1rh * relativeHeight + b1r), psme2022, # a1r also tractable
-                                                    fixedFormula = a1 + a1p + b1 + b1p + b1rh ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  psmeDiameterFromHeightMixed$powerRelHt = fit_nlme("power RelHt", dbh ~ (a1 + a1p * isPlantation)*(height - 1.37)^((b1 + b1p * isPlantation + b1rh * relativeHeight)*(1 + b1rm)), psme2022, # 10x10 RMSE 15.0, AIC 5305
+                                                    fixedFormula = a1 + a1p + b1 + b1p + b1rh ~ 1, randomFormula = b1rm ~ 1|stand/plot,
                                                     start = list(fixed = c(a1 = 1.1, a1p = 0.4, b1 = 1.1, b1p = -0.1, b1rh = 0.05)))
-  #psmeDiameterFromHeightMixed$powerRelHtA1 = fit_nlme("power RelHt", dbh ~ (a1 + a1p * isPlantation + a1r)*(height - 1.37)^(b1 + b1p * isPlantation + b1rh * relativeHeight), psme2022, # false convergence
-  #                                                    fixedFormula = a1 + a1p + b1 + b1p + b1rh ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$powerRelHtA1 = fit_nlme("power RelHt", dbh ~ (a1 + a1p * isPlantation + a1ra)*(height - 1.37)^(b1 + b1p * isPlantation + b1rh * relativeHeight), psme2022, # false convergence
+  #                                                    fixedFormula = a1 + a1p + b1 + b1p + b1rh ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                    start = list(fixed = c(a1 = 1.1, a1p = 0.4, b1 = 1.1, b1p = -0.1, b1rh = 0.05)))
-  psmeDiameterFromHeightMixed$ruark = fit_nlme("Ruark", dbh ~ (a1) * (height - 1.37)^(b1 + b1r) * exp((b2) * (height - 1.37)), psme2022, # b2p not significant
-                                               fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$powerRelHtB1 = fit_nlme("power RelHt", dbh ~ (a1 + a1p * isPlantation)*(height - 1.37)^(b1 + b1p * isPlantation + b1rh * relativeHeight + b1ra), psme2022, # 10x10 RMSE 15.2, AIC 5271
+  #                                                    fixedFormula = a1 + a1p + b1 + b1p + b1rh ~ 1, randomFormula = b1ra ~ 1|stand/plot,
+  #                                                    start = list(fixed = c(a1 = 1.1, a1p = 0.4, b1 = 1.1, b1p = -0.1, b1rh = 0.05)))
+  psmeDiameterFromHeightMixed$ruark = fit_nlme("Ruark", dbh ~ (a1) * (height - 1.37)^(b1 + b1ra) * exp((b2) * (height - 1.37)), psme2022, # b2p not significant, 10x10 RMSE 15.0, AIC 5288
+                                               fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
                                                start = list(fixed = c(a1 = 2, b1 = 0.8, b2 = 0.01)))
-  #psmeDiameterFromHeightMixed$ruarkA1 = fit_nlme("Ruark", dbh ~ (a1 + a1r) * (height - 1.37)^(b1) * exp((b2) * (height - 1.37)), psme2022, # false convergence
-  #                                               fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$ruarkA1 = fit_nlme("Ruark", dbh ~ (a1)* (1 + a1rm) * (height - 1.37)^(b1) * exp((b2) * (height - 1.37)), psme2022, # b2rm leading minor, 10x10 RMSE 16.6, AIC 5429
+  #                                               fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = a1rm ~ 1|stand/plot,
+  #                                               start = list(fixed = c(a1 = 1.8, b1 = 0.8, b2 = 0.01)))
+  #psmeDiameterFromHeightMixed$ruarkB1 = fit_nlme("Ruark", dbh ~ (a1) * (height - 1.37)^((b1)*(1 + b1rm)) * exp((b2) * (height - 1.37)), psme2022, # 10x10 RMSE 15.7, AIC 5290
+  #                                               fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b1rm ~ 1|stand/plot,
+  #                                               start = list(fixed = c(a1 = 1.1, b1 = 1.0, b2 = 0)))
+  #psmeDiameterFromHeightMixed$ruarkA1 = fit_nlme("Ruark", dbh ~ (a1 + a1ra) * (height - 1.37)^(b1) * exp((b2) * (height - 1.37)), psme2022, # false convergence
+  #                                               fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                               start = list(fixed = c(a1 = 2, b1 = 0.8, b2 = 0.01)))
-  #psmeDiameterFromHeightMixed$ruarkB2 = fit_nlme("Ruark", dbh ~ (a1) * (height - 1.37)^(b1) * exp((b2 + b2r) * (height - 1.37)), psme2022, # not discriminable from b1r
-  #                                               fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b2r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$ruarkB2 = fit_nlme("Ruark", dbh ~ (a1) * (height - 1.37)^(b1) * exp((b2 + b2ra) * (height - 1.37)), psme2022, # not discriminable from b1ra
+  #                                               fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b2ra ~ 1|stand/plot,
   #                                               start = list(fixed = c(a1 = 2, b1 = 0.8, b2 = 0.01)))
-  psmeDiameterFromHeightMixed$ruarkAbat = fit_nlme("Ruark ABA+T", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b1 + b1r) * exp((b2 + b2p * isPlantation) * (height - 1.37)), psme2022, # 10x10 RMSE 14.6, AIC 5267
-                                                   fixedFormula = a1 + a1aba + b1 + b2 + b2p ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  psmeDiameterFromHeightMixed$ruarkAbat = fit_nlme("Ruark ABA+T", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b1 + b1ra) * exp((b2 + b2p * isPlantation) * (height - 1.37)), psme2022, # 10x10 RMSE 14.6, AIC 5267
+                                                   fixedFormula = a1 + a1aba + b1 + b2 + b2p ~ 1, randomFormula = b1ra ~ 1|stand/plot,
                                                    start = list(fixed = c(a1 = 2.0, a1aba = -0.006, b1 = 0.9, b2 = 0.01, b2p = -0.002)))
-  #psmeDiameterFromHeightMixed$ruarkAbatA1 = fit_nlme("Ruark ABA+T", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare + a1r)*(height - 1.37)^(b1) * exp((b2 + b2p * isPlantation) * (height - 1.37)), psme2022, # 10x10 RMSE 14.7, AIC 5279
-  #                                                   fixedFormula = a1 + a1aba + b1 + b2 + b2p ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$ruarkAbatA1 = fit_nlme("Ruark ABA+T", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare + a1ra)*(height - 1.37)^(b1) * exp((b2 + b2p * isPlantation) * (height - 1.37)), psme2022, # 10x10 RMSE 14.7, AIC 5279
+  #                                                   fixedFormula = a1 + a1aba + b1 + b2 + b2p ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                   start = list(fixed = c(a1 = 2.0, a1aba = -0.006, b1 = 0.9, b2 = 0.01, b2p = -0.002)))
-  #psmeDiameterFromHeightMixed$ruarkAbatB2 = fit_nlme("Ruark ABA+T", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b1) * exp((b2 + b2p * isPlantation + b2r) * (height - 1.37)), psme2022, # 10x10 RMSE 14.7, AIC 5177
-  #                                                   fixedFormula = a1 + a1aba + b1 + b2 + b2p ~ 1, randomFormula = b2r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$ruarkAbatB2 = fit_nlme("Ruark ABA+T", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b1) * exp((b2 + b2p * isPlantation + b2ra) * (height - 1.37)), psme2022, # 10x10 RMSE 14.7, AIC 5177
+  #                                                   fixedFormula = a1 + a1aba + b1 + b2 + b2p ~ 1, randomFormula = b2ra ~ 1|stand/plot,
   #                                                   start = list(fixed = c(a1 = 2.0, a1aba = -0.006, b1 = 0.9, b2 = 0.01, b2p = -0.002)))
-  psmeDiameterFromHeightMixed$ruarkAbatPhysio = fit_nlme("Ruark ABA+T physio", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare + a1ac * cos(3.14159/180 * aspect))*(height - 1.37)^(b1 + b1r) * exp((b2 + b2p * isPlantation) * (height - 1.37)), psme2022, # a1r false convergence, 10x10 RMSE 14.3, AIC 5240
-                                                         fixedFormula = a1 + a1aba + a1ac + b1 + b2 + b2p ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  psmeDiameterFromHeightMixed$ruarkAbatPhysio = fit_nlme("Ruark ABA+T physio", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare + a1ac * cos(3.14159/180 * aspect))*(height - 1.37)^(b1 + b1ra) * exp((b2 + b2p * isPlantation) * (height - 1.37)), psme2022, # a1ra false convergence, 10x10 RMSE 14.3, AIC 5240
+                                                         fixedFormula = a1 + a1aba + a1ac + b1 + b2 + b2p ~ 1, randomFormula = b1ra ~ 1|stand/plot,
                                                          start = list(fixed = c(a1 = 2.0, a1aba = -0.006, a1ac = -0.1, b1 = 0.9, b2 = 0.01, b2p = -0.002)))
-  #psmeDiameterFromHeightMixed$ruarkAbatPhysioB2 = fit_nlme("Ruark ABA+T physio", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare + a1ac * cos(3.14159/180 * aspect))*(height - 1.37)^(b1) * exp((b2 + b2p * isPlantation + b2r) * (height - 1.37)), psme2022, # 10x10 RMSE 14.4, AIC 5254
-  #                                                       fixedFormula = a1 + a1aba + a1ac + b1 + b2 + b2p ~ 1, randomFormula = b2r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$ruarkAbatPhysioB2 = fit_nlme("Ruark ABA+T physio", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare + a1ac * cos(3.14159/180 * aspect))*(height - 1.37)^(b1) * exp((b2 + b2p * isPlantation + b2ra) * (height - 1.37)), psme2022, # 10x10 RMSE 14.4, AIC 5254
+  #                                                       fixedFormula = a1 + a1aba + a1ac + b1 + b2 + b2p ~ 1, randomFormula = b2ra ~ 1|stand/plot,
   #                                                       start = list(fixed = c(a1 = 2.0, a1aba = -0.006, a1ac = -0.1, b1 = 0.9, b2 = 0.01, b2p = -0.002)))
-  psmeDiameterFromHeightMixed$ruarkAbatRelHt = fit_nlme("Ruark RelHt ABA+T", dbh ~ (a1 + a1rh * relativeHeight + a1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b1 + b1r) * exp((b2 + b2p * isPlantation) * (height - 1.37)), psme2022, # 10x10 RMSE 14.4, AIC, 5262
-                                                        fixedFormula = a1 + a1rh + a1aba + b1 + b2 + b2p ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  psmeDiameterFromHeightMixed$ruarkAbatRelHt = fit_nlme("Ruark RelHt ABA+T", dbh ~ (a1 + a1rh * relativeHeight + a1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b1 + b1ra) * exp((b2 + b2p * isPlantation) * (height - 1.37)), psme2022, # 10x10 RMSE 14.4, AIC, 5262
+                                                        fixedFormula = a1 + a1rh + a1aba + b1 + b2 + b2p ~ 1, randomFormula = b1ra ~ 1|stand/plot,
                                                         start = list(fixed = c(a1 = 2.0, a1aba = -0.006, a1rh = 0.2, b1 = 0.9, b2 = 0.01, b2p = -0.002)))
-  #psmeDiameterFromHeightMixed$ruarkAbatRelHtA1 = fit_nlme("Ruark RelHt ABA+T", dbh ~ (a1 + a1r + a1rh * relativeHeight + a1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b1) * exp((b2 + b2p * isPlantation) * (height - 1.37)), psme2022, # job false convergence, 10x10 RMSE 14.7, AIC 5281
-  #                                                        fixedFormula = a1 + a1rh + a1aba + b1 + b2 + b2p ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$ruarkAbatRelHtA1 = fit_nlme("Ruark RelHt ABA+T", dbh ~ (a1 + a1ra + a1rh * relativeHeight + a1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b1) * exp((b2 + b2p * isPlantation) * (height - 1.37)), psme2022, # job false convergence, 10x10 RMSE 14.7, AIC 5281
+  #                                                        fixedFormula = a1 + a1rh + a1aba + b1 + b2 + b2p ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                        start = list(fixed = c(a1 = 2.0, a1aba = -0.006, a1rh = 0.2, b1 = 0.9, b2 = 0.01, b2p = -0.002)))
-  #psmeDiameterFromHeightMixed$ruarkAbatRelHtB2 = fit_nlme("Ruark RelHt ABA+T", dbh ~ (a1 + a1rh * relativeHeight + a1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b1) * exp((b2 + b2p * isPlantation + b2r) * (height - 1.37)), psme2022, # 10x10 RMSE 14.7, AIC 5265
-  #                                                      fixedFormula = a1 + a1rh + a1aba + b1 + b2 + b2p ~ 1, randomFormula = b2r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$ruarkAbatRelHtB2 = fit_nlme("Ruark RelHt ABA+T", dbh ~ (a1 + a1rh * relativeHeight + a1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b1) * exp((b2 + b2p * isPlantation + b2ra) * (height - 1.37)), psme2022, # 10x10 RMSE 14.7, AIC 5265
+  #                                                      fixedFormula = a1 + a1rh + a1aba + b1 + b2 + b2p ~ 1, randomFormula = b2ra ~ 1|stand/plot,
   #                                                      start = list(fixed = c(a1 = 2.0, a1aba = -0.006, a1rh = 0.2, b1 = 0.9, b2 = 0.01, b2p = -0.002)))
-  psmeDiameterFromHeightMixed$ruarkAbatRelHtPhysio = fit_nlme("Ruark RelHt ABA+T physio", dbh ~ (a1 + a1rh * relativeHeight + a1aba * bootstrapStandBasalAreaPerHectare + a1ac * cos(3.14159/180 * aspect))*(height - 1.37)^(b1 + b1r) * exp((b2 + b2p * isPlantation) * (height - 1.37)), psme2022, # a1r singular precision, 10x10 RMSE 14.3, AIC 5273
-                                                              fixedFormula = a1 + a1aba + a1ac + a1rh + b1 + b2 + b2p ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  psmeDiameterFromHeightMixed$ruarkAbatRelHtPhysio = fit_nlme("Ruark RelHt ABA+T physio", dbh ~ (a1 + a1rh * relativeHeight + a1aba * bootstrapStandBasalAreaPerHectare + a1ac * cos(3.14159/180 * aspect))*(height - 1.37)^(b1 + b1ra) * exp((b2 + b2p * isPlantation) * (height - 1.37)), psme2022, # a1ra singular precision, 10x10 RMSE 14.3, AIC 5273
+                                                              fixedFormula = a1 + a1aba + a1ac + a1rh + b1 + b2 + b2p ~ 1, randomFormula = b1ra ~ 1|stand/plot,
                                                               start = list(fixed = c(a1 = 2.0, a1aba = -0.006, a1rh = 0.2, a1ac = -0.1, b1 = 0.9, b2 = 0.01, b2p = -0.002)))
-  #psmeDiameterFromHeightMixed$ruarkAbatRelHtPhysioB2 = fit_nlme("Ruark RelHt ABA+T physio", dbh ~ (a1 + a1rh * relativeHeight + a1aba * bootstrapStandBasalAreaPerHectare + a1ac * cos(3.14159/180 * aspect))*(height - 1.37)^(b1) * exp((b2 + b2p * isPlantation + b2r) * (height - 1.37)), psme2022, # 10x10 RMSE 14.6, AIC 5176
-  #                                                            fixedFormula = a1 + a1aba + a1ac + a1rh + b1 + b2 + b2p ~ 1, randomFormula = b2r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$ruarkAbatRelHtPhysioB2 = fit_nlme("Ruark RelHt ABA+T physio", dbh ~ (a1 + a1rh * relativeHeight + a1aba * bootstrapStandBasalAreaPerHectare + a1ac * cos(3.14159/180 * aspect))*(height - 1.37)^(b1) * exp((b2 + b2p * isPlantation + b2ra) * (height - 1.37)), psme2022, # 10x10 RMSE 14.6, AIC 5176
+  #                                                            fixedFormula = a1 + a1aba + a1ac + a1rh + b1 + b2 + b2p ~ 1, randomFormula = b2ra ~ 1|stand/plot,
   #                                                            start = list(fixed = c(a1 = 2.0, a1aba = -0.006, a1rh = 0.2, a1ac = -0.1, b1 = 0.9, b2 = 0.01, b2p = -0.002)))
-  psmeDiameterFromHeightMixed$ruarkPhysio = fit_nlme("Ruark physio", dbh ~ (a1 + a1ac * cos(3.14159/180 * aspect))*(height - 1.37)^(b1) * exp((b2 + b2r) * (height - 1.37)), psme2022, # a1r singular precision, b1r also tractable
-                                                     fixedFormula = a1 + a1ac + b1 + b2 ~ 1, randomFormula = b2r ~ 1|stand/plot,
+  psmeDiameterFromHeightMixed$ruarkPhysio = fit_nlme("Ruark physio", dbh ~ (a1 + a1ac * cos(3.14159/180 * aspect))*(height - 1.37)^(b1) * exp((b2 + b2ra) * (height - 1.37)), psme2022, # a1ra singular precision, b1ra also tractable
+                                                     fixedFormula = a1 + a1ac + b1 + b2 ~ 1, randomFormula = b2ra ~ 1|stand/plot,
                                                      start = list(fixed = c(a1 = 2, a1ac = -0.1, b1 = 0.8, b2 = 0.01)))
-  #psmeDiameterFromHeightMixed$ruarkPhysioB1 = fit_nlme("Ruark physio", dbh ~ (a1 + a1ac * cos(3.14159/180 * aspect))*(height - 1.37)^(b1 + b1r) * exp((b2) * (height - 1.37)), psme2022, # near identical to b2r
-  #                                                     fixedFormula = a1 + a1ac + b1 + b2 ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$ruarkPhysioB1 = fit_nlme("Ruark physio", dbh ~ (a1 + a1ac * cos(3.14159/180 * aspect))*(height - 1.37)^(b1 + b1ra) * exp((b2) * (height - 1.37)), psme2022, # near identical to b2ra
+  #                                                     fixedFormula = a1 + a1ac + b1 + b2 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                     start = list(fixed = c(a1 = 2, a1ac = -0.1, b1 = 0.8, b2 = 0.01)))
-  psmeDiameterFromHeightMixed$ruarkRelHt = fit_nlme("Ruark RelHt", dbh ~ (a1)*(height - 1.37)^(b1) * exp((b2 + b2rh * relativeHeight + b2r) * (height - 1.37)), psme2022, # a1r, b1r also tractable
-                                                    fixedFormula = a1 + b1 + b2 + b2rh ~ 1, randomFormula = b2r ~ 1|stand/plot,
+  
+  psmeDiameterFromHeightMixed$ruarkRelHt = fit_nlme("Ruark RelHt", dbh ~ (a1)*(height - 1.37)^(b1) * exp((b2 + b2rh * relativeHeight + b2ra) * (height - 1.37)), psme2022, # 10x10 RMSE 14.8, AIC 5197
+                                                    fixedFormula = a1 + b1 + b2 + b2rh ~ 1, randomFormula = b2ra ~ 1|stand/plot,
                                                     start = list(fixed = c(a1 = 2, b1 = 0.8, b2 = 0.008, b2rh = 0.003)))
-  #psmeDiameterFromHeightMixed$ruarkRelHtA1 = fit_nlme("Ruark RelHt", dbh ~ (a1 + a1r)*(height - 1.37)^(b1) * exp((b2 + b2rh * relativeHeight) * (height - 1.37)), psme2022, # false convergence
-  #                                                    fixedFormula = a1 + b1 + b2 + b2rh ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$ruarkRelHtA1 = fit_nlme("Ruark RelHt", dbh ~ (a1 + a1ra)*(height - 1.37)^(b1) * exp((b2 + b2rh * relativeHeight) * (height - 1.37)), psme2022, # false convergence, 10x10 RMSE 14.9, AIC 5341
+  #                                                      fixedFormula = a1 + b1 + b2 + b2rh ~ 1, randomFormula = a1ra ~ 1|stand/plot,
+  #                                                      start = list(fixed = c(a1 = 2, b1 = 0.8, b2 = 0.008, b2rh = 0.003)))
+  #psmeDiameterFromHeightMixed$ruarkRelHtB1 = fit_nlme("Ruark RelHt", dbh ~ (a1)*(height - 1.37)^(b1 + b1ra) * exp((b2 + b2rh * relativeHeight) * (height - 1.37)), psme2022, # 10x10 RMSE 15.1, AIC 5282
+  #                                                    fixedFormula = a1 + b1 + b2 + b2rh ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                    start = list(fixed = c(a1 = 2, b1 = 0.8, b2 = 0.008, b2rh = 0.003)))
-  #psmeDiameterFromHeightMixed$ruarkRelHtB1 = fit_nlme("Ruark RelHt", dbh ~ (a1)*(height - 1.37)^(b1 + b1r) * exp((b2 + b2rh * relativeHeight) * (height - 1.37)), psme2022, # likely slightly less accurate than b1r
-  #                                                    fixedFormula = a1 + b1 + b2 + b2rh ~ 1, randomFormula = b1r ~ 1|stand/plot,
-  #                                                    start = list(fixed = c(a1 = 2, b1 = 0.8, b2 = 0.008, b2rh = 0.003)))
-  psmeDiameterFromHeightMixed$ruarkRelHtPhysio = fit_nlme("Ruark RelHt physio", dbh ~ (a1 + a1ac * cos(3.14159/180 * aspect))*(height - 1.37)^(b1) * exp((b2 + b2rh * relativeHeight + b2r) * (height - 1.37)), psme2022, # a1r, b1r also tractable
-                                                          fixedFormula = a1 + a1ac + b1 + b2 + b2rh ~ 1, randomFormula = b2r ~ 1|stand/plot,
+  psmeDiameterFromHeightMixed$ruarkRelHtPhysio = fit_nlme("Ruark RelHt physio", dbh ~ (a1 + a1ac * cos(3.14159/180 * aspect))*(height - 1.37)^(b1) * exp((b2 + b2rh * relativeHeight + b2ra) * (height - 1.37)), psme2022, # a1ra, b1ra also tractable
+                                                          fixedFormula = a1 + a1ac + b1 + b2 + b2rh ~ 1, randomFormula = b2ra ~ 1|stand/plot,
                                                           start = list(fixed = c(a1 = 2, a1ac = -0.09, b1 = 0.8, b2 = 0.008, b2rh = 0.003)))
-  #psmeDiameterFromHeightMixed$ruarkRelHtPhysioA1 = fit_nlme("Ruark RelHt physio", dbh ~ (a1 + a1ac * cos(3.14159/180 * aspect) + a1r)*(height - 1.37)^(b1) * exp((b2 + b2rh * relativeHeight) * (height - 1.37)), psme2022, # false convergence
-  #                                                          fixedFormula = a1 + a1ac + b1 + b2 + b2rh ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$ruarkRelHtPhysioA1 = fit_nlme("Ruark RelHt physio", dbh ~ (a1 + a1ac * cos(3.14159/180 * aspect) + a1ra)*(height - 1.37)^(b1) * exp((b2 + b2rh * relativeHeight) * (height - 1.37)), psme2022, # false convergence
+  #                                                          fixedFormula = a1 + a1ac + b1 + b2 + b2rh ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                          start = list(fixed = c(a1 = 2, a1ac = -0.09, b1 = 0.8, b2 = 0.008, b2rh = 0.003)))
-  #psmeDiameterFromHeightMixed$ruarkRelHtPhysioB1 = fit_nlme("Ruark RelHt physio", dbh ~ (a1 + a1ac * cos(3.14159/180 * aspect))*(height - 1.37)^(b1 + b1r) * exp((b2 + b2rh * relativeHeight) * (height - 1.37)), psme2022, # less accurate than b2r
-  #                                                          fixedFormula = a1 + a1ac + b1 + b2 + b2rh ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$ruarkRelHtPhysioB1 = fit_nlme("Ruark RelHt physio", dbh ~ (a1 + a1ac * cos(3.14159/180 * aspect))*(height - 1.37)^(b1 + b1ra) * exp((b2 + b2rh * relativeHeight) * (height - 1.37)), psme2022, # less accurate than b2ra
+  #                                                          fixedFormula = a1 + a1ac + b1 + b2 + b2rh ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                          start = list(fixed = c(a1 = 2, a1ac = -0.09, b1 = 0.8, b2 = 0.008, b2rh = 0.003)))
-  #psmeDiameterFromHeightMixed$schnute = fit_nlme("Schnute inverse", dbh ~ -1/a1 * log(1 - pmin((1 - exp(-a2))*(height^b1 - 1.37^b1)/((Ha + Har)^b1 - 1.37^b1), 0.9999)), psme2022, # a1r, a2r, b1r, Har step halving
-  #                                               fixedFormula = a1 + a2 + b1 + Ha ~ 1, randomFormula = Har ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$schnute = fit_nlme("Schnute inverse", dbh ~ -1/a1 * log(1 - pmin((1 - exp(-a2))*(height^b1 - 1.37^b1)/((Ha + Hara)^b1 - 1.37^b1), 0.9999)), psme2022, # a1ra, a1rm, a2ra, a2rm, b1ra, b1rm, Hara, Harm step halving
+  #                                               fixedFormula = a1 + a2 + b1 + Ha ~ 1, randomFormula = Hara ~ 1|stand/plot,
   #                                               start = list(fixed = c(a1 = 0.000001, a2 = 0.0003, b1 = 1.2, Ha = 130)))
   psmeDiameterFromHeightMixed$schnute = create_fit_statistics(name = "Schnute inverse", fitting = "nlme")
-  #psmeDiameterFromHeightMixed$sharmaParton = fit_nlme("modified Sharma-Parton", dbh ~ a1 * (height - 1.37)^(b1 + b1r)*(exp(b2*(standTreesPerHectare/topHeight)^b3*(height - 1.37)) - 1)^(b4), psme2022, # a1r, b2r, b3r singularity in backsolve, b1r, b4r step halving
-  #                                                    fixedFormula = a1 + b1 + b2 + b3 + b4 ~ 1, randomFormula = b1r ~ 1|stand/plot, # |stand, |uniquePlotID singularity in backsolve with
+  #psmeDiameterFromHeightMixed$sharmaParton = fit_nlme("modified Sharma-Parton", dbh ~ a1 * (height - 1.37)^(b1 + b1ra)*(exp(b2*(standTreesPerHectare/topHeight)^b3*(height - 1.37)) - 1)^(b4), psme2022, # a1ra, b2ra, b3ra, b3rm singularity in backsolve, a1rm, b1ra, b1rm, b3ra, b3rm, b4rm step halving
+  #                                                    fixedFormula = a1 + b1 + b2 + b3 + b4 ~ 1, randomFormula = b1ra ~ 1|stand/plot, # |stand, |uniquePlotID singularity in backsolve
   #                                                    start = list(fixed = c(a1 = 3, b1 = 0.7, b2 = 0.1, b3 = 0.03, b4 = 0.3)))
   psmeDiameterFromHeightMixed$sharmaParton = create_fit_statistics(name = "modified Sharma-Parton", fitting = "nlme")
-  psmeDiameterFromHeightMixed$sibbesenReplace = fit_nlme("Sibbesen replace", dbh ~ (a1 + a1p * isPlantation)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2r)), psme2022, # a1r step halving, b1r also tractable
-                                                         fixedFormula = a1 + a1p + b1 + b2 + b2p ~ 1, randomFormula = b2r ~ 1|stand/plot,
+  psmeDiameterFromHeightMixed$sibbesenReplace = fit_nlme("Sibbesen replace", dbh ~ (a1 + a1p * isPlantation)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2ra)), psme2022, # a1ra step halving, b2rm max iterations, 10x10 RMSE 15.0, AIC 5310
+                                                         fixedFormula = a1 + a1p + b1 + b2 + b2p ~ 1, randomFormula = b2ra ~ 1|stand/plot,
                                                          start = list(fixed = c(a1 = 1.6, a1p = 0.4, b1 = 0.7, b2 = 0.1, b2p = -0.02)))
-  #psmeDiameterFromHeightMixed$sibbesenReplaceB1 = fit_nlme("Sibbesen replace", dbh ~ (a1 + a1p * isPlantation)*(height - 1.37)^((b1 + b1r)*(height - 1.37)^(b2 + b2p * isPlantation)), psme2022, # a1r step halving, b1r also tractable
-  #                                                         fixedFormula = a1 + a1p + b1 + b2 + b2p ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$sibbesenReplace = fit_nlme("Sibbesen replace", dbh ~ (a1)*(1 + a1rm)*(height - 1.37)^((b1)*(height - 1.37)^(b2)), psme2022, # a1p, b2p not significant, 10x10 RMSE 16.5, AIC 5403
+  #                                                       fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = a1rm ~ 1|stand/plot,
+  #                                                       start = list(fixed = c(a1 = 1.9, b1 = 0.7, b2 = 0.09)))
+  #psmeDiameterFromHeightMixed$sibbesenReplace = fit_nlme("Sibbesen replace", dbh ~ (a1)*(height - 1.37)^((b1)*(1 + b1rm)*(height - 1.37)^(b2)), psme2022, # a1p, b2p not significant, 10x10 RMSE 15.3, AIC 5329
+  #                                                       fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b1rm ~ 1|stand/plot,
+  #                                                       start = list(fixed = c(a1 = 1.4, b1 = 0.9, b2 = 0.05)))
+  #psmeDiameterFromHeightMixed$sibbesenReplaceB1 = fit_nlme("Sibbesen replace", dbh ~ (a1 + a1p * isPlantation)*(height - 1.37)^((b1 + b1ra)*(height - 1.37)^(b2 + b2p * isPlantation)), psme2022, # a1ra step halving, b1ra also tractable
+  #                                                         fixedFormula = a1 + a1p + b1 + b2 + b2p ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                         start = list(fixed = c(a1 = 1.6, a1p = 0.4, b1 = 0.7, b2 = 0.1, b2p = -0.02)))
-  psmeDiameterFromHeightMixed$sibbesenReplaceAbat = fit_nlme("Sibbesen replace ABA+T", dbh ~ (a1)*(height - 1.37)^(b1*(height - 1.37)^(b2 + b2p * isPlantation + b2aba * bootstrapStandBasalAreaPerHectare + b2r)), psme2022, # a1r step halving, b1r false convergence
-                                                             fixedFormula = a1 + b1 + b2 + b2p + b2aba ~ 1, randomFormula = b2r ~ 1|stand/plot,
+  psmeDiameterFromHeightMixed$sibbesenReplaceAbat = fit_nlme("Sibbesen replace ABA+T", dbh ~ (a1)*(height - 1.37)^(b1*(height - 1.37)^(b2 + b2p * isPlantation + b2aba * bootstrapStandBasalAreaPerHectare + b2ra)), psme2022, # a1ra step halving, b1ra false convergence
+                                                             fixedFormula = a1 + b1 + b2 + b2p + b2aba ~ 1, randomFormula = b2ra ~ 1|stand/plot,
                                                              start = list(fixed = c(a1 = 2.0, b1 = 0.7, b2 = 0.1, b2p = -0.007, b2aba = -0.0002)))
-  #psmeDiameterFromHeightMixed$sibbesenReplaceAbatPhysio = fit_nlme("Sibbesen replace ABA+T physio", dbh ~ (a1 + a1p * isPlantation + a1r)*(height - 1.37)^(b1*(height - 1.37)^(b2 + b2p * isPlantation + b2aba * bootstrapStandBasalAreaPerHectare + b2ac * cos(3.14159/180 * aspect))), psme2022,
-  #                                                                 fixedFormula = a1 + a1p + b1 + b2 + b2p + b2aba + b2ac + ~ 1, randomFormula = a1r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$sibbesenReplaceAbatPhysio = fit_nlme("Sibbesen replace ABA+T physio", dbh ~ (a1 + a1p * isPlantation + a1ra)*(height - 1.37)^(b1*(height - 1.37)^(b2 + b2p * isPlantation + b2aba * bootstrapStandBasalAreaPerHectare + b2ac * cos(3.14159/180 * aspect))), psme2022,
+  #                                                                 fixedFormula = a1 + a1p + b1 + b2 + b2p + b2aba + b2ac + ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                                 start = list(fixed = c(a1 = 1.6, a1p = 0.4, b1 = 0.7, b2 = 0.1, b2p = -0.02, b2aba = -0.0002, b2ac = -0.003)))
   psmeDiameterFromHeightMixed$sibbesenReplaceAbatPhysio = create_fit_statistics(name = "Sibbesen replace ABA+T physio", fitting = "nlme") # parsing failure: object `a1` not found
-  psmeDiameterFromHeightMixed$sibbesenReplaceAbatRelHt = fit_nlme("Sibbesen replace RelHt ABA+T", dbh ~ (a1)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2rh * relativeHeight + b2aba * bootstrapStandBasalAreaPerHectare + b2r)), psme2022, # a1r singular precision, b1r job max iterations
-                                                                  fixedFormula = a1 + b1 + b2 + b2p + b2rh + b2aba ~ 1, randomFormula = b2r ~ 1|stand/plot,
+  psmeDiameterFromHeightMixed$sibbesenReplaceAbatRelHt = fit_nlme("Sibbesen replace RelHt ABA+T", dbh ~ (a1)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2rh * relativeHeight + b2aba * bootstrapStandBasalAreaPerHectare + b2ra)), psme2022, # a1ra singular precision, b1ra job max iterations
+                                                                  fixedFormula = a1 + b1 + b2 + b2p + b2rh + b2aba ~ 1, randomFormula = b2ra ~ 1|stand/plot,
                                                                   start = list(fixed = c(a1 = 2, b1 = 0.8, b2 = 0.05, b2p = -0.006, b2rh = 0.01, b2aba = -0.0002)))
-  psmeDiameterFromHeightMixed$sibbesenReplaceAbatRelHtPhysioB2 = fit_nlme("Sibbesen replace RelHt ABA+T physio", dbh ~ (a1)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2rh * relativeHeight + b2aba * bootstrapStandBasalAreaPerHectare + b2ac * cos(3.14159/180 * aspect) + b2r)), psme2022, # a1r singular precision, job false convergence, 10x0 RMSE 14.6, AIC 5267
-                                                                          fixedFormula = a1 + b1 + b2 + b2p + b2rh + b2aba + b2ac ~ 1, randomFormula = b2r ~ 1|stand/plot,
-                                                                          start = list(fixed = c(a1 = 2, b1 = 0.8, b2 = 0.05, b2p = -0.006, b2rh = 0.01, b2aba = -0.0002, b2ac = -0.003)))
-  #psmeDiameterFromHeightMixed$sibbesenReplaceAbatRelHtPhysioB1 = fit_nlme("Sibbesen replace RelHt ABA+T physio", dbh ~ (a1)*(height - 1.37)^((b1 + b1r)*(height - 1.37)^(b2 + b2p * isPlantation + b2rh * relativeHeight + b2aba * bootstrapStandBasalAreaPerHectare + b2ac * cos(3.14159/180 * aspect))), psme2022, # job false convergence, 10X10 RMSE 16.0, AIC 5295
-  #                                                                        fixedFormula = a1 + b1 + b2 + b2p + b2rh + b2aba + b2ac ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  psmeDiameterFromHeightMixed$sibbesenReplaceAbatRelHtPhysio = fit_nlme("Sibbesen replace RelHt ABA+T physio", dbh ~ (a1)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2rh * relativeHeight + b2aba * bootstrapStandBasalAreaPerHectare + b2ac * cos(3.14159/180 * aspect) + b2ra)), psme2022, # a1ra singular precision, job false convergence, 10x0 RMSE 14.6, AIC 5267
+                                                                        fixedFormula = a1 + b1 + b2 + b2p + b2rh + b2aba + b2ac ~ 1, randomFormula = b2ra ~ 1|stand/plot,
+                                                                        start = list(fixed = c(a1 = 2, b1 = 0.8, b2 = 0.05, b2p = -0.006, b2rh = 0.01, b2aba = -0.0002, b2ac = -0.003)))
+  #psmeDiameterFromHeightMixed$sibbesenReplaceAbatRelHtPhysioB1 = fit_nlme("Sibbesen replace RelHt ABA+T physio", dbh ~ (a1)*(height - 1.37)^((b1 + b1ra)*(height - 1.37)^(b2 + b2p * isPlantation + b2rh * relativeHeight + b2aba * bootstrapStandBasalAreaPerHectare + b2ac * cos(3.14159/180 * aspect))), psme2022, # job false convergence, 10X10 RMSE 16.0, AIC 5295
+  #                                                                        fixedFormula = a1 + b1 + b2 + b2p + b2rh + b2aba + b2ac ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                                        start = list(fixed = c(a1 = 2, b1 = 0.8, b2 = 0.05, b2p = -0.006, b2rh = 0.01, b2aba = -0.0002, b2ac = -0.003)))
-  psmeDiameterFromHeightMixed$sibbesenReplacePhysio = fit_nlme("Sibbesen replace physio", dbh ~ (a1 + a1p * isPlantation)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2ac * cos(3.14159/180 * aspect) + b2r)), psme2022, # a1r false convergence, false convergence but more accurate than b1r
-                                                               fixedFormula = a1 + a1p + b1 + b2 + b2p + b2ac ~ 1, randomFormula = b2r ~ 1|stand/plot,
+  psmeDiameterFromHeightMixed$sibbesenReplacePhysio = fit_nlme("Sibbesen replace physio", dbh ~ (a1 + a1p * isPlantation)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2ac * cos(3.14159/180 * aspect) + b2ra)), psme2022, # a1ra false convergence, false convergence but more accurate than b1ra
+                                                               fixedFormula = a1 + a1p + b1 + b2 + b2p + b2ac ~ 1, randomFormula = b2ra ~ 1|stand/plot,
                                                                start = list(fixed = c(a1 = 1.2, a1p = 0.3, b1 = 0.7, b2 = 0.1, b2p = -0.02, b2ac = -0.003)))
-  #psmeDiameterFromHeightMixed$sibbesenReplacePhysioB1 = fit_nlme("Sibbesen replace physio", dbh ~ (a1 + a1p * isPlantation)*(height - 1.37)^((b1 + b1r)*(height - 1.37)^(b2 + b2p * isPlantation + b2ac * cos(3.14159/180 * aspect))), psme2022,
-  #                                                               fixedFormula = a1 + a1p + b1 + b2 + b2p + b2ac ~ 1, randomFormula = b1r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$sibbesenReplacePhysioB1 = fit_nlme("Sibbesen replace physio", dbh ~ (a1 + a1p * isPlantation)*(height - 1.37)^((b1 + b1ra)*(height - 1.37)^(b2 + b2p * isPlantation + b2ac * cos(3.14159/180 * aspect))), psme2022,
+  #                                                               fixedFormula = a1 + a1p + b1 + b2 + b2p + b2ac ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                               start = list(fixed = c(a1 = 1.2, a1p = 0.3, b1 = 0.7, b2 = 0.1, b2p = -0.02, b2ac = -0.003)))
-  psmeDiameterFromHeightMixed$sibbesenReplaceRelHt = fit_nlme("Sibbesen replace RelHt", dbh ~ a1*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2rh * relativeHeight + b2r)), psme2022, # a1r step halving, b1r singularity in backsolve
-                                                              fixedFormula = a1 + b1 + b2 + b2p + b2rh ~ 1, randomFormula = b2r ~ 1|stand/plot,
-                                                              start = list(fixed = c(a1 = 2, b1 = 0.8, b2 = 0.05, b2p = -0.002, b2rh = 0.01)))
-  psmeDiameterFromHeightMixed$sibbesenReplaceRelHtPhysio = fit_nlme("Sibbesen replace RelHt physio", dbh ~ (a1)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2rh * relativeHeight + b2ac * cos(3.14159/180 * aspect) + b2r)), psme2022, # a1r, b1r false convergence
-                                                                    fixedFormula = a1 + b1 + b2 + b2p + b2rh + b2ac ~ 1, randomFormula = b2r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$sibbesenReplaceRelHt = fit_nlme("Sibbesen replace RelHt", dbh ~ a1*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2rh * relativeHeight + b2ra)), psme2022, # a1ra step halving, b1ra singularity in backsolve, 10x10 RMSE 1.50, AIC 5775
+  #                                                            fixedFormula = a1 + b1 + b2 + b2p + b2rh ~ 1, randomFormula = b2ra ~ 1|stand/plot,
+  #                                                            start = list(fixed = c(a1 = 2, b1 = 0.8, b2 = 0.05, b2p = -0.002, b2rh = 0.01)))
+  psmeDiameterFromHeightMixed$sibbesenReplaceRelHt = fit_nlme("Sibbesen replace RelHt", dbh ~ (a1)*(height - 1.37)^((b1 + b1ra)*(relativeHeight * (height - 1.37))^(b2)), psme2022, # a1ra job step halving, 10x10 RMSE 14.9, AIC 5267
+                                                              fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
+                                                              start = list(fixed = c(a1 = 2.0, b1 = 0.7, b2 = 0.08)))
+  #psmeDiameterFromHeightMixed$sibbesenReplaceRelHt = fit_nlme("Sibbesen replace RelHt", dbh ~ (a1)*(height - 1.37)^((b1)*(relativeHeight * (height - 1.37))^(b2 + b2ra)), psme2022, # b1p not significant, 10x10 RMSE 15.3, AIC 5331
+  #                                                            fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b2ra ~ 1|stand/plot,
+  #                                                            start = list(fixed = c(a1 = 1.6, b1 = 0.9, b2 = 0.04)))
+  #psmeDiameterFromHeightMixed$sibbesenReplaceRelHt = fit_nlme("Sibbesen replace RelHt", dbh ~ (a1)*(1 + a1rm)*(height - 1.37)^((b1)*(relativeHeight * (height - 1.37))^(b2)), psme2022, # 10x10 RMSE 15.7, AIC 5425
+  #                                                            fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = a1rm ~ 1|stand/plot,
+  #                                                            start = list(fixed = c(a1 = 1.9, b1 = 0.8, b2 = 0.05)))
+  #psmeDiameterFromHeightMixed$sibbesenReplaceRelHt = fit_nlme("Sibbesen replace RelHt", dbh ~ (a1)*(height - 1.37)^((b1*(1 + b1rm))*(relativeHeight * (height - 1.37))^(b2)), psme2022, # b2rm max iterations, 10x10 RMSE 15.1, AIC 5283
+  #                                                            fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b1rm ~ 1|stand/plot,
+  #                                                            start = list(fixed = c(a1 = 1.5, b1 = 1.0, b2 = 0.04)))
+  psmeDiameterFromHeightMixed$sibbesenReplaceRelHtPhysio = fit_nlme("Sibbesen replace RelHt physio", dbh ~ (a1)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2p * isPlantation + b2rh * relativeHeight + b2ac * cos(3.14159/180 * aspect) + b2ra)), psme2022, # a1ra, b1ra false convergence
+                                                                    fixedFormula = a1 + b1 + b2 + b2p + b2rh + b2ac ~ 1, randomFormula = b2ra ~ 1|stand/plot,
                                                                     start = list(fixed = c(a1 = 2, b1 = 0.8, b2 = 0.05, b2p = -0.002, b2rh = 0.01, b2ac = -0.003)))
-  #psmeDiameterFromHeightMixed$weibull = fit_nlme("Weibull inverse", dbh ~ (a1*log(1 - pmin(b1*(height - 1.37), 0.9999)))^(b2 + b2r), psme2022, # a1r step halving, b1r singularity in backsolve, b2r job max iterations
-  #                                               fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b2r ~ 1|stand/plot,
+  #psmeDiameterFromHeightMixed$weibull = fit_nlme("Weibull inverse", dbh ~ (a1*log(1 - pmin(b1*(height - 1.37), 0.9999)))^(b2 + b2ra), psme2022, # a1ra step halving, b1ra singularity in backsolve, b2ra job max iterations
+  #                                               fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b2ra ~ 1|stand/plot,
   #                                               start = list(fixed = c(a1 = -140, b1 = 0.01, b2 = 0.9)))
-  psmeDiameterFromHeightMixed$weibull = create_fit_statistics(name = "Weibull inverse", fitting = "nlme")
+  psmeDiameterFromHeightMixed$weibull = fit_nlme("Weibull inverse", dbh ~ (a1*log(1 - pmin(b1*(height - 1.37), 0.9999)))^(b2*(1 + b2rm)), psme2022, # a1rm singularity in backsolve
+                                                 fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b2rm ~ 1|stand/plot,
+                                                 start = list(fixed = c(a1 = -135, b1 = 0.01, b2 = 0.97)))
   #to_fixed_coeffficients(psmeDiameterFromHeightMixed$weibull)
   #print(to_parameter_confidence_intervals(psmeDiameterFromHeightMixed$weibull), n = 40)
   
-  psmeDiameterFromHeightMixed$gam = fit_gam("REML GAM", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, bs = "ts", k = 4), random = list(uniquePlotID = ~1), data = psme2022, distinct = FALSE) # collapses to linear, plantation not signficiant
-  #psmeDiameterFromHeightMixed$gamAbat = fit_gam("REML GAM ABA+T", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, basalAreaTaller, bootstrapStandBasalAreaPerHectare, bs = "ts", by = as.factor(isPlantation), k = 28), random = list(uniquePlotID = ~1), data = psme2022)
-  psmeDiameterFromHeightMixed$gamRelHt = fit_gam("REML GAM RelHt", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, relativeHeight, bs = "ts", k = 4), random = list(uniquePlotID = ~1), data = psme2022) # plantation not significant
-  #psmeDiameterFromHeightMixed$gamAbatPhysio = fit_gam("REML GAM ABA+T physio", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, basalAreaTaller, bootstrapStandBasalAreaPerHectare, elevation, sin(3.14159/180 * aspect), cos(3.14159/180 * aspect), terrainRoughness, bs = "ts", by = as.factor(isPlantation), k = 331), random = list(uniquePlotID = ~1), data = psme2022)
-  #psmeDiameterFromHeightMixed$gamAbatPhysioRelHt = fit_gam("REML GAM RelHt ABA+T physio", dbh ~ I(height^) + s(height, basalAreaTaller, bootstrapStandBasalAreaPerHectare, elevation, sin(3.14159/180 * aspect), cos(3.14159/180 * aspect), terrainRoughness, relativeHeight, bs = "ts", by = as.factor(isPlantation), k = 496), random = list(uniquePlotID = ~1), data = psme2022)
+  psmeDiameterFromHeightMixed$gam = fit_gam("REML GAM", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, bs = "ts", k = 4), random = list(uniquePlotID = ~1), data = psme2022, distinct = FALSE) # collapses to linear, plantation not significant
+  psmeDiameterFromHeightMixed$gamAbat = fit_gam("REML GAM ABA+T", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, basalAreaTaller, bs = "ts", by = as.factor(isPlantation), k = 8), random = list(uniquePlotID = ~1), data = psme2022)
+  psmeDiameterFromHeightMixed$gamAbatPhysio = fit_gam("REML GAM ABA+T physio", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, basalAreaTaller, bootstrapStandBasalAreaPerHectare, cos(3.14159/180 * aspect), bs = "ts", by = as.factor(isPlantation), k = 16), random = list(uniquePlotID = ~1), data = psme2022) # min k = 16
+  psmeDiameterFromHeightMixed$gamAbatPhysioRelHt = fit_gam("REML GAM RelHt ABA+T physio", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, relativeHeight, bootstrapStandBasalAreaPerHectare, cos(3.14159/180 * aspect), bs = "ts", by = as.factor(isPlantation), k = 16), random = list(uniquePlotID = ~1), data = psme2022) # min k = 16
   psmeDiameterFromHeightMixed$gamPhysio = fit_gam("REML GAM physio", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, cos(3.14159/180 * aspect), bs = "ts", k = 8), random = list(uniquePlotID = ~1), data = psme2022) # plantation not significant
+  psmeDiameterFromHeightMixed$gamRelHt = fit_gam("REML GAM RelHt", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, relativeHeight, bs = "ts", k = 4), random = list(uniquePlotID = ~1), data = psme2022) # plantation not significant
   psmeDiameterFromHeightMixed$gamRelHtPhysio = fit_gam("REML GAM RelHt physio", dbh ~ I((0.668 + 0.607 * isPlantation) * height^(1.283 - 0.200 * isPlantation)) + s(height, relativeHeight, sin(3.14159/180 * aspect), terrainRoughness, bs = "ts", by = as.factor(isPlantation), k = 16), random = list(uniquePlotID = ~1), data = psme2022) # k = 16 minimum -> only weakly significant
   #lapply(psmeDiameterFromHeightMixed$gamRelHtPhysio$fit, function(fit) { return(k.check(fit$gam)) })
   #lapply(psmeDiameterFromHeightMixed$gamRelHtPhysio$fit, function(fit) { return(summary(fit$gam)) })
@@ -810,12 +953,12 @@ if (psmeOptions$fitHeightPrimary & psmeOptions$fitHeightMixed & psmeOptions$fitD
     psmeDiameterFromHeightMixed = readRDS(paste0("trees/height-diameter/data/PSME DBH mixed ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds")) 
   }
 
-  psmeFixedEffects = bind_rows(bind_rows(bind_rows(lapply(psmeHeightFromDiameter, unnest_fixed_effects)),
-                                         bind_rows(lapply(psmeHeightFromDiameterMixed, unnest_fixed_effects))) %>%
-                                 mutate(responseVariable = "height"),
-                               bind_rows(bind_rows(lapply(psmeDiameterFromHeight, unnest_fixed_effects)),
-                                         bind_rows(lapply(psmeDiameterFromHeightMixed, unnest_fixed_effects))) %>%
-                                 mutate(responseVariable = "DBH")) %>%
+  psmeCoefficients = bind_rows(bind_rows(bind_rows(lapply(psmeHeightFromDiameter, unnest_coefficients)),
+                               bind_rows(lapply(psmeHeightFromDiameterMixed, unnest_coefficients))) %>%
+                            mutate(responseVariable = "height"),
+                          bind_rows(bind_rows(lapply(psmeDiameterFromHeight, unnest_coefficients)),
+                                    bind_rows(lapply(psmeDiameterFromHeightMixed, unnest_coefficients))) %>%
+                            mutate(responseVariable = "DBH")) %>%
     mutate(species = "PSME")
   psmeFitStats = bind_rows(bind_rows(bind_rows(lapply(psmeHeightFromDiameter, unnest_validation_statistics)),
                                     bind_rows(lapply(psmeHeightFromDiameterMixed, unnest_validation_statistics))) %>%
@@ -826,7 +969,7 @@ if (psmeOptions$fitHeightPrimary & psmeOptions$fitHeightMixed & psmeOptions$fitD
     mutate(species = "PSME")
 
   check_plot_fit_stats(psmeFitStats)
-  saveRDS(psmeFixedEffects, paste0("trees/height-diameter/data/PSME coefficients ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds"))
+  saveRDS(psmeCoefficients, paste0("trees/height-diameter/data/PSME coefficients ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds"))
   saveRDS(psmeFitStats, paste0("trees/height-diameter/data/PSME fit stats ", htDiaOptions$folds, "x", htDiaOptions$repetitions, ".Rds"))
 }
 
