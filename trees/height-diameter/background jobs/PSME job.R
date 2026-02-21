@@ -1,11 +1,13 @@
+library(dplyr)
+
 # processor  cross validation   workers   height runtime   DBH runtime
 # 9900X      10x10              10        9.2 min          2.5 + 2.9 min
 jobStartTime = Sys.time()
-psmeOptions = tibble(fitHeightPrimary = FALSE,
-                     fitHeightMixed = FALSE,
+psmeOptions = tibble(fitHeightPrimary = TRUE,
+                     fitHeightMixed = TRUE,
                      fitDbhPrimary = TRUE,
                      fitDbhMixed = TRUE,
-                     fitPhysioGams = FALSE,
+                     fitPhysioGams = TRUE,
                      recalcPreferredModels = FALSE)
 
 source("trees/height-diameter/setup.R")

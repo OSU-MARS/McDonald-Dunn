@@ -1,10 +1,12 @@
-# processor  cross validation   workers   height runtime   DBH runtime
-# 9900X      10x10              10        3.4 + 1.3 min    2.3 min       
+library(dplyr)
+
+# processor  cross validation   workers   runtime
+# 9950X      10x10              10        12 min
 jobStartTime = Sys.time()
 otherOptions = tibble(fitHeight = TRUE, 
                       fitHeightMixed = TRUE,
-                      fitDbh = FALSE,
-                      fitDbhMixed = FALSE,
+                      fitDbh = TRUE,
+                      fitDbhMixed = TRUE,
                       recalcPreferredModels = FALSE)
 
 source("trees/height-diameter/setup.R")

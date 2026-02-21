@@ -7,68 +7,131 @@ if (acmaOptions$fitHeight)
   acmaHeightFromDiameter = list(linear = fit_lm("linear", height ~ dbh + I(isPlantation*dbh), acma2022))
   acmaHeightFromDiameter$parabolic = fit_lm("parabolic", height ~ dbh + I(dbh^2) + I(isPlantation*dbh) + I(isPlantation*dbh^2), acma2022)
   
-  acmaHeightFromDiameter$chapmanRichards = fit_gsl_nls("Chapman-Richards", height ~ 1.37 + a1*(1 - exp(b1*dbh))^b2, acma2022, start = list(a1 = 27, b1 = -0.06, b2 = 1.1)) # a1p, b1p, b2p not significant
+  acmaHeightFromDiameter$chapmanRichards = fit_gsl_nls("Chapman-Richards", height ~ 1.37 + a1*(1 - exp(b1*dbh))^b2, acma2022, 
+                                                       start = list(a1 = 27, b1 = -0.06, b2 = 1.1)) # a1p, b1p, b2p not significant
   # linear BA+L not significant but fits complete successfully
-  acmaHeightFromDiameter$chapmanRichardsBal = fit_gsl_nls("Chapman-Richards BA+L", height ~ 1.37 + a1 * (1 - exp(b1*dbh))^(b2 + b2ba * standBasalAreaPerHectare), acma2022, start = list(a1 = 27, b1 = -0.06, b2 = 1.1, b2ba = 0), distinct = FALSE) # a1ba, a1bal, a1balp, b1ba, b1bal, b1balp, b2ba, b2bal, b2balp not significant
-  acmaHeightFromDiameter$chapmanRichardsBalPhysio = fit_gsl_nls("Chapman-Richards BA+L physio", height ~ 1.37 + (a1 + a1bal * basalAreaLarger + a1s * slope) * (1 - exp(b1*dbh))^(b2 + b2p * isPlantation), acma2022, start = list(a1 = 27, a1bal = 0, a1s = 0, b1 = -0.06, b2 = 1.1, b2p = -0.2), distinct = FALSE) # by propagation
-  acmaHeightFromDiameter$chapmanRichardsBalPhysioRelDbh = fit_gsl_nls("Chapman-Richards RelDbh BA+L physio", height ~ 1.37 + (a1 + a1bal * basalAreaLarger + a1rd * relativeDiameter + a1s * slope) * (1 - exp(b1*dbh))^(b2 + b2p * isPlantation), acma2022, start = list(a1 = 30, a1bal = 0, a1rd = 0, a1s = 0, b1 = -0.06, b2 = 1.1, b2p = -0.2), distinct = FALSE) # by propagation
-  acmaHeightFromDiameter$chapmanRichardsBalRelDbh = fit_gsl_nls("Chapman-Richards RelDbh BA+L", height ~ 1.37 + (a1 + a1bal * basalAreaLarger + a1rd * relativeDiameter) * (1 - exp(b1*dbh))^(b2 + b2p * isPlantation), acma2022, start = list(a1 = 27, a1bal = 0, a1rd = 0, b1 = -0.027, b2 = 1.08, b2p = -0.2), distinct = FALSE) # a1ba, a1rd not significant
+  acmaHeightFromDiameter$chapmanRichardsBal = fit_gsl_nls("Chapman-Richards BA+L", height ~ 1.37 + a1 * (1 - exp(b1*dbh))^(b2 + b2ba * standBasalAreaPerHectare), acma2022, 
+                                                          start = list(a1 = 27, b1 = -0.06, b2 = 1.1, b2ba = 0), distinct = FALSE) # a1ba, a1bal, a1balp, b1ba, b1bal, b1balp, b2ba, b2bal, b2balp not significant
+  acmaHeightFromDiameter$chapmanRichardsBalPhysio = fit_gsl_nls("Chapman-Richards BA+L physio", height ~ 1.37 + (a1 + a1bal * basalAreaLarger + a1s * slope) * (1 - exp(b1*dbh))^(b2 + b2p * isPlantation), acma2022, 
+                                                                start = list(a1 = 27, a1bal = 0, a1s = 0, b1 = -0.06, b2 = 1.1, b2p = -0.2), distinct = FALSE) # by propagation
+  acmaHeightFromDiameter$chapmanRichardsBalPhysioRelDbh = fit_gsl_nls("Chapman-Richards RelDbh BA+L physio", height ~ 1.37 + (a1 + a1bal * basalAreaLarger + a1rd * relativeDiameter + a1s * slope) * (1 - exp(b1*dbh))^(b2 + b2p * isPlantation), acma2022, 
+                                                                      start = list(a1 = 30, a1bal = 0, a1rd = 0, a1s = 0, b1 = -0.06, b2 = 1.1, b2p = -0.2), distinct = FALSE) # by propagation
+  acmaHeightFromDiameter$chapmanRichardsBalRelDbh = fit_gsl_nls("Chapman-Richards RelDbh BA+L", height ~ 1.37 + (a1 + a1bal * basalAreaLarger + a1rd * relativeDiameter) * (1 - exp(b1*dbh))^(b2 + b2p * isPlantation), acma2022, 
+                                                                start = list(a1 = 27, a1bal = 0, a1rd = 0, b1 = -0.027, b2 = 1.08, b2p = -0.2), distinct = FALSE) # a1ba, a1rd not significant
   # reciprocal BA+L not significant and NaN-Infs during job fitting
-  #acmaHeightFromDiameter$chapmanRichardsBal = fit_gsl_nls("Chapman-Richards BA+L", height ~ 1.37 + (a1) * (1 - exp((b1)*dbh))^(b2 + b2bal / (b2balr + basalAreaLarger)), acma2022, start = list(a1 = 27, b1 = -0.06, b2 = 1.1, b2bal = 0, b2balr = 10), distinct = FALSE) # a1ba+r, a1bal+r, b1ba+r, b1bal+r, b2ba+r, b2bal+r not significant
-  #acmaHeightFromDiameter$chapmanRichardsBalPhysio = fit_gsl_nls("Chapman-Richards BA+L physio", height ~ 1.37 + (a1 + a1s * slope) * (1 - exp(b1*dbh))^(b2 + b2bal / (b2balr + basalAreaLarger)), acma2022, start = list(a1 = 27, a1s = 0, b1 = -0.06, b2 = 1.1, b2bal = 0, b2balr = 10), distinct = FALSE) # a1s not significant
-  #acmaHeightFromDiameter$chapmanRichardsBalPhysioRelDbh = fit_gsl_nls("Chapman-Richards RelDbh BA+L physio", height ~ 1.37 + (a1 + a1rd * relativeDiameter + a1s * slope) * (1 - exp(b1*dbh))^(b2 + b2bal / (b2balr + basalAreaLarger)), acma2022, start = list(a1 = 30, a1rd = 0, a1s = 0, b1 = -0.06, b2 = 1.1, b2bal = 0, b2balr = 10), distinct = FALSE) # a1s, a1rd, b2bal+r not significant
-  #acmaHeightFromDiameter$chapmanRichardsBalRelDbh = fit_gsl_nls("Chapman-Richards RelDbh BA+L", height ~ 1.37 + (a1 + a1rd * relativeDiameter) * (1 - exp(b1*dbh))^(b2 + b2bal / (b2balr + basalAreaLarger)), acma2022, start = list(a1 = 27, a1rd = 0, b1 = -0.027, b2 = 1.08, b2bal = 0, b2balr = 10), distinct = FALSE) # a1rd, b2bal+r not significant
-  acmaHeightFromDiameter$chapmanRichardsPhysio = fit_gsl_nls("Chapman-Richards physio", height ~ 1.37 + a1 * (1 - exp((b1)*dbh))^(b2 + b2p * isPlantation + a1tw * topographicWetnessFD8f), acma2022, start = list(a1 = 27, a1tw = 0, b1 = -0.06, b2 = 1.1, b2p = -0.2), distinct = FALSE) # { a1, b1, b2 } x { s, e, a, tr, tw } not significant, a1tw+e NaN-Inf
-  acmaHeightFromDiameter$chapmanRichardsRelDbh = fit_gsl_nls("Chapman-Richards RelDbh", height ~ 1.37 + (a1 + a1rd * relativeDiameter)*(1 - exp(b1*dbh))^b2, acma2022, start = list(a1 = 27, a1rd = 0, b1 = -0.06, b2 = 1.1), distinct = FALSE) # a1rd, b2p, b2rd not significant, b1rd nan-inf
-  acmaHeightFromDiameter$chapmanRichardsRelDbhPhysio = fit_gsl_nls("Chapman-Richards RelDbh physio", height ~ 1.37 + (a1 + a1rd * relativeDiameter + a1as * sin(3.14159/180 * slope)) * (1 - exp(b1*dbh))^b2, acma2022, start = list(a1 = 27, a1rd = 0, a1as = 0, b1 = -0.06, b2 = 1.1), distinct = FALSE) # by propagation
-  acmaHeightFromDiameter$curtis = fit_gsl_nls("Curtis", height ~ 1.37 + a1 * dbh / (1 + dbh)^b1, acma2022, start = list(a1 = 2.4, b1 = 0.4)) # a1p, b1p not significant
-  acmaHeightFromDiameter$hossfeld = fit_gsl_nls("Hossfeld IV", height ~ 1.37 + a1 / (1 + a2 * dbh^b1), acma2022, start = list(a1 = 32, a2 = 33, b1 = -1.2)) # a1p, b1p, b2p not significant
-  acmaHeightFromDiameter$korf = fit_gsl_nls("Korf", height ~ 1.37 + a1*exp(b1*dbh^b2), acma2022, start = list(a1 = 70, b1 = -5.0, b2 = -0.35)) # a1p, b1p, b2p not significant
-  acmaHeightFromDiameter$michaelisMenten = fit_gsl_nls("Michaelis-Menten", height ~ 1.37 + a1*dbh^b1 / (a2 + dbh^b1), acma2022, start = list(a1 = 33, a2 = 30, b1 = 1.1)) # a1p, b1p, b2p not significant
-  acmaHeightFromDiameter$michaelisMentenBal = fit_gsl_nls("Michaelis-Menten BA+L", height ~ 1.37 + (a1)*dbh^(b1 + b1ba / standBasalAreaPerHectare) / (a2 + dbh^(b1 + b1ba / standBasalAreaPerHectare)), acma2022, start = list(a1 = 33, a2 = 30, b1 = 1.3, b1ba = -3.7)) # b1bap not significant, 10x10 MAE 2.38, AIC 1181
-  #acmaHeightFromDiameter$michaelisMentenBaA1 = fit_gsl_nls("Michaelis-Menten BA", height ~ 1.37 + (a1 + a1ba * standBasalAreaPerHectare)*dbh^b1 / (a2 + dbh^b1), acma2022, start = list(a1 = 30, a1ba = 0.05, a2 = 30, b1 = 1.1)) # a2ba, b1ba not significant, 10x10 MAE 2.45, AIC 1209
-  #acmaHeightFromDiameter$michaelisMentenBarA1 = fit_gsl_nls("Michaelis-Menten BA", height ~ 1.37 + (a1 + a1ba / standBasalAreaPerHectare)*dbh^b1 / (a2 + dbh^b1), acma2022, start = list(a1 = 35, a1ba = -140, a2 = 30, b1 = 1.2)) # 10x10 MAE 2.40, AIC 1181
-  #acmaHeightFromDiameter$michaelisMentenBarA2 = fit_gsl_nls("Michaelis-Menten BA", height ~ 1.37 + (a1)*dbh^b1 / (a2 + a2ba / standBasalAreaPerHectare + dbh^b1), acma2022, start = list(a1 = 33, a2 = 25, a2ba = 175, b1 = 1.2)) # 10x10 MAE 2.45, AIC 1230
-  #acmaHeightFromDiameter$michaelisMentenBalA1 = fit_gsl_nls("Michaelis-Menten BAL", height ~ 1.37 + (a1 + a1bal * basalAreaLarger)*dbh^b1 / (a2 + dbh^b1), acma2022, start = list(a1 = 30, a1bal = 0.08, a2 = 30, b1 = 1.1)) # a1bal+r, a2bal+r, b1bal+r not significant, 10x10 MAE 2.43, AIC 1224
-  #acmaHeightFromDiameter$michaelisMentenBalB1 = fit_gsl_nls("Michaelis-Menten BAL", height ~ 1.37 + (a1)*dbh^(b1 + b1bal * basalAreaLarger) / (a2 + dbh^(b1 + b1bal * basalAreaLarger)), acma2022, start = list(a1 = 35, a2 = 32, b1 = 1.1, b1bal = 0.0002)) # 10x10 MAE 2.45, AIC 1220
-  #acmaHeightFromDiameter$michaelisMentenBal = fit_gsl_nls("Michaelis-Menten BA+L", height ~ 1.37 + (a1 + a1bal * basalAreaLarger)*dbh^(b1 + b1ba / standBasalAreaPerHectare) / (a2 + dbh^(b1 + b1ba / standBasalAreaPerHectare)), acma2022, start = list(a1 = 33, a1bal = 0, a2 = 30, b1 = 1.3, b1ba = -3.7), distinct = FALSE) # a1bal not significant
-  acmaHeightFromDiameter$michaelisMentenBalRelDbh = fit_gsl_nls("Michaelis-Menten RelDbh BA+L", height ~ 1.37 + (a1)*dbh^(b1 + b1rd * relativeDiameter + b1ba / standBasalAreaPerHectare) / (a2 + dbh^(b1 + b1rd * relativeDiameter + b1ba / standBasalAreaPerHectare)), acma2022, start = list(a1 = 33, a2 = 30, b1 = 1.3, b1rd = 0, b1ba = -3.7), distinct = FALSE) # b1ba-b1rd not mutually significant
-  acmaHeightFromDiameter$michaelisMentenRelDbh = fit_gsl_nls("Michaelis-Menten RelDbh", height ~ 1.37 + (a1)*dbh^(b1 + b1rd * relativeDiameter) / (a2 + dbh^(b1 + b1rd * relativeDiameter)), acma2022, start = list(a1 = 37, a2 = 36, b1 = 1.2, b1rd = -0.05)) # b1rdp not significant, 10x10 MAE 2.43, AIC 1208
-  #acmaHeightFromDiameter$michaelisMentenRelDbhA1 = fit_gsl_nls("Michaelis-Menten RelDbh", height ~ 1.37 + (a1 + a1rd * relativeDiameter)*dbh^b1 / (a2 + dbh^b1), acma2022, start = list(a1 = 40, a1rd = -3, a2 = 35, b1 = 1.1)) # 10x10 MAE 2.44, AIC 1216
-  #acmaHeightFromDiameter$michaelisMentenRelDbhA2 = fit_gsl_nls("Michaelis-Menten RelDbh", height ~ 1.37 + (a1)*dbh^b1 / (a2 + a2rd * relativeDiameter + dbh^b1), acma2022, start = list(a1 = 37, a2 = 35, a2rd = 12, b1 = 1.2)) # 10x10 MAE 2.49, AIC 1208
-  acmaHeightFromDiameter$power = fit_gsl_nls("power", height ~ 1.37 + a1*dbh^b1, acma2022, start = list(a1 = 2.0, b1 = 0.66)) # a1p, b1p not significant, all data power = 0.666
-  acmaHeightFromDiameter$prodan = fit_gsl_nls("Prodan", height ~ 1.37 + dbh^2 / (a1 * dbh^2 + (a2 + a2p * isPlantation)*dbh + a3), acma2022, start = list(a1 = 0.024, a2 = 1.27, a2p = -0.23, a3 = -0.19))
-  acmaHeightFromDiameter$ratkowsky = fit_gsl_nls("Ratkowsky", height ~ 1.37 + a1*exp(b1/(dbh + b2)), acma2022, start = list(a1 = 30, b1 = -13, b2 = 3.5)) # a1p, b1p, b2p not significant
-  acmaHeightFromDiameter$richardsW = fit_gsl_nls("unified Richards", height ~ 1.37 + Ha * (1 + ((1.37/Ha)^(1 - d) - 1) * exp((-kU * dbh)/d^(d/(1 - d))))^(1/(1 - d)), acma2022, start = list(Ha = 25, d = 0.7, kU = 0.035)) # Hap, kUp, dp not significant
-  #acmaHeightFromDiameter$sharmaParton = fit_gsl_nls("Sharma-Parton", height ~ 1.37 + a1*topHeight^b1*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^b3*dbh))^b4, acma2022, start = list(a1 = 12, b1 = 0.2, b2 = -0.04, b3 = 0.1, b4 = 1.1)) # a1p, b1p, b2p, b3p, b4p not significant, 10x10 RMSE 3.51, AIC 1204
-  acmaHeightFromDiameter$sharmaPartonB4 = fit_gsl_nls("Sharma-Parton", height ~ 1.37 + a1*topHeight^b1*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^b3*dbh^b4d)), acma2022, start = list(a1 = 12, b1 = 0.2, b2 = -0.03, b3 = 0.1, b4d = 1)) # b3, b4 not significant, 10x10 RMSE 3.45, AIC 1222
-  #acmaHeightFromDiameter$sharmaPartonBal = fit_gsl_nls("Sharma-Parton BA+L", height ~ 1.37 + (a1)*topHeight^(b1) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger))*dbh))^(b4), acma2022, start = list(a1 = 13, b1 = 0.2, b2 = -0.04, b3 = 0.1, b3bal = 0, b3balr = 10, b4 = 1.1), distinct = FALSE) # a1bal+r, b1bal+r, b3bal+r, b4bal+r not significant, b2bal+r NaN-inf
-  acmaHeightFromDiameter$sharmaPartonB4bal = fit_gsl_nls("Sharma-Parton BA+L", height ~ 1.37 + (a1)*topHeight^(b1) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3)*dbh^(b4d + b4bal / (b4balr + basalAreaLarger)))), acma2022, start = list(a1 = 13, b1 = 0.2, b2 = -0.04, b3 = 0.1, b4bal = 0, b4balr = 10, b4d = 1.1), distinct = FALSE) # a1bal, a1bal+r, b1bal, b1bal+r, b2bal, b2bal+r, b3bal, b3bal+r, b4bal, b4bal+r not significant
-  acmaHeightFromDiameter$sharmaPartonBalPhysio = fit_gsl_nls("Sharma-Parton BA+L physio", height ~ 1.37 + a1*topHeight^b1 * (1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger))*dbh))^(b4 + b4tw * topographicWetnessFD8f), acma2022, start = list(a1 = 13, b1 = 0.2, b2 = -0.05, b3 = 0.1, b3bal = 0, b3balr = 10, b4 = 1.1, b4tw = 0), distinct = FALSE) # { a1, b1, b2, b3, b4 } x { e, s, a, tr, tw } not significant
-  acmaHeightFromDiameter$sharmaPartonBalPhysioRelDbh = fit_gsl_nls("Sharma-Parton RelDbh BA+L physio", height ~ 1.37 + a1*topHeight^b1 * (1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3rd * relativeDiameter + b3bal / (b3balr + basalAreaLarger) + b3tr * terrainRoughness)*dbh))^b4, acma2022, start = list(a1 = 13, b1 = 0.2, b2 = -0.05, b3 = 0.1, b3rd = -0.04, b3bal = 0, b3balr = 10, b3tr = 0, b4 = 1.1), distinct = FALSE) # by propagation
-  acmaHeightFromDiameter$sharmaPartonBalRelDbh = fit_gsl_nls("Sharma-Parton RelDbh BA+L", height ~ 1.37 + a1*topHeight^b1 * (1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3rd * relativeDiameter + b3bal / (b3balr + basalAreaLarger))*dbh))^b4, acma2022, start = list(a1 = 13, b1 = 0.2, b2 = -0.05, b3 = 0.1, b3rd = -0.05, b3bal = 0, b3balr = 10, b4 = 1.1), distinct = FALSE) # by propagation
-  #acmaHeightFromDiameter$sharmaPartonPhysio = fit_gsl_nls("Sharma-Parton physio", height ~ 1.37 + a1*topHeight^b1 * (1 - exp(b2*(standTreesPerHectare/(standBasalAreaPerHectare))^b3*dbh))^(b4 + b4s * slope), acma2022, start = list(a1 = 12.4, b1 = 0.2, b2 = -0.05, b3 = 0.1, b4 = 1.1, b4s = 0), distinct = FALSE) # { a1, b1, b2, b3, b4 } x { e, s, a, tr, tw }, b4tw+e not significant
-  acmaHeightFromDiameter$sharmaPartonB4physio = fit_gsl_nls("Sharma-Parton physio", height ~ 1.37 + (a1 + a1tw*topographicWetnessFD8f)*topHeight^(b1)*(1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3)*dbh^(b4d))), acma2022, start = list(a1 = 12, a1tw = 0, b1 = 0.2, b2 = -0.03, b3 = 0.1, b4d = 1), distinct = FALSE) # { a1, b1, b2, b3, b4 } x { e, s, a, tr, tw} not significant, a1tw and b4tw probably closest to significance
-  #acmaHeightFromDiameter$sharmaPartonRelDbh = fit_gsl_nls("Sharma-Parton RelDbh", height ~ 1.37 + a1*topHeight^b1*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3rd * relativeDiameter)*dbh))^b4, acma2022, start = list(a1 = 17, b1 = 0.14, b2 = -0.04, b3 = 0.12, b3rd = -0.04, b4 = 1.2)) # a1rd, b1rd, b4rd not significant, b2rd nan-inf, 10x10 RMSE 3.62, AIC 1207
-  #acmaHeightFromDiameter$sharmaPartonRelDbhPhysio = fit_gsl_nls("Sharma-Parton RelDbh physio", height ~ 1.37 + a1*topHeight^b1 * (1 - exp(b2*(standTreesPerHectare/(standBasalAreaPerHectare))^(b3 + b3rd * relativeDiameter + b3as * sin(3.14159/180 * aspect))*dbh))^b4, acma2022, start = list(a1 = 17, b1 = 0.14, b2 = -0.04, b3 = 0.12, b3as = 0, b3rd = -0.04, b4 = 1.2), distinct = FALSE) # by propagation
-  acmaHeightFromDiameter$sharmaPartonB4relDbh = fit_gsl_nls("Sharma-Parton RelDbh", height ~ 1.37 + (a1)*topHeight^(b1)*(1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3rd * relativeDiameter)*dbh^(b4d))), acma2022, start = list(a1 = 15, b1 = 0.2, b2 = -0.02, b3 = 0.15, b3rd = -0.06, b4d = 1.1), distinct = FALSE) # a1rd, b1, b1rd, b2rd, b4rd not significant, 10x10 RMSE 3.49, AIC 1199
-  acmaHeightFromDiameter$sharmaPartonB4relDbhPhysio = fit_gsl_nls("Sharma-Parton RelDbh physio", height ~ 1.37 + (a1 + a1tw*topographicWetnessFD8f)*topHeight^(b1)*(1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3rd * relativeDiameter)*dbh^(b4d))), acma2022, start = list(a1 = 15, a1tw = 0, b1 = 0.2, b2 = -0.02, b3 = 0.15, b3rd = -0.06, b4d = 1.1), distinct = FALSE) # a1tw not significant
-  acmaHeightFromDiameter$sharmaZhang = fit_gsl_nls("Sharma-Zhang", height ~ 1.37 + a1*standBasalAreaPerHectare^b1*(1 - exp(b2*standTreesPerHectare^b3*dbh))^b4, acma2022, start = list(a1 = 17, b1 = 0.1, b2 = -0.05, b3 = -0.1, b4 = 1.0)) # a1p, b1p, b2p, b3p, b4p not significant, 10x10 RMSE 3.55, AIC 1183
-  #acmaHeightFromDiameter$sharmaZhangB4 = fit_gsl_nls("Sharma-Zhang", height ~ 1.37 + a1*standBasalAreaPerHectare^b1*(1 - exp(b2*standTreesPerHectare^b3*dbh^b4)), acma2022, start = list(a1 = 16, b1 = 0.1, b2 = -0.03, b3 = 0, b4 = 1.1)) # b3 not significant, 10x10 RMSE 3.63, AIC 1222
-  acmaHeightFromDiameter$sharmaZhangBal = fit_gsl_nls("Sharma-Zhang BA+L", height ~ 1.37 + a1*standBasalAreaPerHectare^b1 * (1 - exp((b2 + b2ba * standBasalAreaPerHectare)*standTreesPerHectare^b3*dbh))^b4, acma2022, start = list(a1 = 10, b1 = 0.3, b2 = -0.06, b2ba = 0.0005, b3 = 0.04, b4 = 1.1)) # a1ba, b1bal, b2bal, b3ba, b3bal, b4ba, b4bal not significant, { a1bal, b1ba, b2ba } all significant
-  #acmaHeightFromDiameter$sharmaZhangBal = fit_gsl_nls("Sharma-Zhang BA+L", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1) * (1 - exp((b2)*standTreesPerHectare^(b3 + b3bal / (b3balr + basalAreaLarger))*dbh))^(b4), acma2022, start = list(a1 = 10, b1 = 0.1, b2 = -0.05, b3 = -0.1, b3bal = 0, b3balr = 10, b4 = 1.0)) # a1ba, a1ba+r, a1bal+r, b1ba, b1bal+r, b2ba, b2ba+r, b2bal+r, b3ba, b3ba+r, b3bal+r, b4ba, b4ba+r, b4bal+r NaN-inf, b3ba+r not significant
-  acmaHeightFromDiameter$sharmaZhangBalRelDbh = fit_gsl_nls("Sharma-Zhang RelDbh BA+L", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1) * (1 - exp((b2 + b2ba * standBasalAreaPerHectare)*standTreesPerHectare^b3*dbh))^(b4 + b4rd * relativeDiameter), acma2022, start = list(a1 = 10, b1 = 0.3, b2 = -0.06, b2ba = 0.0005, b3 = 0.04, b4 = 1.1, b4rd = 0), distinct = FALSE) # b4rd not significant
-  acmaHeightFromDiameter$sharmaZhangRelDbh = tryCatch({ fit_gsl_nls("Sharma-Zhang RelDbh", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1)*(1 - exp((b2)*standTreesPerHectare^(b3)*dbh))^(b4 + b4rd * relativeDiameter), acma2022, start = list(a1 = 17, b1 = 0.1, b2 = -0.05, b3 = -0.1, b4 = 1.0, b4rd = 0), distinct = FALSE) }, # a1rd, b1rd, b4rd not significant, b2rd, b3rd NaN-Inf
-                                                      error = function(e) { reset_future(); return(create_fit_statistics("Sharma-Zhang RelDbh", fittingMethod = "gsl_nls")) }) # 2x50 NaN-inf
-  acmaHeightFromDiameter$sibbesen = fit_gsl_nls("Sibbesen", height ~ 1.37 + a1*dbh^(b1*dbh^b2), acma2022, start = list(a1 = 0.7, b1 = 1.5, b2 = -0.16)) # a1p, b1p, b2p not significant
-  acmaHeightFromDiameter$weibull = fit_gsl_nls("Weibull", height ~ 1.37 + (a1)*(1 - exp(b1*dbh^b2)), acma2022, start = list(a1 = 27, b1 = -0.04, b2 = 1.0)) # a1p, b1p, b2p not significant
-  acmaHeightFromDiameter$weibullBal = fit_gsl_nls("Weibull BA+L", height ~ 1.37 + (a1) * (1 - exp(b1*dbh^(b2 + b2bal * basalAreaLarger))), acma2022, start = list(a1 = 27, b1 = -0.04, b2 = 1.0, b2bal = 0.002)) # a1ba, b1ba, b1bal, b2ba not significant, a1bal also significant but typically less accurate
-  #acmaHeightFromDiameter$weibullBal = fit_gsl_nls("Weibull BA+L", height ~ 1.37 + (a1) * (1 - exp(b1*dbh^(b2 + b2bal / (b2balr + basalAreaLarger)))), acma2022, start = list(a1 = 27, b1 = -0.04, b2 = 1.0, b2bal = 0, b2balr = 10)) # a1bal+r, b1bal+r, b2bal+r not significant
-  #acmaHeightFromDiameter$weibullBalA1 = fit_gsl_nls("Weibull BA+L", height ~ 1.37 + (a1 + a1bal * basalAreaLarger) * (1 - exp(b1*dbh^(b2))), acma2022, start = list(a1 = 26, a1bal = 0.05, b1 = -0.04, b2 = 1.0))
-  #acmaHeightFromDiameter$weibullBal = fit_gsl_nls("Weibull BA+L", height ~ 1.37 + (a1 + a1bal * basalAreaLarger) * (1 - exp(b1*dbh^(b2))), acma2022, start = list(a1 = 26, a1bal = 0.08, b1 = -0.04, b2 = 1.0)) # overlaps at 10x10 blocked cross validation but tends to be less accurate
+  #acmaHeightFromDiameter$chapmanRichardsBal = fit_gsl_nls("Chapman-Richards BA+L", height ~ 1.37 + (a1) * (1 - exp((b1)*dbh))^(b2 + b2bal / (b2balr + basalAreaLarger)), acma2022, 
+  #                                                        start = list(a1 = 27, b1 = -0.06, b2 = 1.1, b2bal = 0, b2balr = 10), distinct = FALSE) # a1ba+r, a1bal+r, b1ba+r, b1bal+r, b2ba+r, b2bal+r not significant
+  #acmaHeightFromDiameter$chapmanRichardsBalPhysio = fit_gsl_nls("Chapman-Richards BA+L physio", height ~ 1.37 + (a1 + a1s * slope) * (1 - exp(b1*dbh))^(b2 + b2bal / (b2balr + basalAreaLarger)), acma2022, 
+  #                                                              start = list(a1 = 27, a1s = 0, b1 = -0.06, b2 = 1.1, b2bal = 0, b2balr = 10), distinct = FALSE) # a1s not significant
+  #acmaHeightFromDiameter$chapmanRichardsBalPhysioRelDbh = fit_gsl_nls("Chapman-Richards RelDbh BA+L physio", height ~ 1.37 + (a1 + a1rd * relativeDiameter + a1s * slope) * (1 - exp(b1*dbh))^(b2 + b2bal / (b2balr + basalAreaLarger)), acma2022, 
+  #                                                                    start = list(a1 = 30, a1rd = 0, a1s = 0, b1 = -0.06, b2 = 1.1, b2bal = 0, b2balr = 10), distinct = FALSE) # a1s, a1rd, b2bal+r not significant
+  #acmaHeightFromDiameter$chapmanRichardsBalRelDbh = fit_gsl_nls("Chapman-Richards RelDbh BA+L", height ~ 1.37 + (a1 + a1rd * relativeDiameter) * (1 - exp(b1*dbh))^(b2 + b2bal / (b2balr + basalAreaLarger)), acma2022, 
+  #                                                              start = list(a1 = 27, a1rd = 0, b1 = -0.027, b2 = 1.08, b2bal = 0, b2balr = 10), distinct = FALSE) # a1rd, b2bal+r not significant
+  acmaHeightFromDiameter$chapmanRichardsPhysio = fit_gsl_nls("Chapman-Richards physio", height ~ 1.37 + a1 * (1 - exp((b1)*dbh))^(b2 + b2p * isPlantation + a1tw * topographicWetnessFD8f), acma2022, 
+                                                             start = list(a1 = 27, a1tw = 0, b1 = -0.06, b2 = 1.1, b2p = -0.2), distinct = FALSE) # { a1, b1, b2 } x { s, e, a, tr, tw } not significant, a1tw+e NaN-Inf
+  acmaHeightFromDiameter$chapmanRichardsRelDbh = fit_gsl_nls("Chapman-Richards RelDbh", height ~ 1.37 + (a1 + a1rd * relativeDiameter)*(1 - exp(b1*dbh))^b2, acma2022, 
+                                                             start = list(a1 = 27, a1rd = 0, b1 = -0.06, b2 = 1.1), distinct = FALSE) # a1rd, b2p, b2rd not significant, b1rd nan-inf
+  acmaHeightFromDiameter$chapmanRichardsRelDbhPhysio = fit_gsl_nls("Chapman-Richards RelDbh physio", height ~ 1.37 + (a1 + a1rd * relativeDiameter + a1as * sin(3.14159/180 * slope)) * (1 - exp(b1*dbh))^b2, acma2022, 
+                                                                   start = list(a1 = 27, a1rd = 0, a1as = 0, b1 = -0.06, b2 = 1.1), distinct = FALSE) # by propagation
+  acmaHeightFromDiameter$curtis = fit_gsl_nls("Curtis", height ~ 1.37 + a1 * dbh / (1 + dbh)^b1, acma2022, 
+                                              start = list(a1 = 2.4, b1 = 0.4)) # a1p, b1p not significant
+  acmaHeightFromDiameter$hossfeld = fit_gsl_nls("Hossfeld IV", height ~ 1.37 + a1 / (1 + a2 * dbh^b1), acma2022, 
+                                                start = list(a1 = 32, a2 = 33, b1 = -1.2)) # a1p, b1p, b2p not significant
+  acmaHeightFromDiameter$korf = fit_gsl_nls("Korf", height ~ 1.37 + a1*exp(b1*dbh^b2), acma2022, 
+                                            start = list(a1 = 70, b1 = -5.0, b2 = -0.35)) # a1p, b1p, b2p not significant
+  acmaHeightFromDiameter$michaelisMenten = fit_gsl_nls("Michaelis-Menten", height ~ 1.37 + a1*dbh^b1 / (a2 + dbh^b1), acma2022, 
+                                                       start = list(a1 = 33, a2 = 30, b1 = 1.1)) # a1p, b1p, b2p not significant
+  acmaHeightFromDiameter$michaelisMentenBal = fit_gsl_nls("Michaelis-Menten BA+L", height ~ 1.37 + (a1)*dbh^(b1 + b1ba / standBasalAreaPerHectare) / (a2 + dbh^(b1 + b1ba / standBasalAreaPerHectare)), acma2022, 
+                                                          start = list(a1 = 33, a2 = 30, b1 = 1.3, b1ba = -3.7)) # b1bap not significant, 10x10 MAE 2.38, AIC 1181
+  #acmaHeightFromDiameter$michaelisMentenBaA1 = fit_gsl_nls("Michaelis-Menten BA", height ~ 1.37 + (a1 + a1ba * standBasalAreaPerHectare)*dbh^b1 / (a2 + dbh^b1), acma2022, 
+  #                                                         start = list(a1 = 30, a1ba = 0.05, a2 = 30, b1 = 1.1)) # a2ba, b1ba not significant, 10x10 MAE 2.45, AIC 1209
+  #acmaHeightFromDiameter$michaelisMentenBarA1 = fit_gsl_nls("Michaelis-Menten BA", height ~ 1.37 + (a1 + a1ba / standBasalAreaPerHectare)*dbh^b1 / (a2 + dbh^b1), acma2022, 
+  #                                                          start = list(a1 = 35, a1ba = -140, a2 = 30, b1 = 1.2)) # 10x10 MAE 2.40, AIC 1181
+  #acmaHeightFromDiameter$michaelisMentenBarA2 = fit_gsl_nls("Michaelis-Menten BA", height ~ 1.37 + (a1)*dbh^b1 / (a2 + a2ba / standBasalAreaPerHectare + dbh^b1), acma2022, 
+  #                                                          start = list(a1 = 33, a2 = 25, a2ba = 175, b1 = 1.2)) # 10x10 MAE 2.45, AIC 1230
+  #acmaHeightFromDiameter$michaelisMentenBalA1 = fit_gsl_nls("Michaelis-Menten BAL", height ~ 1.37 + (a1 + a1bal * basalAreaLarger)*dbh^b1 / (a2 + dbh^b1), acma2022, 
+  #                                                          start = list(a1 = 30, a1bal = 0.08, a2 = 30, b1 = 1.1)) # a1bal+r, a2bal+r, b1bal+r not significant, 10x10 MAE 2.43, AIC 1224
+  #acmaHeightFromDiameter$michaelisMentenBalB1 = fit_gsl_nls("Michaelis-Menten BAL", height ~ 1.37 + (a1)*dbh^(b1 + b1bal * basalAreaLarger) / (a2 + dbh^(b1 + b1bal * basalAreaLarger)), acma2022, 
+  #                                                          start = list(a1 = 35, a2 = 32, b1 = 1.1, b1bal = 0.0002)) # 10x10 MAE 2.45, AIC 1220
+  #acmaHeightFromDiameter$michaelisMentenBal = fit_gsl_nls("Michaelis-Menten BA+L", height ~ 1.37 + (a1 + a1bal * basalAreaLarger)*dbh^(b1 + b1ba / standBasalAreaPerHectare) / (a2 + dbh^(b1 + b1ba / standBasalAreaPerHectare)), acma2022, 
+  #                                                        start = list(a1 = 33, a1bal = 0, a2 = 30, b1 = 1.3, b1ba = -3.7), distinct = FALSE) # a1bal not significant
+  acmaHeightFromDiameter$michaelisMentenBalRelDbh = fit_gsl_nls("Michaelis-Menten RelDbh BA+L", height ~ 1.37 + (a1)*dbh^(b1 + b1rd * relativeDiameter + b1ba / standBasalAreaPerHectare) / (a2 + dbh^(b1 + b1rd * relativeDiameter + b1ba / standBasalAreaPerHectare)), acma2022, 
+                                                                start = list(a1 = 33, a2 = 30, b1 = 1.3, b1rd = 0, b1ba = -3.7), distinct = FALSE) # b1ba-b1rd not mutually significant
+  acmaHeightFromDiameter$michaelisMentenRelDbh = fit_gsl_nls("Michaelis-Menten RelDbh", height ~ 1.37 + (a1)*dbh^(b1 + b1rd * relativeDiameter) / (a2 + dbh^(b1 + b1rd * relativeDiameter)), acma2022, 
+                                                             start = list(a1 = 37, a2 = 36, b1 = 1.2, b1rd = -0.05)) # b1rdp not significant, 10x10 MAE 2.43, AIC 1208
+  #acmaHeightFromDiameter$michaelisMentenRelDbhA1 = fit_gsl_nls("Michaelis-Menten RelDbh", height ~ 1.37 + (a1 + a1rd * relativeDiameter)*dbh^b1 / (a2 + dbh^b1), acma2022, 
+  #                                                            start = list(a1 = 40, a1rd = -3, a2 = 35, b1 = 1.1)) # 10x10 MAE 2.44, AIC 1216
+  #acmaHeightFromDiameter$michaelisMentenRelDbhA2 = fit_gsl_nls("Michaelis-Menten RelDbh", height ~ 1.37 + (a1)*dbh^b1 / (a2 + a2rd * relativeDiameter + dbh^b1), acma2022, 
+  #                                                             start = list(a1 = 37, a2 = 35, a2rd = 12, b1 = 1.2)) # 10x10 MAE 2.49, AIC 1208
+  acmaHeightFromDiameter$power = fit_gsl_nls("power", height ~ 1.37 + a1*dbh^b1, acma2022, 
+                                             start = list(a1 = 2.0, b1 = 0.66)) # a1p, b1p not significant, all data power = 0.666
+  acmaHeightFromDiameter$prodan = fit_gsl_nls("Prodan", height ~ 1.37 + dbh^2 / (a1 * dbh^2 + (a2 + a2p * isPlantation)*dbh + a3), acma2022, 
+                                              start = list(a1 = 0.024, a2 = 1.27, a2p = -0.23, a3 = -0.19))
+  acmaHeightFromDiameter$ratkowsky = fit_gsl_nls("Ratkowsky", height ~ 1.37 + a1*exp(b1/(dbh + b2)), acma2022, 
+                                                 start = list(a1 = 30, b1 = -13, b2 = 3.5)) # a1p, b1p, b2p not significant
+  acmaHeightFromDiameter$richardsW = fit_gsl_nls("unified Richards", height ~ 1.37 + Ha * (1 + ((1.37/Ha)^(1 - d) - 1) * exp((-kU * dbh)/d^(d/(1 - d))))^(1/(1 - d)), acma2022, 
+                                                 start = list(Ha = 25, d = 0.7, kU = 0.035)) # Hap, kUp, dp not significant
+  #acmaHeightFromDiameter$sharmaParton = fit_gsl_nls("Sharma-Parton", height ~ 1.37 + a1*topHeight^b1*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^b3*dbh))^b4, acma2022, 
+  #                                                  start = list(a1 = 12, b1 = 0.2, b2 = -0.04, b3 = 0.1, b4 = 1.1)) # a1p, b1p, b2p, b3p, b4p not significant, 10x10 RMSE 3.51, AIC 1204
+  acmaHeightFromDiameter$sharmaPartonB4 = fit_gsl_nls("Sharma-Parton", height ~ 1.37 + a1*topHeight^b1*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^b3*dbh^b4d)), acma2022, 
+                                                      start = list(a1 = 12, b1 = 0.2, b2 = -0.03, b3 = 0.1, b4d = 1)) # b3, b4 not significant, 10x10 RMSE 3.45, AIC 1222
+  #acmaHeightFromDiameter$sharmaPartonBal = fit_gsl_nls("Sharma-Parton BA+L", height ~ 1.37 + (a1)*topHeight^(b1) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger))*dbh))^(b4), acma2022, 
+  #                                                     start = list(a1 = 13, b1 = 0.2, b2 = -0.04, b3 = 0.1, b3bal = 0, b3balr = 10, b4 = 1.1), distinct = FALSE) # a1bal+r, b1bal+r, b3bal+r, b4bal+r not significant, b2bal+r NaN-inf
+  acmaHeightFromDiameter$sharmaPartonB4bal = fit_gsl_nls("Sharma-Parton BA+L", height ~ 1.37 + (a1)*topHeight^(b1) * (1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3)*dbh^(b4d + b4bal / (b4balr + basalAreaLarger)))), acma2022, 
+                                                         start = list(a1 = 13, b1 = 0.2, b2 = -0.04, b3 = 0.1, b4bal = 0, b4balr = 10, b4d = 1.1), distinct = FALSE) # a1bal, a1bal+r, b1bal, b1bal+r, b2bal, b2bal+r, b3bal, b3bal+r, b4bal, b4bal+r not significant
+  acmaHeightFromDiameter$sharmaPartonBalPhysio = fit_gsl_nls("Sharma-Parton BA+L physio", height ~ 1.37 + a1*topHeight^b1 * (1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3bal / (b3balr + basalAreaLarger))*dbh))^(b4 + b4tw * topographicWetnessFD8f), acma2022, 
+                                                             start = list(a1 = 13, b1 = 0.2, b2 = -0.05, b3 = 0.1, b3bal = 0, b3balr = 10, b4 = 1.1, b4tw = 0), distinct = FALSE) # { a1, b1, b2, b3, b4 } x { e, s, a, tr, tw } not significant
+  acmaHeightFromDiameter$sharmaPartonBalPhysioRelDbh = fit_gsl_nls("Sharma-Parton RelDbh BA+L physio", height ~ 1.37 + a1*topHeight^b1 * (1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3rd * relativeDiameter + b3bal / (b3balr + basalAreaLarger) + b3tr * terrainRoughness)*dbh))^b4, acma2022, 
+                                                                   start = list(a1 = 13, b1 = 0.2, b2 = -0.05, b3 = 0.1, b3rd = -0.04, b3bal = 0, b3balr = 10, b3tr = 0, b4 = 1.1), distinct = FALSE) # by propagation
+  acmaHeightFromDiameter$sharmaPartonBalRelDbh = fit_gsl_nls("Sharma-Parton RelDbh BA+L", height ~ 1.37 + a1*topHeight^b1 * (1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3rd * relativeDiameter + b3bal / (b3balr + basalAreaLarger))*dbh))^b4, acma2022, 
+                                                             start = list(a1 = 13, b1 = 0.2, b2 = -0.05, b3 = 0.1, b3rd = -0.05, b3bal = 0, b3balr = 10, b4 = 1.1), distinct = FALSE) # by propagation
+  #acmaHeightFromDiameter$sharmaPartonPhysio = fit_gsl_nls("Sharma-Parton physio", height ~ 1.37 + a1*topHeight^b1 * (1 - exp(b2*(standTreesPerHectare/(standBasalAreaPerHectare))^b3*dbh))^(b4 + b4s * slope), acma2022, 
+  #                                                        start = list(a1 = 12.4, b1 = 0.2, b2 = -0.05, b3 = 0.1, b4 = 1.1, b4s = 0), distinct = FALSE) # { a1, b1, b2, b3, b4 } x { e, s, a, tr, tw }, b4tw+e not significant
+  acmaHeightFromDiameter$sharmaPartonB4physio = fit_gsl_nls("Sharma-Parton physio", height ~ 1.37 + (a1 + a1tw*topographicWetnessFD8f)*topHeight^(b1)*(1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3)*dbh^(b4d))), acma2022, 
+                                                            start = list(a1 = 12, a1tw = 0, b1 = 0.2, b2 = -0.03, b3 = 0.1, b4d = 1), distinct = FALSE) # { a1, b1, b2, b3, b4 } x { e, s, a, tr, tw} not significant, a1tw and b4tw probably closest to significance
+  #acmaHeightFromDiameter$sharmaPartonRelDbh = fit_gsl_nls("Sharma-Parton RelDbh", height ~ 1.37 + a1*topHeight^b1*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3rd * relativeDiameter)*dbh))^b4, acma2022, 
+  #                                                        start = list(a1 = 17, b1 = 0.14, b2 = -0.04, b3 = 0.12, b3rd = -0.04, b4 = 1.2)) # a1rd, b1rd, b4rd not significant, b2rd nan-inf, 10x10 RMSE 3.62, AIC 1207
+  #acmaHeightFromDiameter$sharmaPartonRelDbhPhysio = fit_gsl_nls("Sharma-Parton RelDbh physio", height ~ 1.37 + a1*topHeight^b1 * (1 - exp(b2*(standTreesPerHectare/(standBasalAreaPerHectare))^(b3 + b3rd * relativeDiameter + b3as * sin(3.14159/180 * aspect))*dbh))^b4, acma2022, 
+  #                                                              start = list(a1 = 17, b1 = 0.14, b2 = -0.04, b3 = 0.12, b3as = 0, b3rd = -0.04, b4 = 1.2), distinct = FALSE) # by propagation
+  acmaHeightFromDiameter$sharmaPartonB4relDbh = fit_gsl_nls("Sharma-Parton RelDbh", height ~ 1.37 + (a1)*topHeight^(b1)*(1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3rd * relativeDiameter)*dbh^(b4d))), acma2022, 
+                                                            start = list(a1 = 15, b1 = 0.2, b2 = -0.02, b3 = 0.15, b3rd = -0.06, b4d = 1.1), distinct = FALSE) # a1rd, b1, b1rd, b2rd, b4rd not significant, 10x10 RMSE 3.49, AIC 1199
+  acmaHeightFromDiameter$sharmaPartonB4relDbhPhysio = fit_gsl_nls("Sharma-Parton RelDbh physio", height ~ 1.37 + (a1 + a1tw*topographicWetnessFD8f)*topHeight^(b1)*(1 - exp((b2)*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3rd * relativeDiameter)*dbh^(b4d))), acma2022, 
+                                                                  start = list(a1 = 15, a1tw = 0, b1 = 0.2, b2 = -0.02, b3 = 0.15, b3rd = -0.06, b4d = 1.1), distinct = FALSE) # a1tw not significant
+  acmaHeightFromDiameter$sharmaZhang = fit_gsl_nls("Sharma-Zhang", height ~ 1.37 + a1*standBasalAreaPerHectare^b1*(1 - exp(b2*standTreesPerHectare^b3*dbh))^b4, acma2022, 
+                                                   start = list(a1 = 17, b1 = 0.1, b2 = -0.05, b3 = -0.1, b4 = 1.0)) # a1p, b1p, b2p, b3p, b4p not significant, 10x10 RMSE 3.55, AIC 1183
+  #acmaHeightFromDiameter$sharmaZhangB4 = fit_gsl_nls("Sharma-Zhang", height ~ 1.37 + a1*standBasalAreaPerHectare^b1*(1 - exp(b2*standTreesPerHectare^b3*dbh^b4)), acma2022, 
+  #                                                   start = list(a1 = 16, b1 = 0.1, b2 = -0.03, b3 = 0, b4 = 1.1)) # b3 not significant, 10x10 RMSE 3.63, AIC 1222
+  acmaHeightFromDiameter$sharmaZhangBal = fit_gsl_nls("Sharma-Zhang BA+L", height ~ 1.37 + a1*standBasalAreaPerHectare^b1 * (1 - exp((b2 + b2ba * standBasalAreaPerHectare)*standTreesPerHectare^b3*dbh))^b4, acma2022, 
+                                                      start = list(a1 = 10, b1 = 0.3, b2 = -0.06, b2ba = 0.0005, b3 = 0.04, b4 = 1.1)) # a1ba, b1bal, b2bal, b3ba, b3bal, b4ba, b4bal not significant, { a1bal, b1ba, b2ba } all significant
+  #acmaHeightFromDiameter$sharmaZhangBal = fit_gsl_nls("Sharma-Zhang BA+L", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1) * (1 - exp((b2)*standTreesPerHectare^(b3 + b3bal / (b3balr + basalAreaLarger))*dbh))^(b4), acma2022, 
+  #                                                    start = list(a1 = 10, b1 = 0.1, b2 = -0.05, b3 = -0.1, b3bal = 0, b3balr = 10, b4 = 1.0)) # a1ba, a1ba+r, a1bal+r, b1ba, b1bal+r, b2ba, b2ba+r, b2bal+r, b3ba, b3ba+r, b3bal+r, b4ba, b4ba+r, b4bal+r NaN-inf, b3ba+r not significant
+  acmaHeightFromDiameter$sharmaZhangBalRelDbh = fit_gsl_nls("Sharma-Zhang RelDbh BA+L", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1) * (1 - exp((b2 + b2ba * standBasalAreaPerHectare)*standTreesPerHectare^b3*dbh))^(b4 + b4rd * relativeDiameter), acma2022, 
+                                                            start = list(a1 = 10, b1 = 0.3, b2 = -0.06, b2ba = 0.0005, b3 = 0.04, b4 = 1.1, b4rd = 0), distinct = FALSE) # b4rd not significant
+  acmaHeightFromDiameter$sharmaZhangRelDbh = fit_gsl_nls("Sharma-Zhang RelDbh", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1)*(1 - exp((b2)*standTreesPerHectare^(b3)*dbh))^(b4 + b4rd * relativeDiameter), acma2022, 
+                                                         start = list(a1 = 17, b1 = 0.1, b2 = -0.05, b3 = -0.1, b4 = 1.0, b4rd = 0), distinct = FALSE) # a1rd, b1rd, b4rd not significant, b2rd, b3rd NaN-Inf, 2x50 NaN-inf
+  acmaHeightFromDiameter$sibbesen = fit_gsl_nls("Sibbesen", height ~ 1.37 + a1*dbh^(b1*dbh^b2), acma2022, 
+                                                start = list(a1 = 0.7, b1 = 1.5, b2 = -0.16)) # a1p, b1p, b2p not significant
+  acmaHeightFromDiameter$weibull = fit_gsl_nls("Weibull", height ~ 1.37 + (a1)*(1 - exp(b1*dbh^b2)), acma2022, 
+                                               start = list(a1 = 27, b1 = -0.04, b2 = 1.0)) # a1p, b1p, b2p not significant
+  acmaHeightFromDiameter$weibullBal = fit_gsl_nls("Weibull BA+L", height ~ 1.37 + (a1) * (1 - exp(b1*dbh^(b2 + b2bal * basalAreaLarger))), acma2022, 
+                                                  start = list(a1 = 27, b1 = -0.04, b2 = 1.0, b2bal = 0.002)) # a1ba, b1ba, b1bal, b2ba not significant, a1bal also significant but typically less accurate
+  #acmaHeightFromDiameter$weibullBal = fit_gsl_nls("Weibull BA+L", height ~ 1.37 + (a1) * (1 - exp(b1*dbh^(b2 + b2bal / (b2balr + basalAreaLarger)))), acma2022, 
+  #                                                start = list(a1 = 27, b1 = -0.04, b2 = 1.0, b2bal = 0, b2balr = 10)) # a1bal+r, b1bal+r, b2bal+r not significant
+  #acmaHeightFromDiameter$weibullBalA1 = fit_gsl_nls("Weibull BA+L", height ~ 1.37 + (a1 + a1bal * basalAreaLarger) * (1 - exp(b1*dbh^(b2))), acma2022, 
+  #                                                  start = list(a1 = 26, a1bal = 0.05, b1 = -0.04, b2 = 1.0))
+  #acmaHeightFromDiameter$weibullBal = fit_gsl_nls("Weibull BA+L", height ~ 1.37 + (a1 + a1bal * basalAreaLarger) * (1 - exp(b1*dbh^(b2))), acma2022, 
+  #                                                start = list(a1 = 26, a1bal = 0.08, b1 = -0.04, b2 = 1.0)) # overlaps at 10x10 blocked cross validation but tends to be less accurate
   #print(to_parameter_confidence_intervals(acmaHeightFromDiameter$sharmaPartonBalRelDbh), n = 40)
   #to_fixed_coeffficients(acmaHeightFromDiameter$weibullBal)
   #acmaHeightFromDiameter$weibullBalA1$validation %>% summarize(maeMin = min(mae), maeMedian = median(mae), maeMean = mean(mae), maeMax = max(mae), aicMin = min(aic), aicMedian = median(aic), aicMean = mean(aic), aicMax = max(aic))
+  acmaHeightFromDiameter$weibullBalRelDbh = fit_gsl_nls("Weibull RelDbh BA+L", height ~ 1.37 + (a1) * (1 - exp((b1 + b1rd * relativeDiameter)*dbh^(b2 + b2bal * basalAreaLarger))), acma2022, 
+                                                        start = list(a1 = 27, b1 = -0.04, b1rd = 0, b2 = 1.0, b2bal = 0.002), distinct = FALSE) # b1rd-b2bal not mutually significant
+  #acmaHeightFromDiameter$weibullRelDbh = fit_gsl_nls("Weibull RelDbh", height ~ 1.37 + (a1 + a1rd * relativeDiameter)*(1 - exp(b1*dbh^b2)), acma2022, 
+  #                                                   start = list(a1 = 31, a1rd = -2, b1 = -0.04, b2 = 1.0)) # 10x10 MAE 2.47, AIC 1213
+  acmaHeightFromDiameter$weibullRelDbh = fit_gsl_nls("Weibull RelDbh", height ~ 1.37 + (a1)*(1 - exp((b1 + b1rd * relativeDiameter)*dbh^b2)), acma2022, 
+                                                     start = list(a1 = 28, b1 = -0.04, b1rd = 0.005, b2 = 1.1)) # 10x10 MAE 2.43, AIC 1192
+  #acmaHeightFromDiameter$weibullRelDbh = fit_gsl_nls("Weibull RelDbh", height ~ 1.37 + (a1)*(1 - exp((b1)*dbh^(b2 + b2rd * relativeDiameter))), acma2022, 
+  #                                                   start = list(a1 = 29, b1 = -0.04, b2 = 1.1, b2rd = -0.05)) # 10x10 MAE 2.47, AIC1214
   
   # all significant GAM forms NaN with Γ link
   # Slight increases in accuracy from power to Hossfeld IV and Michaelis-Menten bases, the two of which are mathematically identical for the regression coefficients reached in this case.
@@ -293,6 +356,15 @@ if (acmaOptions$fitHeightMixed)
   #acmaHeightFromDiameterMixed$weibullBal = fit_nlme("Weibull BA+L", height ~ 1.37 + (a1 + a1ra) * (1 - exp(b1*dbh^(b2 + b2bal * basalAreaLarger))), acma2022, # 10x10 MAE 2.52, AIC 1250
   #                                                  fixedFormula = a1 + b1 + b2 + b2bal ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                  start = list(fixed = c(a1 = 24, b1 = -0.05, b2 = 1.0, b2bal = 0.001)))
+  #acmaHeightFromDiameterMixed$weibullBalRelDbh = fit_nlme("Weibull RelDbh BA+L", height ~ 1.37 + (a1) * (1 - exp((b1 + b1rd * relativeDiameter)*dbh^(b2 + b2bal * basalAreaLarger))), acma2022, 
+  #                                                        start = list(a1 = 27, b1 = -0.04, b1rd = 0, b2 = 1.0, b2bal = 0.002), distinct = FALSE)
+  acmaHeightFromDiameterMixed$weibullBalRelDbh = create_fit_statistics("Weibull RelDbh BA+L", fitting = "nlme", distinct = FALSE)
+  #acmaHeightFromDiameterMixed$weibullRelDbh = fit_nlme("Weibull RelDbh", height ~ 1.37 + (a1 + a1ra)*(1 - exp((b1 + b1rd * relativeDiameter)*dbh^(b2))), acma2022, # a1ra-b1rd not mutually significant, b1ra, b2ra step halving, 10x10 MAE 2.55, AIC 1195
+  #                                                     fixedFormula = a1 + b1 + b1rd + b2 ~ 1, randomFormula = a1ra ~ 1|stand/plot,
+  #                                                     start = list(fixed = c(a1 = 28, b1 = -0.04, b1rd = 0.005, b2 = 1.1)), distinct = FALSE)
+  acmaHeightFromDiameterMixed$weibullRelDbh = fit_nlme("Weibull RelDbh", height ~ 1.37 + (a1)*(1 + a1rm)*(1 - exp((b1 + b1rd * relativeDiameter)*dbh^(b2))), acma2022, # b1rm step halving, b2rm max iterations, 10x10 MAE 2.40, AIC 1224
+                                                       fixedFormula = a1 + b1 + b1rd + b2 ~ 1, randomFormula = a1rm ~ 1|stand/plot,
+                                                       start = list(fixed = c(a1 = 30, b1 = -0.04, b1rd = 0.005, b2 = 1.0)))
   #to_fixed_coeffficients(acmaHeightFromDiameterMixed$weibullBal)
   #print(to_parameter_confidence_intervals(acmaHeightFromDiameterMixed$weibullBal), n = 16)
 
@@ -314,58 +386,108 @@ if (acmaOptions$fitHeightMixed)
 ## bigleaf maple diameter regressions
 if (acmaOptions$fitDbh)
 {
-  acmaDiameterFromHeight = list(linear = fit_lm("linear", dbh ~ 0 + I(height - 1.37), acma2022)) # plantation not significant
-  acmaDiameterFromHeight$parabolic = fit_lm("parabolic", dbh ~ 0 + I(height - 1.37) + I((height - 1.37)^2), acma2022) # plantation, plantation^2 not significant
+  acmaDiameterFromHeight = list(linear = fit_lm("linear", dbh ~ I(height - 1.37), acma2022)) # plantation not significant
+  acmaDiameterFromHeight$parabolic = fit_lm("parabolic", dbh ~ I(height - 1.37) + I((height - 1.37)^2), acma2022) # plantation, plantation^2 not significant
 
-  acmaDiameterFromHeight$chapmanReplace = fit_gsl_nls("Chapman-Richards replace", dbh ~ a1*(exp(b1*(height - 1.37)) - 1)^b2, acma2022, start = list(a1 = 40, b1 = 0.02, b2 = 1.1)) # a1p, b1p, b2p not significant, a1-b1 evaporation
-  acmaDiameterFromHeight$chapmanReplaceAbat = fit_gsl_nls("Chapman-Richards replace ABA+T", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare)*(exp((b1)*(height - 1.37)) - 1)^(b2), acma2022, start = list(a1 = 40, a1aba = 0, b1 = 0.02, b2 = 1.1), distinct = FALSE) # { a1, b1, b2 } x { aba, bat } not significant
-  acmaDiameterFromHeight$chapmanReplaceRelHt = fit_gsl_nls("Chapman-Richards replace RelHt", dbh ~ a1*(exp((b1 + b1rh * relativeHeight)*(height - 1.37)) - 1)^b2, acma2022, start = list(a1 = 50, b1 = 0.02, b1rh = 0, b2 = 1.1), distinct = FALSE) # a1rh, b1rh, b2rh not significant, a1-b1 evaporation
-  acmaDiameterFromHeight$chapmanRichards = fit_gsl_nls("Chapman-Richards inverse", dbh ~ a1*log(1 - pmin(b1*(height - 1.37)^b2, 0.9999)), acma2022, start = list(a1 = 40, b1 = -0.02, b2 = 1.3)) # a1p, b1p, b2p not significant, a1-b1 evaporation
-  acmaDiameterFromHeight$chapmanRichardsAbat = fit_gsl_nls("Chapman-Richards inverse ABA+T", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare)*log(1 - pmin((b1)*(height - 1.37)^(b2), 0.9999)), acma2022, start = list(a1 = 40, a1aba = 0, b1 = -0.02, b2 = 1.3), distinct = FALSE) # { a1, b1, b2 } x { aba, bat } not significant
-  acmaDiameterFromHeight$chapmanRichardsPhysio = fit_gsl_nls("Chapman-Richards inverse physio", dbh ~ a1*log(1 - pmin(b1*(height - 1.37)^(b2 + b2tw * topographicWetnessFD8f), 0.9999)), acma2022, start = list(a1 = 40, b1 = -0.023, b2 = 1.6, b2tw = 0), distinct = FALSE) # { a1, b1, b2 } x { e, s, a, tr, tw } not significant
-  acmaDiameterFromHeight$chapmanRichardsRelHt = fit_gsl_nls("Chapman-Richards inverse RelHt", dbh ~ a1*log(1 - pmin(b1*(height - 1.37)^(b2 + b2rh * relativeHeight), 0.9999)), acma2022, start = list(a1 = 40, b1 = -0.02, b2 = 1.3, b2rh = 0), distinct = FALSE) # a1rh, b1rh, b2rh not significant
-  acmaDiameterFromHeight$michaelisMentenReplace = fit_gsl_nls("Michaelis-Menten replace", dbh ~ a1 * (height - 1.37)^b1 / (a2 - (height - 1.37)^b1), acma2022, start = list(a1 = -10, a2 = -10, b1 = 1.3)) # a1p, a2p, b1p not significant, prone to a1-a2 evaporation, 10x10 RMSE 11.0, AIC 1671
-  #acmaDiameterFromHeight$michaelisMentenReplaceAbat = fit_gsl_nls("Michaelis-Menten replace ABA+T", dbh ~ (a1 + a1aat / (a1aatr + basalAreaTaller)) * (height - 1.37)^(b1) / (a2 - (height - 1.37)^(b1)), acma2022, start = list(a1 = -10, a1aat = 0, a1aatr = 10, a2 = -10, b1 = 1.30), distinct = FALSE) # a1aba, a1abar, a1aat, a1aat+4, a2aba, a2aat, a2aat+r, a1abar, b1aba, b1abar, b1aat, b1aat+r not significant
+  acmaDiameterFromHeight$chapmanReplace = fit_gsl_nls("Chapman-Richards replace", dbh ~ a1*(exp(b1*(height - 1.37)) - 1)^b2, acma2022, 
+                                                      start = list(a1 = 40, b1 = 0.02, b2 = 1.1)) # a1p, b1p, b2p not significant, a1-b1 evaporation
+  acmaDiameterFromHeight$chapmanReplaceAbat = fit_gsl_nls("Chapman-Richards replace ABA+T", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare)*(exp((b1)*(height - 1.37)) - 1)^(b2), acma2022, 
+                                                          start = list(a1 = 40, a1aba = 0, b1 = 0.02, b2 = 1.1), distinct = FALSE) # { a1, b1, b2 } x { aba, bat } not significant
+  acmaDiameterFromHeight$chapmanReplaceRelHt = fit_gsl_nls("Chapman-Richards replace RelHt", dbh ~ a1*(exp((b1 + b1rh * relativeHeight)*(height - 1.37)) - 1)^b2, acma2022, 
+                                                           start = list(a1 = 50, b1 = 0.02, b1rh = 0, b2 = 1.1), distinct = FALSE) # a1rh, b1rh, b2rh not significant, a1-b1 evaporation
+  acmaDiameterFromHeight$chapmanRichards = fit_gsl_nls("Chapman-Richards inverse", dbh ~ a1*log(1 - pmin(b1*(height - 1.37)^b2, 0.9999)), acma2022, 
+                                                       start = list(a1 = 40, b1 = -0.02, b2 = 1.3)) # a1p, b1p, b2p not significant, a1-b1 evaporation
+  acmaDiameterFromHeight$chapmanRichardsAbat = fit_gsl_nls("Chapman-Richards inverse ABA+T", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare)*log(1 - pmin((b1)*(height - 1.37)^(b2), 0.9999)), acma2022, 
+                                                           start = list(a1 = 40, a1aba = 0, b1 = -0.02, b2 = 1.3), distinct = FALSE) # { a1, b1, b2 } x { aba, bat } not significant
+  acmaDiameterFromHeight$chapmanRichardsPhysio = fit_gsl_nls("Chapman-Richards inverse physio", dbh ~ a1*log(1 - pmin(b1*(height - 1.37)^(b2 + b2tw * topographicWetnessFD8f), 0.9999)), acma2022, 
+                                                             start = list(a1 = 40, b1 = -0.023, b2 = 1.6, b2tw = 0), distinct = FALSE) # { a1, b1, b2 } x { e, s, a, tr, tw } not significant
+  acmaDiameterFromHeight$chapmanRichardsRelHt = fit_gsl_nls("Chapman-Richards inverse RelHt", dbh ~ a1*log(1 - pmin(b1*(height - 1.37)^(b2 + b2rh * relativeHeight), 0.9999)), acma2022, 
+                                                            start = list(a1 = 40, b1 = -0.02, b2 = 1.3, b2rh = 0), distinct = FALSE) # a1rh, b1rh, b2rh not significant
+  acmaDiameterFromHeight$michaelisMentenReplace = fit_gsl_nls("Michaelis-Menten replace", dbh ~ a1 * (height - 1.37)^b1 / (a2 - (height - 1.37)^b1), acma2022, 
+                                                              start = list(a1 = -10, a2 = -10, b1 = 1.3)) # a1p, a2p, b1p not significant, prone to a1-a2 evaporation, 10x10 RMSE 11.0, AIC 1671
+  #acmaDiameterFromHeight$michaelisMentenReplaceAbat = fit_gsl_nls("Michaelis-Menten replace ABA+T", dbh ~ (a1 + a1aat / (a1aatr + basalAreaTaller)) * (height - 1.37)^(b1) / (a2 - (height - 1.37)^(b1)), acma2022, 
+  #                                                                start = list(a1 = -10, a1aat = 0, a1aatr = 10, a2 = -10, b1 = 1.30), distinct = FALSE) # a1aba, a1abar, a1aat, a1aat+4, a2aba, a2aat, a2aat+r, a1abar, b1aba, b1abar, b1aat, b1aat+r not significant
   acmaDiameterFromHeight$michaelisMentenReplaceAbat = create_fit_statistics(name = "Michaelis-Menten replace ABA+T", fitting = "gsl_nls", distinct = FALSE)
   acmaDiameterFromHeight$michaelisMentenReplaceAbatRelHt = create_fit_statistics(name = "Michaelis-Menten replace RelHt ABA+T", fitting = "gsl_nls", distinct = FALSE) # by propagation
-  #acmaDiameterFromHeight$michaelisMentenReplaceRelHt = fit_gsl_nls("Michaelis-Menten replace RelHt", dbh ~ (a1 + a1rh * relativeHeight) * (height - 1.37)^(b1) / (a2 - (height - 1.37)^(b1)), acma2022, start = list(a1 = -11, a1rh = 0, a2 = -12, b1 = 1.30), distinct = FALSE) # a1rh, a2rh, b1rh not significant
+  #acmaDiameterFromHeight$michaelisMentenReplaceRelHt = fit_gsl_nls("Michaelis-Menten replace RelHt", dbh ~ (a1 + a1rh * relativeHeight) * (height - 1.37)^(b1) / (a2 - (height - 1.37)^(b1)), acma2022, 
+  #                                                                 start = list(a1 = -11, a1rh = 0, a2 = -12, b1 = 1.30), distinct = FALSE) # a1rh, a2rh, b1rh not significant
   acmaDiameterFromHeight$michaelisMentenReplaceRelHt = create_fit_statistics(name = "Michaelis-Menten replace RelHt", fitting = "gsl_nls", distinct = FALSE)
-  #acmaDiameterFromHeight$michaelisMentenReplaceB2 = fit_gsl_nls("Michaelis-Menten replace b₂", dbh ~ a1 * (height - 1.37)^b1 / (a2 - (height - 1.37)^b2), acma2022, start = list(a1 = -60, a2 = -70, b1 = 1.5, b2 = 0.8)) # capable of better fit but numerically unstable
-  acmaDiameterFromHeight$naslund = fit_gsl_nls("Näslund inverse", dbh ~ (a1 + a1p * isPlantation) * sqrt(height - 1.37) / (1 + (a2 + a2p * isPlantation) * sqrt(height - 1.37)), acma2022, start = list(a1 = 3, a1p = -1, a2 = -0.12, a2p = -0.02))
-  acmaDiameterFromHeight$power = fit_gsl_nls("power", dbh ~ a1*(height - 1.37)^b1, acma2022, start = list(a1 = 0.8, b1 = 1.2)) # a1p, b1p not significant, 10x10 RMSE 10.8, AIC 1658
-  acmaDiameterFromHeight$powerAbat = fit_gsl_nls("power ABA+T", dbh ~ (a1)*(height - 1.37)^(b1 + (b1aat + b1aatp * isPlantation) * basalAreaTaller), acma2022, start = list(a1 = 0.8, b1 = 1.2, b1aat = -0.003, b1aatp = -0.002)) # a1aba not significant, 10x10 RMSE 6.45, AIC 1648
-  #acmaDiameterFromHeight$powerAbatB1aba = fit_gsl_nls("power ABA+T", dbh ~ (a1)*(height - 1.37)^(b1 + b1aba * bootstrapStandBasalAreaPerHectare), acma2022, start = list(a1 = 0.7, b1aba = -0.0002, b1 = 1.4)) # 10x10 RMSE 6.65, AIC 1677
-  #acmaDiameterFromHeight$powerAbatA1bat = fit_gsl_nls("power ABA+T", dbh ~ (a1 + a1aat * basalAreaTaller)*(height - 1.37)^(b1), acma2022, start = list(a1 = 1.0, a1aat = -0.007, b1 = 1.2)) # 10x10 RMSE 6.48, AIC 1695
-  #acmaDiameterFromHeight$powerAbatA1batB1aba = fit_gsl_nls("power ABA+T", dbh ~ (a1 + a1aat * basalAreaTaller)*(height - 1.37)^(b1 + b1aba * bootstrapStandBasalAreaPerHectare), acma2022, start = list(a1 = 0.8, a1aat = -0.007, b1aba = -0.0002, b1 = 1.2)) # 10x10 RMSE 6.56, AIC 1629
-  #acmaDiameterFromHeight$powerAbatB1abaBat = fit_gsl_nls("power ABA+T", dbh ~ (a1)*(height - 1.37)^(b1 + b1aba * bootstrapStandBasalAreaPerHectare + b1aat * basalAreaTaller), acma2022, start = list(a1 = 0.8, b1aba = -0.0002, b1aat = -0.003, b1 = 1.2)) # 10x10 RMSE 6.50, AIC 1640
-  acmaDiameterFromHeight$powerPhysio = fit_gsl_nls("power physio", dbh ~ a1*(height - 1.37)^(b1 + b1tw * topographicWetnessFD8f), acma2022, start = list(a1 = 0.8, b1 = 1.1, b1tw = 0.02)) # { a1, b1 } x { e, s, a, tr }, a1tw not significant, 10x10 RMSE 10.5, AIC 1630
-  acmaDiameterFromHeight$powerRelHt = fit_gsl_nls("power RelHt", dbh ~ a1*(height - 1.37)^(b1 + b1rh * relativeHeight), acma2022, start = list(a1 = 0.8, b1 = 1.0, b1rh = 0), distinct = FALSE) # a1rh, b1rh not significant
-  acmaDiameterFromHeight$ruark = fit_gsl_nls("Ruark", dbh ~ a1*(height - 1.37)^b1 * exp(b2 * (height - 1.37)), acma2022, start = list(a1 = 0.9, b1 = 1.3, b2 = 0), distinct = FALSE) # a1p, b1p, b2, b2p not significant -> collapses to power form
-  acmaDiameterFromHeight$ruarkAbat = fit_gsl_nls("Ruark ABA+T", dbh ~ (a1)*(height - 1.37)^(b1) * exp((b2 + b2aba * bootstrapStandBasalAreaPerHectare) * (height - 1.37)), acma2022, start = list(a1 = 0.9, b1 = 1.3, b2 = 0, b2aba = 0), distinct = FALSE) # b2 not significant for all ABA+T placements
-  acmaDiameterFromHeight$ruarkAbatPhysio = fit_gsl_nls("Ruark ABA+T physio", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b1) * exp((b2 + b2e * elevation) * (height - 1.37)), acma2022, start = list(a1 = 0.9, a1aba = 0, b1 = 1.3, b2 = 0, b2e = 0), distinct = FALSE) # by propagation
-  acmaDiameterFromHeight$ruarkAbatPhysioRelHt = fit_gsl_nls("Ruark RelHt ABA+T physio", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b1) * exp((b2 + b2rh * relativeHeight + b2e * elevation) * (height - 1.37)), acma2022, start = list(a1 = 0.9, a1aba = 0, b1 = 1.3, b2 = 0, b2rh = 0, b2e = 0), distinct = FALSE) # by propagation
-  acmaDiameterFromHeight$ruarkAbatRelHt = fit_gsl_nls("Ruark RelHt ABA+T", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b1) * exp((b2 + b2rh * relativeHeight) * (height - 1.37)), acma2022, start = list(a1 = 0.9, a1aba = 0, b1 = 1.3, b2 = 0, b2rh = 0), distinct = FALSE) # by propagation
-  acmaDiameterFromHeight$ruarkPhysio = fit_gsl_nls("Ruark physio", dbh ~ a1*(height - 1.37)^b1 * exp((b2 + b2e * elevation) * (height - 1.37)), acma2022, start = list(a1 = 0.9, b1 = 1.3, b2 = 0, b2e = 0), distinct = FALSE) # { a1, b1 } x { e, s, a, tr, tw }, b2 not significant
-  acmaDiameterFromHeight$ruarkRelHt = fit_gsl_nls("Ruark RelHt", dbh ~ a1*(height - 1.37)^b1 * exp((b2 + b2rh * relativeHeight) * (height - 1.37)), acma2022, start = list(a1 = 0.9, b1 = 1.3, b2 = 0, b2rh = 0), distinct = FALSE) # a1rh, b1rh, b2rh not significant
-  acmaDiameterFromHeight$ruarkRelHtPhysio = fit_gsl_nls("Ruark RelHt physio", dbh ~ a1*(height - 1.37)^b1 * exp((b2 + b2e * elevation + b2rh * relativeHeight) * (height - 1.37)), acma2022, start = list(a1 = 0.9, b1 = 1.3, b2 = 0, b2e = 0, b2rh = 0), distinct = FALSE) # by propagation
-  acmaDiameterFromHeight$schnute = fit_gsl_nls("Schnute inverse", dbh ~ -1/a1 * log(1 - (1 - exp(-a2))*(height^b1 - 1.37^b1)/(Ha^b1 - 1.37^b1)), acma2022, start = list(a1 = 0.000003, a2 = 0.002, b1 = 1.3, Ha = 161)) # a1p, b1p, Hap not significant, Ha-a1 evaporation increases with Levenberg
-  acmaDiameterFromHeight$sharmaParton = fit_gsl_nls("modified Sharma-Parton", dbh ~ a1*(height - 1.37)^b1*(exp(b2*(standTreesPerHectare/topHeight)^b3*(height - 1.37)) - 1), acma2022, start = list(a1 = 20, b1 = 1, b2 = 0.1, b3 = -0.1, b4 = 0.3), control = gsl_nls_control(scale = "levenberg")) # a1p, b1p, b2p, b3p, b4p all NaN-inf, a1-b2 evaporation, job NaN-inf with More
-  acmaDiameterFromHeight$sibbesenReplace = fit_gsl_nls("Sibbesen replace", dbh ~ a1*(height - 1.37)^(b1*(height - 1.37)^b2), acma2022, start = list(a1 = 1.3, b1 = 1, b2 = 0), distinct = FALSE) # a1p, b1p, b2, b2p not significant, 10x10 RSMSE 10.7, AIC 1690
-  acmaDiameterFromHeight$sibbesenReplaceAbat = fit_gsl_nls("Sibbesen replace ABA+T", dbh ~ (a1)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2aat * basalAreaTaller)), acma2022, start = list(a1 = 1.2, b1 = 0.9, b2 = 0, b2aat = -0.001)) # 10x10 RMSE 6.39, AIC 1668
-  #acmaDiameterFromHeight$sibbesenReplaceAbatB1aba = fit_gsl_nls("Sibbesen replace ABA+T", dbh ~ (a1)*(height - 1.37)^((b1 + b1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b2)), acma2022, start = list(a1 = 1.5, b1 = 0.7, b1aba = -0.001, b2 = 0), distinct = FALSE) # a1aba not significant, ABA+T significant in all other positions but b2 always not significant -> collapses to power unless modulated by b2aba or b2aat, 10x10 RMSE 6.69, AIC 1683
-  #acmaDiameterFromHeight$sibbesenReplaceAbatB2aba = fit_gsl_nls("Sibbesen replace ABA+T", dbh ~ (a1)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2aba * bootstrapStandBasalAreaPerHectare)), acma2022, start = list(a1 = 1.5, b1 = 0.7, b2 = 0, b2aba = -0.0007)) # 10x10 RMSE 6.51, AIC 1645
-  #acmaDiameterFromHeight$sibbesenReplaceAbatA1bat = fit_gsl_nls("Sibbesen replace ABA+T", dbh ~ (a1 + a1aat * basalAreaTaller)*(height - 1.37)^((b1)*(height - 1.37)^(b2)), acma2022, start = list(a1 = 1.4, a1aat = -0.01, b1 = 1.0, b2 = 0), distinct = FALSE) # 10x10 RMSE 6.35, AIC 1658
-  #acmaDiameterFromHeight$sibbesenReplaceAbatB1bat = fit_gsl_nls("Sibbesen replace ABA+T", dbh ~ (a1)*(height - 1.37)^((b1 + b1aat * basalAreaTaller)*(height - 1.37)^(b2)), acma2022, start = list(a1 = 1.1, b1 = 1.2, b1aat = -0.003, b2 = 0), distinct = FALSE) # 10x10 RMSE 6.40, AIC 1673
-  #acmaDiameterFromHeight$sibbesenReplaceAbatA1batB2aba = fit_gsl_nls("Sibbesen replace ABA+T", dbh ~ (a1 + a1aat * basalAreaTaller)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2aba * bootstrapStandBasalAreaPerHectare)), acma2022, start = list(a1 = 1.4, a1aat = -0.01, b1 = 1.0, b2 = 0, b2aba = -0.0007), distinct = FALSE) # a1aat-b2aba not mutually significant, 10x10 RMSE 6.30, AIC 1698
-  acmaDiameterFromHeight$sibbesenReplaceAbatPhysio = fit_gsl_nls("Sibbesen replace ABA+T physio", dbh ~ (a1)*(height - 1.37)^((b1 + b1tw * topographicWetnessFD8f)*(height - 1.37)^(b2 + b2aat * basalAreaTaller)), acma2022, start = list(a1 = 1.3, b1 = 1, b1tw = 0.02, b2 = 0, b2aat = -0.001), distinct = FALSE) # a1aat-b2aba not mutually significant, b2 not significant
-  acmaDiameterFromHeight$sibbesenReplaceAbatPhysioRelHt = fit_gsl_nls("Sibbesen replace RelHt ABA+T physio", dbh ~ (a1)*(height - 1.37)^((b1 + b1tw * topographicWetnessFD8f)*(height - 1.37)^(b2 + b2rh * relativeHeight + b2aba * bootstrapStandBasalAreaPerHectare)), acma2022, start = list(a1 = 1.3, b1 = 0.7, b1tw = 0.01, b2 = 0.2, b2aba = -0.001, b2rh = -0.05)) # all parameters significant
-  acmaDiameterFromHeight$sibbesenReplaceAbatRelHt = fit_gsl_nls("Sibbesen replace RelHt ABA+T", dbh ~ (a1)*(height - 1.37)^(b1*(height - 1.37)^(b2 + b2rh * relativeHeight + b2aat * basalAreaTaller)), acma2022, start = list(a1 = 1.3, b1 = 0.7, b2 = 0.2, b2aat = -0.001, b2rh = -0.05)) # b2aba-b2aat, b2aba-b2rh not mutually significant, 10x10 RMSE 10.9, AIC 1627
-  acmaDiameterFromHeight$sibbesenReplacePhysio = fit_gsl_nls("Sibbesen replace physio", dbh ~ a1*(height - 1.37)^((b1 + b1tw * topographicWetnessFD8f)*(height - 1.37)^b2), acma2022, start = list(a1 = 1.3, b1 = 1, b1tw = 0.02, b2 = 0), distinct = FALSE) # b2 not significant
-  acmaDiameterFromHeight$sibbesenReplaceRelHt = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ a1*(height - 1.37)^(b1*(height - 1.37)^(b2 + b2rh * relativeHeight)), acma2022, start = list(a1 = 1.3, b1 = 1, b2 = 0, b2rh = 0), distinct = FALSE) # a1rh, b1rh, b2rh not significant
-  #acmaDiameterFromHeight$sibbesenReplaceRelHt = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ a1*(height - 1.37)^(b1*(relativeHeight*(height - 1.37))^b2), acma2022, start = list(a1 = 1.3, b1 = 1, b2 = 0), distinct = FALSE) # b2 not significant
-  #acmaDiameterFromHeight$sibbesenReplaceRelHt = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ a1*(relativeHeight*(height - 1.37))^(b1*(height - 1.37)^b2), acma2022, start = list(a1 = 5, b1 = 0.5, b2 = 0.1)) # 10x10 RMSE 12.0, AIC 1679
-  acmaDiameterFromHeight$sibbesenReplaceRelHtPhysio = fit_gsl_nls("Sibbesen replace RelHt physio", dbh ~ a1*(height - 1.37)^((b1 + b1rh * relativeHeight + b1tw * topographicWetnessFD8f)*(height - 1.37)^b2), acma2022, start = list(a1 = 1.3, b1 = 1, b1rh = 0, b1tw = 0.02, b2 = 0), distinct = FALSE) # b1rh not significant, also by propagation
-  acmaDiameterFromHeight$weibull = fit_gsl_nls("Weibull inverse", dbh ~ (a1*log(1 - pmin(b1*(height - 1.37), 0.9999)))^b2, acma2022, start = list(a1 = -30, b1 = 0.07, b2 = 0.63)) # a1p, b1p, b2p not significant
+  #acmaDiameterFromHeight$michaelisMentenReplaceB2 = fit_gsl_nls("Michaelis-Menten replace b₂", dbh ~ a1 * (height - 1.37)^b1 / (a2 - (height - 1.37)^b2), acma2022, 
+  #                                                              start = list(a1 = -60, a2 = -70, b1 = 1.5, b2 = 0.8)) # capable of better fit but numerically unstable
+  acmaDiameterFromHeight$naslund = fit_gsl_nls("Näslund inverse", dbh ~ (a1 + a1p * isPlantation) * sqrt(height - 1.37) / (1 + (a2 + a2p * isPlantation) * sqrt(height - 1.37)), acma2022, 
+                                               start = list(a1 = 3, a1p = -1, a2 = -0.12, a2p = -0.02))
+  acmaDiameterFromHeight$power = fit_gsl_nls("power", dbh ~ a1*(height - 1.37)^b1, acma2022, 
+                                             start = list(a1 = 0.8, b1 = 1.2)) # a1p, b1p not significant, 10x10 RMSE 10.8, AIC 1658
+  acmaDiameterFromHeight$powerAbat = fit_gsl_nls("power ABA+T", dbh ~ (a1)*(height - 1.37)^(b1 + (b1aat + b1aatp * isPlantation) * basalAreaTaller), acma2022, 
+                                                 start = list(a1 = 0.8, b1 = 1.2, b1aat = -0.003, b1aatp = -0.002)) # a1aba not significant, 10x10 RMSE 6.45, AIC 1648
+  #acmaDiameterFromHeight$powerAbatB1aba = fit_gsl_nls("power ABA+T", dbh ~ (a1)*(height - 1.37)^(b1 + b1aba * bootstrapStandBasalAreaPerHectare), acma2022, 
+  #                                                    start = list(a1 = 0.7, b1aba = -0.0002, b1 = 1.4)) # 10x10 RMSE 6.65, AIC 1677
+  #acmaDiameterFromHeight$powerAbatA1bat = fit_gsl_nls("power ABA+T", dbh ~ (a1 + a1aat * basalAreaTaller)*(height - 1.37)^(b1), acma2022, 
+  #                                                    start = list(a1 = 1.0, a1aat = -0.007, b1 = 1.2)) # 10x10 RMSE 6.48, AIC 1695
+  #acmaDiameterFromHeight$powerAbatA1batB1aba = fit_gsl_nls("power ABA+T", dbh ~ (a1 + a1aat * basalAreaTaller)*(height - 1.37)^(b1 + b1aba * bootstrapStandBasalAreaPerHectare), acma2022, 
+  #                                                         start = list(a1 = 0.8, a1aat = -0.007, b1aba = -0.0002, b1 = 1.2)) # 10x10 RMSE 6.56, AIC 1629
+  #acmaDiameterFromHeight$powerAbatB1abaBat = fit_gsl_nls("power ABA+T", dbh ~ (a1)*(height - 1.37)^(b1 + b1aba * bootstrapStandBasalAreaPerHectare + b1aat * basalAreaTaller), acma2022, 
+  #                                                       start = list(a1 = 0.8, b1aba = -0.0002, b1aat = -0.003, b1 = 1.2)) # 10x10 RMSE 6.50, AIC 1640
+  acmaDiameterFromHeight$powerPhysio = fit_gsl_nls("power physio", dbh ~ a1*(height - 1.37)^(b1 + b1tw * topographicWetnessFD8f), acma2022, 
+                                                   start = list(a1 = 0.8, b1 = 1.1, b1tw = 0.02)) # { a1, b1 } x { e, s, a, tr }, a1tw not significant, 10x10 RMSE 10.5, AIC 1630
+  acmaDiameterFromHeight$powerRelHt = fit_gsl_nls("power RelHt", dbh ~ a1*(height - 1.37)^b1*relativeHeight^b1rh, acma2022, 
+                                                  start = list(a1 = 0.8, b1 = 1.0, b1rh = 0), distinct = FALSE) # b1rh not significant, 10x10 RMSE 10.9 AIC 1651
+  #acmaDiameterFromHeight$powerRelHt = fit_gsl_nls("power RelHt", dbh ~ a1*(height - 1.37)^(b1 + b1rh * relativeHeight), acma2022, 
+  #                                                start = list(a1 = 0.8, b1 = 1.0, b1rh = 0), distinct = FALSE) # a1rh, b1rh not significant, 10x10 RMSE 11.1, AIC 1665
+  #acmaDiameterFromHeight$powerRelHt = fit_gsl_nls("power RelHt", dbh ~ a1*(height - 1.37)^b1*(1 + relativeHeight)^b1rh, acma2022, 
+  #                                                start = list(a1 = 0.8, b1 = 1.0, b1rh = 0), distinct = FALSE) # b1rh not significant, 10x10 RMSE 11.0, AIC 1672
+  acmaDiameterFromHeight$ruark = fit_gsl_nls("Ruark", dbh ~ a1*(height - 1.37)^b1 * exp(b2 * (height - 1.37)), acma2022, 
+                                             start = list(a1 = 0.9, b1 = 1.3, b2 = 0), distinct = FALSE) # a1p, b1p, b2, b2p not significant -> collapses to power form
+  acmaDiameterFromHeight$ruarkAbat = fit_gsl_nls("Ruark ABA+T", dbh ~ (a1)*(height - 1.37)^(b1) * exp((b2 + b2aba * bootstrapStandBasalAreaPerHectare) * (height - 1.37)), acma2022, 
+                                                 start = list(a1 = 0.9, b1 = 1.3, b2 = 0, b2aba = 0), distinct = FALSE) # b2 not significant for all ABA+T placements
+  acmaDiameterFromHeight$ruarkAbatPhysio = fit_gsl_nls("Ruark ABA+T physio", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b1) * exp((b2 + b2e * elevation) * (height - 1.37)), acma2022, 
+                                                       start = list(a1 = 0.9, a1aba = 0, b1 = 1.3, b2 = 0, b2e = 0), distinct = FALSE) # by propagation
+  acmaDiameterFromHeight$ruarkAbatPhysioRelHt = fit_gsl_nls("Ruark RelHt ABA+T physio", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b1) * exp((b2 + b2rh * relativeHeight + b2e * elevation) * (height - 1.37)), acma2022, 
+                                                            start = list(a1 = 0.9, a1aba = 0, b1 = 1.3, b2 = 0, b2rh = 0, b2e = 0), distinct = FALSE) # by propagation
+  acmaDiameterFromHeight$ruarkAbatRelHt = fit_gsl_nls("Ruark RelHt ABA+T", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b1) * exp((b2 + b2rh * relativeHeight) * (height - 1.37)), acma2022, 
+                                                      start = list(a1 = 0.9, a1aba = 0, b1 = 1.3, b2 = 0, b2rh = 0), distinct = FALSE) # by propagation
+  acmaDiameterFromHeight$ruarkPhysio = fit_gsl_nls("Ruark physio", dbh ~ a1*(height - 1.37)^b1 * exp((b2 + b2e * elevation) * (height - 1.37)), acma2022, 
+                                                   start = list(a1 = 0.9, b1 = 1.3, b2 = 0, b2e = 0), distinct = FALSE) # { a1, b1 } x { e, s, a, tr, tw }, b2 not significant
+  acmaDiameterFromHeight$ruarkRelHt = fit_gsl_nls("Ruark RelHt", dbh ~ a1*(height - 1.37)^b1 * exp((b2 + b2rh * relativeHeight) * (height - 1.37)), acma2022, 
+                                                  start = list(a1 = 0.9, b1 = 1.3, b2 = 0, b2rh = 0), distinct = FALSE) # a1rh, b1rh, b2rh not significant
+  acmaDiameterFromHeight$ruarkRelHtPhysio = fit_gsl_nls("Ruark RelHt physio", dbh ~ a1*(height - 1.37)^b1 * exp((b2 + b2e * elevation + b2rh * relativeHeight) * (height - 1.37)), acma2022, 
+                                                        start = list(a1 = 0.9, b1 = 1.3, b2 = 0, b2e = 0, b2rh = 0), distinct = FALSE) # by propagation
+  acmaDiameterFromHeight$schnute = fit_gsl_nls("Schnute inverse", dbh ~ -1/a1 * log(1 - (1 - exp(-a2))*(height^b1 - 1.37^b1)/(Ha^b1 - 1.37^b1)), acma2022, 
+                                               start = list(a1 = 0.000003, a2 = 0.002, b1 = 1.3, Ha = 161)) # a1p, b1p, Hap not significant, Ha-a1 evaporation increases with Levenberg
+  acmaDiameterFromHeight$sharmaParton = fit_gsl_nls("modified Sharma-Parton", dbh ~ a1*(height - 1.37)^b1*(exp(b2*(standTreesPerHectare/topHeight)^b3*(height - 1.37)) - 1), acma2022, 
+                                                    start = list(a1 = 20, b1 = 1, b2 = 0.1, b3 = -0.1, b4 = 0.3), control = gsl_nls_control(scale = "levenberg")) # a1p, b1p, b2p, b3p, b4p all NaN-inf, a1-b2 evaporation, job NaN-inf with More
+  acmaDiameterFromHeight$sibbesenReplace = fit_gsl_nls("Sibbesen replace", dbh ~ a1*(height - 1.37)^(b1*(height - 1.37)^b2), acma2022, 
+                                                       start = list(a1 = 1.3, b1 = 1, b2 = 0), distinct = FALSE) # a1p, b1p, b2, b2p not significant, 10x10 RSMSE 10.7, AIC 1690
+  acmaDiameterFromHeight$sibbesenReplaceAbat = fit_gsl_nls("Sibbesen replace ABA+T", dbh ~ (a1)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2aat * basalAreaTaller)), acma2022, 
+                                                           start = list(a1 = 1.2, b1 = 0.9, b2 = 0, b2aat = -0.001)) # 10x10 RMSE 6.39, AIC 1668
+  #acmaDiameterFromHeight$sibbesenReplaceAbatB1aba = fit_gsl_nls("Sibbesen replace ABA+T", dbh ~ (a1)*(height - 1.37)^((b1 + b1aba * bootstrapStandBasalAreaPerHectare)*(height - 1.37)^(b2)), acma2022, 
+  #                                                              start = list(a1 = 1.5, b1 = 0.7, b1aba = -0.001, b2 = 0), distinct = FALSE) # a1aba not significant, ABA+T significant in all other positions but b2 always not significant -> collapses to power unless modulated by b2aba or b2aat, 10x10 RMSE 6.69, AIC 1683
+  #acmaDiameterFromHeight$sibbesenReplaceAbatB2aba = fit_gsl_nls("Sibbesen replace ABA+T", dbh ~ (a1)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2aba * bootstrapStandBasalAreaPerHectare)), acma2022, 
+  #                                                              start = list(a1 = 1.5, b1 = 0.7, b2 = 0, b2aba = -0.0007)) # 10x10 RMSE 6.51, AIC 1645
+  #acmaDiameterFromHeight$sibbesenReplaceAbatA1bat = fit_gsl_nls("Sibbesen replace ABA+T", dbh ~ (a1 + a1aat * basalAreaTaller)*(height - 1.37)^((b1)*(height - 1.37)^(b2)), acma2022, 
+  #                                                              start = list(a1 = 1.4, a1aat = -0.01, b1 = 1.0, b2 = 0), distinct = FALSE) # 10x10 RMSE 6.35, AIC 1658
+  #acmaDiameterFromHeight$sibbesenReplaceAbatB1bat = fit_gsl_nls("Sibbesen replace ABA+T", dbh ~ (a1)*(height - 1.37)^((b1 + b1aat * basalAreaTaller)*(height - 1.37)^(b2)), acma2022, 
+  #                                                              start = list(a1 = 1.1, b1 = 1.2, b1aat = -0.003, b2 = 0), distinct = FALSE) # 10x10 RMSE 6.40, AIC 1673
+  #acmaDiameterFromHeight$sibbesenReplaceAbatA1batB2aba = fit_gsl_nls("Sibbesen replace ABA+T", dbh ~ (a1 + a1aat * basalAreaTaller)*(height - 1.37)^((b1)*(height - 1.37)^(b2 + b2aba * bootstrapStandBasalAreaPerHectare)), acma2022, 
+  #                                                                   start = list(a1 = 1.4, a1aat = -0.01, b1 = 1.0, b2 = 0, b2aba = -0.0007), distinct = FALSE) # a1aat-b2aba not mutually significant, 10x10 RMSE 6.30, AIC 1698
+  acmaDiameterFromHeight$sibbesenReplaceAbatPhysio = fit_gsl_nls("Sibbesen replace ABA+T physio", dbh ~ (a1)*(height - 1.37)^((b1 + b1tw * topographicWetnessFD8f)*(height - 1.37)^(b2 + b2aat * basalAreaTaller)), acma2022, 
+                                                                 start = list(a1 = 1.3, b1 = 1, b1tw = 0.02, b2 = 0, b2aat = -0.001), distinct = FALSE) # a1aat-b2aba not mutually significant, b2 not significant
+  acmaDiameterFromHeight$sibbesenReplaceAbatPhysioRelHt = fit_gsl_nls("Sibbesen replace RelHt ABA+T physio", dbh ~ (a1)*(height - 1.37)^((b1 + b1tw * topographicWetnessFD8f)*(height - 1.37)^(b2 + b2rh * relativeHeight + b2aba * bootstrapStandBasalAreaPerHectare)), acma2022, 
+                                                                      start = list(a1 = 1.3, b1 = 0.7, b1tw = 0.01, b2 = 0.2, b2aba = -0.001, b2rh = -0.05)) # all parameters significant
+  acmaDiameterFromHeight$sibbesenReplaceAbatRelHt = fit_gsl_nls("Sibbesen replace RelHt ABA+T", dbh ~ (a1)*(height - 1.37)^(b1*(height - 1.37)^(b2 + b2rh * relativeHeight + b2aat * basalAreaTaller)), acma2022, 
+                                                                start = list(a1 = 1.3, b1 = 0.7, b2 = 0.2, b2aat = -0.001, b2rh = -0.05)) # b2aba-b2aat, b2aba-b2rh not mutually significant, 10x10 RMSE 10.9, AIC 1627
+  acmaDiameterFromHeight$sibbesenReplacePhysio = fit_gsl_nls("Sibbesen replace physio", dbh ~ a1*(height - 1.37)^((b1 + b1tw * topographicWetnessFD8f)*(height - 1.37)^b2), acma2022, 
+                                                             start = list(a1 = 1.3, b1 = 1, b1tw = 0.02, b2 = 0), distinct = FALSE) # b2 not significant
+  acmaDiameterFromHeight$sibbesenReplaceRelHt = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ a1*(height - 1.37)^(b1*(height - 1.37)^(b2 + b2rh * relativeHeight)), acma2022, 
+                                                            start = list(a1 = 1.3, b1 = 1, b2 = 0, b2rh = 0), distinct = FALSE) # a1rh, b1rh, b2rh not significant
+  #acmaDiameterFromHeight$sibbesenReplaceRelHt = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ a1*(height - 1.37)^(b1*(relativeHeight*(height - 1.37))^b2), acma2022, 
+  #                                                          start = list(a1 = 1.3, b1 = 1, b2 = 0), distinct = FALSE) # b2 not significant
+  #acmaDiameterFromHeight$sibbesenReplaceRelHt = fit_gsl_nls("Sibbesen replace RelHt", dbh ~ a1*(relativeHeight*(height - 1.37))^(b1*(height - 1.37)^b2), acma2022, 
+  #                                                          start = list(a1 = 5, b1 = 0.5, b2 = 0.1)) # 10x10 RMSE 12.0, AIC 1679
+  acmaDiameterFromHeight$sibbesenReplaceRelHtPhysio = fit_gsl_nls("Sibbesen replace RelHt physio", dbh ~ a1*(height - 1.37)^((b1 + b1rh * relativeHeight + b1tw * topographicWetnessFD8f)*(height - 1.37)^b2), acma2022, 
+                                                                  start = list(a1 = 1.3, b1 = 1, b1rh = 0, b1tw = 0.02, b2 = 0), distinct = FALSE) # b1rh not significant, also by propagation
+  acmaDiameterFromHeight$weibull = fit_gsl_nls("Weibull inverse", dbh ~ (a1*log(1 - pmin(b1*(height - 1.37), 0.9999)))^b2, acma2022, 
+                                               start = list(a1 = -30, b1 = 0.07, b2 = 0.63)) # a1p, b1p, b2p not significant
   #print(to_parameter_confidence_intervals(acmaDiameterFromHeight$weibull), n = 24)
   #to_fixed_coeffficients(acmaDiameterFromHeight$weibull)
   #acmaDiameterFromHeight$sibbesenReplaceAbatRelHt$validation %>% summarize(rmseMin = min(rmse), rmseMedian = median(rmse), rmseMean = mean(rmse), rmseMax = max(rmse), aicMin = min(aic), aicMedian = median(aic), aicMean = mean(aic), aicMax = max(aic))
@@ -452,7 +574,7 @@ if (acmaOptions$fitDbhMixed)
   acmaDiameterFromHeightMixed$michaelisMentenReplaceRelHt = create_fit_statistics(name = "Michaelis-Menten replace RelHt", fitting = "nlme", distinct = FALSE)
   acmaDiameterFromHeightMixed$naslund = fit_nlme("Näslund inverse", dbh ~ (a1 + a1p * isPlantation) * (1 + a1rm) * sqrt(height - 1.37) / (1 + (a2 + a2p * isPlantation) * sqrt(height - 1.37)), acma2022, # a2rm max iterations, 10x10 RMSE 12.7, AIC 1812
                                                  fixedFormula = a1 + a1p + a2 + a2p ~ 1, randomFormula = a1rm ~ 1|stand/plot,
-                                                 start = list(fixed = c(a1 = 3, a1p = -1, a2 = -0.12, a2p = -0.02)))
+                                                 start = list(fixed = c(a1 = 3, a1p = -1, a2 = -0.12, a2p = -0.02))) # 10x10, 10x25, 10x50 observation step halving
   #acmaDiameterFromHeightMixed$naslund = fit_nlme("Näslund inverse", dbh ~ (a1 + a1p * isPlantation + a1ra) * sqrt(height - 1.37) / (1 + (a2 + a2p * isPlantation) * sqrt(height - 1.37)), acma2022, # a2ra max iterations, 10x10 RMSE 14.1, AIC 1796
   #                                               fixedFormula = a1 + a1p + a2 + a2p ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                               start = list(fixed = c(a1 = 3, a1p = -1, a2 = -0.12, a2p = -0.02)))
@@ -568,10 +690,9 @@ if (acmaOptions$fitDbhMixed)
   acmaDiameterFromHeightMixed$weibull = fit_nlme("Weibull inverse", dbh ~ (a1 * log(1 - pmin((b1)*(height - 1.37), 0.9999)))^(b2*(1 + b2rm)), acma2022, # 10x10 RMSE 12.4, AIC 1690
                                                  fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b2rm ~ 1|stand/plot,
                                                  start = list(fixed = c(a1 = -40, b1 = 0.07, b2 = 0.63)))
-  #acmaDiameterFromHeightMixed$weibull = tryCatch({ fit_nlme("Weibull inverse", dbh ~ (a1 * log(1 - pmin((b1 + b1ra)*(height - 1.37), 0.9999)))^b2, acma2022, # a1ra singularity in backsolve, b1ra 2x50 job step halving, b2ra step halving, 10x10 RMSE 12.6, AIC 1736
-  #                                                          fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
-  #                                                          start = list(fixed = c(a1 = -30, b1 = 0.07, b2 = 0.63))) },
-  #                                               error = function(e) { reset_future(); return(create_fit_statistics("Weibull inverse", fittingMethod = "nlme")) })
+  #acmaDiameterFromHeightMixed$weibull = fit_nlme("Weibull inverse", dbh ~ (a1 * log(1 - pmin((b1 + b1ra)*(height - 1.37), 0.9999)))^b2, acma2022, # a1ra singularity in backsolve, b1ra 2x50 job step halving, b2ra step halving, 10x10 RMSE 12.6, AIC 1736
+  #                                               fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
+  #                                               start = list(fixed = c(a1 = -30, b1 = 0.07, b2 = 0.63)))
   #acmaDiameterFromHeightMixed$weibullB1 = fit_nlme("Weibull inverse", dbh ~ (a1 * log(1 - pmin((b1*(1 + b1rm))*(height - 1.37), 0.9999)))^b2, acma2022, # a1rm step halving, 10x10 RMSE 12.5, AIC 1688
   #                                                 fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b1rm ~ 1|stand/plot,
   #                                                 start = list(fixed = c(a1 = -40, b1 = 0.07, b2 = 0.63)))
@@ -635,18 +756,41 @@ if (acmaOptions$fitHeight & acmaOptions$fitHeightMixed & acmaOptions$fitDbh & ac
 ## preferred forms identified (results.R, Figure 7)
 if (acmaOptions$recalcPreferredModels)
 {
-  acmaHeightFromDiameterPreferred = list(chapmanRichards = fit_gsl_nls("Chapman-Richards", height ~ 1.37 + a1*(1 - exp(b1*dbh))^b2, acma2022, start = list(a1 = 27, b1 = -0.06, b2 = 1.1), folds = 1, repetitions = 1))
-  acmaHeightFromDiameterPreferred$michaelisMenten = fit_gsl_nls("Michaelis-Menten", height ~ 1.37 + a1*dbh^b1 / (a2 + dbh^b1), acma2022, start = list(a1 = 33, a2 = 30, b1 = 1.1), folds = 1, repetitions = 1)
-  acmaHeightFromDiameterPreferred$power = fit_gsl_nls("power", height ~ 1.37 + a1*dbh^b1, acma2022, start = list(a1 = 2.0, b1 = 0.66), folds = 1, repetitions = 1)
+  # 10x10 model selections
+  # responseVariable species       maeName       rmseName                 aicName                  nseName                  isGam isRandomForest maeFitting rmseFitting aicFitting nseFitting
+  # height           bigleaf maple Prodan        Weibull                  Hossfeld IV              Weibull                      0              0 gsl_nls    gsl_nls     gsl_nls    gsl_nls   
+  # DBH              bigleaf maple REML GAM      random forest            Schnute inverse          random forest                1              2 gam        ranger      gsl_nls    ranger 
+  #acmaHeightFromDiameterPreferred = list(chapmanRichards = fit_gsl_nls("Chapman-Richards", height ~ 1.37 + a1*(1 - exp(b1*dbh))^b2, acma2022, start = list(a1 = 27, b1 = -0.06, b2 = 1.1), folds = 1, repetitions = 1))
+  acmaHeightFromDiameterPreferred = list(hossfeld = fit_gsl_nls("Hossfeld IV", height ~ 1.37 + a1 / (1 + a2 * dbh^b1), acma2022, start = list(a1 = 32, a2 = 33, b1 = -1.2), folds = 1, repetitions = 1))
+  #acmaHeightFromDiameterPreferred$michaelisMenten = fit_gsl_nls("Michaelis-Menten", height ~ 1.37 + a1*dbh^b1 / (a2 + dbh^b1), acma2022, start = list(a1 = 33, a2 = 30, b1 = 1.1), folds = 1, repetitions = 1)
+  #acmaHeightFromDiameterPreferred$power = fit_gsl_nls("power", height ~ 1.37 + a1*dbh^b1, acma2022, start = list(a1 = 2.0, b1 = 0.66), folds = 1, repetitions = 1)
+  acmaHeightFromDiameterPreferred$prodan = fit_gsl_nls("Prodan", height ~ 1.37 + dbh^2 / (a1 * dbh^2 + (a2 + a2p * isPlantation)*dbh + a3), acma2022, start = list(a1 = 0.024, a2 = 1.27, a2p = -0.23, a3 = -0.19), folds = 1, repetitions = 1)
   acmaHeightFromDiameterPreferred$sharmaZhangBal = fit_nlme("Sharma-Zhang BA+L", height ~ 1.37 + a1*standBasalAreaPerHectare^(b1 + b1ra) * (1 - exp((b2 + b2ba * standBasalAreaPerHectare)*standTreesPerHectare^b3*dbh))^b4, acma2022,
                                                             fixedFormula = a1 + b1 + b2 + b2ba + b3 + b4 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
                                                             start = list(fixed = c(a1 = 7, b1 = 0.3, b2 = -0.05, b2ba = 0.0003, b3 = 0.1, b4 = 1.0)), folds = 1, repetitions = 1)
+  acmaHeightFromDiameterPreferred$weibull = fit_gsl_nls("Weibull", height ~ 1.37 + (a1)*(1 - exp(b1*dbh^b2)), acma2022, start = list(a1 = 27, b1 = -0.04, b2 = 1.0), folds = 1, repetitions = 1)
   saveRDS(acmaHeightFromDiameterPreferred, "trees/height-diameter/data/ACMA3 preferred height models.Rds")
 
-  acmaDiameterFromHeightPreferred = list(power = fit_gsl_nls("power", dbh ~ a1*(height - 1.37)^b1, acma2022, start = list(a1 = 0.8, b1 = 1.2), folds = 1, repetitions = 1))
-  acmaDiameterFromHeightPreferred$powerPhysio = fit_gsl_nls("power physio", dbh ~ a1*(height - 1.37)^(b1 + b1tw * topographicWetnessFD8f), acma2022, start = list(a1 = 0.8, b1 = 1.1, b1tw = 0.02), folds = 1, repetitions = 1)
+  acmaDiameterFromHeightPreferred = list(gam = fit_gam("REML GAM", dbh ~ I(0.750 * height^1.263) + s(height, bs = "ts", by = as.factor(isPlantation), k = 7), data = acma2022, folds = 1, repetitions = 1))
+  #acmaDiameterFromHeightPreferred = list(power = fit_gsl_nls("power", dbh ~ a1*(height - 1.37)^b1, acma2022, start = list(a1 = 0.8, b1 = 1.2), folds = 1, repetitions = 1))
+  #acmaDiameterFromHeightPreferred$powerPhysio = fit_gsl_nls("power physio", dbh ~ a1*(height - 1.37)^(b1 + b1tw * topographicWetnessFD8f), acma2022, start = list(a1 = 0.8, b1 = 1.1, b1tw = 0.02), folds = 1, repetitions = 1)
   acmaDiameterFromHeightPreferred$randomForest = fit_ranger("random forest", c("dbh", "height"), acma2022, mtry = 1, minNodeSize = 112, sampleFraction = 0.359, folds = 1, repetitions = 1)
+  acmaDiameterFromHeightPreferred$randomForestAbatRelHtPhysio = fit_ranger("random forest RelHt ABA+T physio", c("dbh", "height", "relativeHeight", "topHeight", "basalAreaTaller", "bootstrapStandBasalAreaPerHectare", "topographicWetnessFD8f", "terrainRoughness", "aspect"), # from setup.R VSURF
+                                                                           acma2022, mtry = 2, minNodeSize = 3, sampleFraction = 0.586, folds = 1, repetitions = 1)
+  acmaDiameterFromHeightPreferred$schnute = fit_gsl_nls("Schnute inverse", dbh ~ -1/a1 * log(1 - (1 - exp(-a2))*(height^b1 - 1.37^b1)/(Ha^b1 - 1.37^b1)), acma2022, start = list(a1 = 0.000003, a2 = 0.002, b1 = 1.3, Ha = 161), folds = 1, repetitions = 1)
   saveRDS(acmaDiameterFromHeightPreferred, "trees/height-diameter/data/ACMA3 preferred diameter models.Rds")
+}
+
+
+## error residual distributions
+if (htDiaOptions$includeInvestigatory)
+{
+  acmaDbhGam = gam(dbh ~ I(0.750 * height^1.263) + s(height, bs = "ts", by = as.factor(isPlantation), k = 7), data = acma2022)
+  ggplot() +
+    geom_point(aes(x = relativeHeight, y = (dbh - residuals(acmaDbhGam)) / dbh), acma2022, alpha = 0.1, shape = 16) +
+    geom_smooth(aes(x = relativeHeight, y = (dbh - residuals(acmaDbhGam)) / dbh), acma2022, formula = y ~ x, method = "loess") + # GAM linear, loess kinked linear
+    coord_cartesian(ylim = c(0, 2)) +
+    labs(x = "relative height", y = "scale error")
 }
 
 

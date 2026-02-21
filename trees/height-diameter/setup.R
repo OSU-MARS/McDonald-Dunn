@@ -21,6 +21,7 @@ plotLetters = c("(a)", "(b)", "(c)", "(d)", "(e)", "(f)", "(g)", "(h)", "(i)", "
 
 htDiaOptions = tibble(folds = 10,
                       repetitions = 10,
+                      crossValidationBalance = "observations", # group (random stand selection without tree count stabilization) or observations (reduces standard deviation of fold size by an order of magnitude on Douglas fir and by ~3x for other species but increases overall runtime by ~40% due to more complex fold setup), passed directly as  group_vfold_cv(balance = htDiaOptions$crossValidationBalance)
                       includeInvestigatory = FALSE, # default to not running plotting and other add ons from background jobs
                       includeSetup = FALSE,
                       rangerThreads = 0.5 * future::availableCores(), # actually available threads, assume all cores hyperthreaded (Ryzen) by default
@@ -255,7 +256,8 @@ fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOption
     return(get_fit_return_value(gamModel, fitStatistics, returnModel))
   }
   
-  splitsAndFits = rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand) %>% mutate(fit = furrr::future_map(splits, fit_gam_fold, .options = furrr::furrr_options(seed = TRUE)))
+  splitsAndFits = rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand, balance = htDiaOptions$crossValidationBalance) %>% 
+    mutate(fit = furrr::future_map(splits, fit_gam_fold, .options = furrr::furrr_options(seed = TRUE)))
   return(get_cross_validation_return_value(splitsAndFits, returnModel))
 }
 
@@ -319,8 +321,14 @@ fit_gsl_nls = function(name, formula, data, start, control = gsl_nls_control(max
     return(get_fit_return_value(nonlinearModel, fitStatistics, returnModel))
   }
 
-  splitsAndFits = rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand) %>% mutate(fit = furrr::future_map(splits, fit_gsl_nls_fold))
-  return(get_cross_validation_return_value(splitsAndFits, returnModel))
+  return(tryCatch({ splitsAndFits = rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand, balance = htDiaOptions$crossValidationBalance) %>% 
+                                      mutate(fit = furrr::future_map(splits, fit_gsl_nls_fold))
+                    return(get_cross_validation_return_value(splitsAndFits, returnModel)) },
+                  error = function(e) { 
+                    print(e)
+                    reset_future()
+                    create_fit_statistics(name, fittingMethod = "gsl_nls") 
+                  }))
 }
 
 fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
@@ -400,7 +408,8 @@ fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions =
     }
   }
   
-  splitsAndFits = rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand) %>% mutate(fit = furrr::future_map(splits, fit_lm_fold))
+  splitsAndFits = rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand, balance = htDiaOptions$crossValidationBalance) %>% 
+    mutate(fit = furrr::future_map(splits, fit_lm_fold))
   return(get_cross_validation_return_value(splitsAndFits, returnModel))
 }
 
@@ -469,10 +478,12 @@ fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start
   
   # nlme is increasingly prone to step halving and iteration runaway as number of folds decreases
   # Rather than require error handling by all callers, just return fit failed here.
-  return(tryCatch({ splitsAndFits = rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand) %>% mutate(fit = furrr::future_map(splits, fit_nlme_fold))
+  return(tryCatch({ splitsAndFits = rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand, balance = htDiaOptions$crossValidationBalance) %>% 
+                      mutate(fit = furrr::future_map(splits, fit_nlme_fold))
                     return(get_cross_validation_return_value(splitsAndFits, returnModel)) },
                   error = function(e) { 
                     print(e)
+                    reset_future()
                     create_fit_statistics(name, fittingMethod = "nlme") 
                     }))
 }
@@ -539,7 +550,8 @@ fit_ranger = function(name, variables, data, trees = htDiaOptions$rangerTrees, m
     return(get_fit_return_value(forest, fitStatistics, returnModel))
   }
   
-  splitsAndFits = rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand) %>% mutate(fit = purrr::map(splits, fit_ranger_fold))
+  splitsAndFits = rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand, balance = htDiaOptions$crossValidationBalance) %>% 
+    mutate(fit = purrr::map(splits, fit_ranger_fold))
   return(get_cross_validation_return_value(splitsAndFits, returnModel))
 }
 
@@ -714,93 +726,158 @@ get_goodness_of_fit_statistics = function(data, predicted, measured, weights, es
   return(fitStatistics)
 }
 
-plot_auc_bank = function(aucs, fillLabel = "median AUC", omitMab = FALSE, xLimits = c("Douglas-fir", "grand fir", "bigleaf maple", "other species"), legendHjustification = 1.8, plotRightMargin = 8)
+plot_auc_bank = function(aucs1, aucs2 = NULL, generalized = FALSE, fillLabel = "median AUC", xLimits = c("Douglas-fir", "grand fir", "bigleaf maple", "other species"), nPreferredModelBoxes = 2, legendHjustification = 1.8, plotRightMargin = 8, bounds = FALSE)
 {
   aucColorbarTheme = theme(legend.key.width = unit(6.5, "lines"), legend.title = element_text(size = 9, vjust = 0.85))
-  if (omitMab)
+  if (generalized)
+  {
+    nameAndFitToDisplay1 = unique((aucs1 %>% filter(isBaseForm == FALSE, (isMixed == FALSE) | isMixedGeneralizedDisplay) %>% group_by(nameAndFit) %>% filter(any(distinct)))$nameAndFit) # exclude mixed models unless preferred and generalizations which are never distinct
+    nameAndFitToDisplay2 = unique((aucs2 %>% filter(isBaseForm == FALSE, (isMixed == FALSE) | isMixedGeneralizedDisplay) %>% group_by(nameAndFit) %>% filter(any(distinct)))$nameAndFit)
+  } else {
+    nameAndFitToDisplay1 = unique((aucs1 %>% filter(isBaseForm))$nameAndFit)
+    nameAndFitToDisplay2 = unique((aucs2 %>% filter(isBaseForm))$nameAndFit)
+  }
+  yAxisLimits = intersect(rev(levels(aucs1$nameAndFit)), unique(c(nameAndFitToDisplay1, nameAndFitToDisplay2))) # filter to consistent y axis since drop = FALSE is used to ensure consistency between auc1 and auc2 plots (using $ operator on NULL just propagates the NULL)
+  
+  # avoid ggplot warnings on axis limits suppressing display of data
+  aucsToDisplay1 = aucs1 %>% filter(nameAndFit %in% yAxisLimits)
+  if (bounds)
   {
     aucBank = ggplot() +
-        geom_tile(aes(x = species, y = nameAndFit, fill = aucMae), aucs) +
-        labs(fill = fillLabel) +
-        scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
-        ggnewscale::new_scale_fill() +
-        geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucs) +
-        scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), guide = guide_legend(order = 2)) +
-        geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucs %>% filter(if_else(isBaseForm, aucMaeRank <= 2, aucMaeRank <= 2)), fill = "transparent") +
-        labs(title = bquote(.(plotLetters[1])~"MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-        #labs(title = bquote(bold(.(plotLetters[1]))~"MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-        scale_y_discrete(limits = rev)
-    letterOffset = 1
-  } else {
-    aucBank = ggplot() +
-        geom_tile(aes(x = species, y = nameAndFit, fill = aucMab), aucs) +
-        labs(fill = fillLabel) +
-        scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
-        ggnewscale::new_scale_fill() +
-        geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucs) +
-        scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-        geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucs %>% filter(if_else(isBaseForm, aucMabRank <= 2, aucMabRank <= 2)), fill = "transparent") +
-        labs(title = bquote(.(plotLetters[1])~"MAB"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-        #labs(title = bquote(bold(.(plotLetters[1]))~"MAB"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-        scale_y_discrete(limits = rev) +
-      ggplot() +
-        geom_tile(aes(x = species, y = nameAndFit, fill = aucMae), aucs) +
-        labs(fill = fillLabel) +
-        scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
-        ggnewscale::new_scale_fill() +
-        geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucs) +
-        geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucs %>% filter(if_else(isBaseForm, aucMaeRank <= 2, aucMaeRank <= 2)), fill = "transparent") +
-        scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-        labs(title = bquote(.(plotLetters[2])~"MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-        #labs(title = bquote(bold(.(plotLetters[2]))~"MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-        scale_y_discrete(labels = NULL, limits = rev)
-    letterOffset = 2
-  }
-
-  aucBank = aucBank +
-    ggplot() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = aucRmse), aucs) +
+      geom_tile(aes(x = species, y = nameAndFit, fill = aucOutOfRange), aucsToDisplay1) + 
       labs(fill = fillLabel) +
       scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
       ggnewscale::new_scale_fill() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucs) +
-      geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucs %>% filter(if_else(isBaseForm, aucRmseRank <= 2, aucRmseRank <= 2)), fill = "transparent") +
+      geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
       scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-      labs(title = bquote(.(plotLetters[letterOffset + 1])~"RMSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-      #labs(title = bquote(bold(.(plotLetters[letterOffset + 1]))~"RMSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-      scale_y_discrete(labels = NULL, limits = rev) +
+      #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucOutOfRangeRank <= nPreferredModelBoxes, aucOutOfRangeRank <= nPreferredModelBoxes)), fill = "transparent") +
+      labs(title = paste0(plotLetters[1], " ", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1]), x = NULL, y = NULL, color = NULL, fill = NULL) +
+      scale_y_discrete(limits = yAxisLimits, drop = FALSE)
+    
+    if (is.null(aucs2) == FALSE)
+    {
+      aucsToDisplay2 = aucs2 %>% filter(nameAndFit %in% yAxisLimits)
+      aucBank = aucBank + 
+        ggplot() +
+          geom_tile(aes(x = species, y = nameAndFit, fill = aucOutOfRange), aucsToDisplay2) +
+          labs(fill = fillLabel) +
+          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
+          ggnewscale::new_scale_fill() +
+          geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2) +
+          scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+          #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucOutOfRangeRank <= nPreferredModelBoxes, aucOutOfRangeRank <= nPreferredModelBoxes)), fill = "transparent") +
+          labs(title = paste0(plotLetters[2], " ", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1]), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE)
+    }
+  } else {
+    aucBank = ggplot() +
+      geom_tile(aes(x = species, y = nameAndFit, fill = aucMae), aucsToDisplay1) +
+      labs(fill = fillLabel) +
+      scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
+      ggnewscale::new_scale_fill() +
+      geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
+      geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucMaeRank <= nPreferredModelBoxes, aucMaeRank <= nPreferredModelBoxes)), fill = "transparent") +
+      scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+      #labs(title = paste0("**", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1], " ", aucsToDisplay1$responseVariable[1], "**<br>", plotLetters[1], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+      labs(title = paste0("**", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1], " ", aucsToDisplay1$responseVariable[1], "**"), subtitle  = paste0(plotLetters[1], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+      scale_y_discrete(limits = yAxisLimits, drop = FALSE) +
     ggplot() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = aucDeltaAicN), aucs) +
+      geom_tile(aes(x = species, y = nameAndFit, fill = aucRmse), aucsToDisplay1) +
+      labs(fill = fillLabel) +
+      scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
+      ggnewscale::new_scale_fill() +
+      geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
+      geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucRmseRank <= nPreferredModelBoxes, aucRmseRank <= nPreferredModelBoxes)), fill = "transparent") +
+      scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+      #labs(title = paste0("<br>", plotLetters[2], " RMSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+      labs(subtitle = paste0(plotLetters[2], " RMSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+      scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE) +
+    ggplot() +
+      geom_tile(aes(x = species, y = nameAndFit, fill = aucDeltaAicN), aucsToDisplay1) +
       labs(fill = fillLabel) +
       scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "grey70") +
       ggnewscale::new_scale_fill() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucs) +
-      geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucs %>% filter(if_else(isBaseForm, aucDeltaAicNRank <= 2, aucDeltaAicNRank <= 2)), fill = "transparent") +
+      geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
+      geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucDeltaAicNRank <= nPreferredModelBoxes, aucDeltaAicNRank <= nPreferredModelBoxes)), fill = "transparent") +
       scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-      labs(title = bquote(.(plotLetters[letterOffset + 2])~"ΔAICn"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-      #labs(title = bquote(bold(.(plotLetters[letterOffset + 2]))~"ΔAICn"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-      scale_y_discrete(labels = NULL, limits = rev) +
+      #labs(title = paste0("<br>", plotLetters[3], " ΔAICn"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+      labs(subtitle = paste0(plotLetters[3], " ΔAICn"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+      scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE) +
     ggplot() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = aucNse), aucs) +
+      geom_tile(aes(x = species, y = nameAndFit, fill = aucNse), aucsToDisplay1) +
       labs(fill = fillLabel) +
       scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
       ggnewscale::new_scale_fill() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucs) +
-      geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucs %>% filter(if_else(isBaseForm, aucNseRank <= 2, aucNseRank <= 2)), fill = "transparent") +
+      geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
+      geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucNseRank <= nPreferredModelBoxes, aucNseRank <= nPreferredModelBoxes)), fill = "transparent") +
       scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-      labs(title = bquote(.(plotLetters[letterOffset + 3])~"model efficiency"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-      #labs(title = bquote(bold(.(plotLetters[letterOffset + 3]))~"model efficiency"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-      scale_y_discrete(labels = NULL, limits = rev) +
+      #labs(title = paste0("<br>", plotLetters[4], " NSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+      labs(subtitle = paste0(plotLetters[4], " NSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+      scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE)
+  
+    if (is.null(aucs2) == FALSE)
+    {
+      # have to repeat all the code as patchwork treats a group of plots returned by a function as being nested within a plot, failing to honor plot_layout(nrow, widths)
+      aucsToDisplay2 = aucs2 %>% filter(nameAndFit %in% yAxisLimits)
+      aucBank = aucBank +
+        ggplot() +
+          geom_tile(aes(x = species, y = nameAndFit, fill = aucMae), aucsToDisplay2) +
+          labs(fill = fillLabel) +
+          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
+          ggnewscale::new_scale_fill() +
+          geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2) +
+          geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucMaeRank <= nPreferredModelBoxes, aucMaeRank <= nPreferredModelBoxes)), fill = "transparent") +
+          scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+          #labs(title = paste0("**", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1], " ", aucsToDisplay2$responseVariable[1], "**<br>", plotLetters[5], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          labs(title = paste0("**", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1], " ", aucsToDisplay2$responseVariable[1], "**"), subtitle = paste0(plotLetters[5], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE) +
+        ggplot() +
+          geom_tile(aes(x = species, y = nameAndFit, fill = aucRmse), aucsToDisplay2) +
+          labs(fill = fillLabel) +
+          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
+          ggnewscale::new_scale_fill() +
+          geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2) +
+          geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucRmseRank <= nPreferredModelBoxes, aucRmseRank <= nPreferredModelBoxes)), fill = "transparent") +
+          scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+          #labs(title = paste0("<br>", plotLetters[6], " RMSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          labs(subtitle = paste0(plotLetters[6], " RMSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE) +
+        ggplot() +
+          geom_tile(aes(x = species, y = nameAndFit, fill = aucDeltaAicN), aucsToDisplay2) +
+          labs(fill = fillLabel) +
+          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "grey70") +
+          ggnewscale::new_scale_fill() +
+          geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2) +
+          geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucDeltaAicNRank <= nPreferredModelBoxes, aucDeltaAicNRank <= nPreferredModelBoxes)), fill = "transparent") +
+          scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+          #labs(title = paste0("<br>", plotLetters[7], " ΔAICn"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          labs(subtitle = paste0(plotLetters[7], " ΔAICn"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE) +
+        ggplot() +
+          geom_tile(aes(x = species, y = nameAndFit, fill = aucNse), aucsToDisplay2) +
+          labs(fill = fillLabel) +
+          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
+          ggnewscale::new_scale_fill() +
+          geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2) +
+          geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucNseRank <= nPreferredModelBoxes, aucNseRank <= nPreferredModelBoxes)), fill = "transparent") +
+          scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+          #labs(title = paste0("<br>", plotLetters[10], " NSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          labs(subtitle = paste0(plotLetters[10], " NSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE)
+    }
+  }
+  
+  aucBank = aucBank +
     plot_annotation(theme = theme(plot.margin =  margin())) +
     plot_layout(nrow = 1, guides = "collect") &
       guides(color = guide_legend(override.aes = list(linewidth = 0.5)), linewidth = "none") &
       scale_color_manual(breaks = c(FALSE, TRUE), labels = c("preferred\ngeneralization", "preferred\nbase form"), values = c("dodgerblue", "grey25")) &
       scale_linewidth_manual(breaks = c(FALSE, TRUE), values = c(0.3, 0.2)) &
       scale_x_discrete(limits = xLimits) &
-      #scale_x_discrete(labels = c("PSME", "ALRU", "TSHE", "ACMA", "UMCA", "THPL", "other"), limits = c("Douglas-fir", "red alder", "western hemlock", "bigleaf maple", "Oregon myrtle", "western redcedar", "other species")) &
       theme(axis.text.x = element_text(angle = 90, size = 10, hjust = 1, vjust = 0.5), axis.text.y = element_text(size = 10),
             legend.position = "bottom", legend.spacing.y = unit(0.4, "line"), legend.justification = c(legendHjustification, 0.5), legend.title = element_text(size = 11),
-            panel.grid = element_blank(), plot.margin = margin(r = plotRightMargin), plot.title = element_text(margin = margin(b = 0.5)))
+            panel.grid = element_blank(), 
+            plot.margin = margin(r = plotRightMargin), plot.subtitle = element_text(margin = margin(b = 1), size = 9), plot.title = ggtext::element_markdown(margin = margin(b = 2)))
   
   return(aucBank)
 }
@@ -946,6 +1023,10 @@ plots2022 = st_drop_geometry(st_read("GIS/McDonald-Dunn.gpkg", layer = "inventor
 #plots2022 %<>% group_by(STAND) %>% arrange(PlotID) %>% mutate(fvsPlotID = row_number())
 #st_write(plots2022, dsn = "GIS/McDonald-Dunn.gpkg", layer = "inventory plots 2019 2020", append = FALSE)
 
+# 309 stands -> 2^309 = 10^93 possible foldings for k = 2 blocked cross validation with stands assigned randomly without balance
+#               10^309 possible foldings for k = 10
+# group_vfold_cv() defaults to balance = "groups" (by way of rlang::arg_match() taking the first element of balance = c("groups", "observations")), 
+# which is random assignment by stand.
 trees2022 = read_xlsx("inventory/FVS.xlsx", sheet = "FVS_TreeInit") %>% 
   select(-New_ID, -STANDPLOT_ID, -TAG_ID, -DIAMETER_HT, -DG, -HTG, -HT_TO_LIVE_CROWN, -DAMAGE2, -SEVERITY2, -DAMAGE3, -SEVERITY3, -DEFECT_CUBIC, -DEFECT_BOARD, -TREEVALUE, -PRESCRIPTION, -PV_CODE, -PV_REF_CODE, -TOPOCODE, -SLOPE, -ASPECT, -SITEPREP) %>%
   rename(stand = STAND_ID, plot = PLOT_ID, tree = TREE_ID, species = SPECIES, treeCount = TREE_COUNT, dbh = DIAMETER, height = HT, heightTopKill = HTTOPK, crownRatio = CRRATIO, age = AGE, history = HISTORY, damage = DAMAGE1, severity = SEVERITY1) %>%
@@ -1478,7 +1559,7 @@ if (htDiaOptions$includeInvestigatory)
   
   # ranger fits for variable importance across all candidate variables using tunings below
   heightImportance = ranger(height ~ ., data = variableImportanceTrees2022 %>% filter(is.na(inventoryAge) == FALSE) %>% select(all_of(heightCandidateVariables)),
-                            importance = "impurity_corrected", # https://github.com/imbs-hl/ranger/issues/664
+                            importance = "permutation", # for consistency with permutation importance plus impurity seems to overestimate, https://scikit-learn.org/stable/auto_examples/inspection/plot_permutation_importance.html
                             mtry = 2, splitrule = 'variance', min.node.size = 2, sample.fraction = 0.827,
                             num.threads = htDiaOptions$rangerThreads)
   heightImportance = tibble(predictor = names(heightImportance$variable.importance), relativeImportance = 100 * heightImportance$variable.importance / max(heightImportance$variable.importance)) %>% 
@@ -1496,7 +1577,7 @@ if (htDiaOptions$includeInvestigatory)
     arrange(desc(weightedMean))
   
   dbhImportance = ranger(dbh ~ ., data = variableImportanceTrees2022 %>% select(all_of(allDbhVariables)),
-                         importance = "impurity_corrected", # https://github.com/imbs-hl/ranger/issues/664
+                         importance = "permutation",
                          mtry = 2, splitrule = 'variance', min.node.size = 2, sample.fraction = 0.741,
                          num.threads = htDiaOptions$rangerThreads)
   dbhImportance = tibble(predictor = names(dbhImportance$variable.importance), relativeImportance = 100 * dbhImportance$variable.importance / max(dbhImportance$variable.importance)) %>% 
@@ -1515,23 +1596,23 @@ if (htDiaOptions$includeInvestigatory)
   
   ggplot() +
     geom_tile(aes(x = "all species", y = predictor, fill = relativeImportance), heightImportance) +
-    labs(x = NULL, y = NULL, fill = "relative\nimportance", title = paste(plotLetters[1], "height prediction importance")) +
+    labs(x = NULL, y = NULL, fill = "relative\nimportance", title = paste(plotLetters[1], "height prediction")) +
     scale_y_discrete(limits = rev) +
   ggplot() +
     geom_tile(aes(x = speciesModel, y = predictor, fill = relativeImportance), heightLocalImportance %>% select(-weightedMean) %>% pivot_longer(cols = -predictor, names_to = "speciesModel", values_to = "relativeImportance")) +
     labs(x = NULL, y = NULL, fill = "relative\nimportance") +
-    scale_x_discrete(limits = c("PSME", "ACMA", "ABGR", "other"), labels = c("Douglas-fir", "bigleaf maple", "grand fir", "other species")) +
+    scale_x_discrete(limits = c("PSME", "ABGR", "ACMA", "other"), labels = c("Douglas-fir", "grand fir", "bigleaf maple", "other species")) +
     scale_y_discrete(limits = rev, labels = NULL) +
     theme(axis.line.y = element_blank(), axis.ticks.y = element_blank()) +
   ggplot() +
     geom_tile(aes(x = "all species", y = predictor, fill = relativeImportance), dbhImportance) +
-    labs(x = NULL, y = NULL, fill = "relative\nimportance", title = paste(plotLetters[2], "DBH prediction importance")) +
+    labs(x = NULL, y = NULL, fill = "relative\nimportance", title = paste(plotLetters[2], "DBH prediction")) +
     scale_y_discrete(limits = rev) +
   ggplot() +
     geom_tile(aes(x = speciesModel, y = predictor, fill = relativeImportance), dbhLocalImportance %>% select(-weightedMean) %>% pivot_longer(cols = -predictor, names_to = "speciesModel", values_to = "relativeImportance")) +
     labs(x = NULL, y = NULL, fill = "relative\nimportance") +
-    scale_x_discrete(limits = c("PSME", "ACMA", "ABGR", "other"), labels = c("Douglas-fir", "bigleaf maple", "grand fir", "other species")) +
-    scale_y_discrete(limits = rev, labels = NULL) +
+    scale_x_discrete(limits = c("PSME", "ABGR", "ACMA", "other"), labels = c("Douglas-fir", "grand fir", "bigleaf maple", "other species")) +
+    scale_y_discrete(limits = rev(levels(dbhImportance$predictor)), labels = NULL) +
     theme(axis.line.y = element_blank(), axis.ticks.y = element_blank()) +
   plot_annotation(theme = theme(plot.margin = margin())) +
   plot_layout(nrow = 1, widths = c(1, 4, 1, 4), guides = "collect") &
