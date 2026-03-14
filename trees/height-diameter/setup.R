@@ -19,14 +19,21 @@ theme_set(theme_bw() + theme(axis.line = element_line(linewidth = 0.3),
                              plot.title = element_text(size = 9)))
 plotLetters = c("(a)", "(b)", "(c)", "(d)", "(e)", "(f)", "(g)", "(h)", "(i)", "(j)", "(k)", "(l)")
 
-htDiaOptions = tibble(folds = 10,
-                      repetitions = 10,
-                      crossValidationBalance = "observations", # group (random stand selection without tree count stabilization) or observations (reduces standard deviation of fold size by an order of magnitude on Douglas fir and by ~3x for other species but increases overall runtime by ~40% due to more complex fold setup), passed directly as  group_vfold_cv(balance = htDiaOptions$crossValidationBalance)
+htDiaOptions = tibble(folds = 5,
+                      repetitions = 200,
+                      crossValidation = "blockedByStand", # blockedByStand or randomByCruiseRecord
+                      crossValidationBalance = "observations", # groups (random stand selection without tree count stabilization) or observations (reduces standard deviation of fold size by an order of magnitude on Douglas fir and by ~3x for other species but increases overall runtime by ~40% due to more complex fold setup), passed directly as  group_vfold_cv(balance = htDiaOptions$crossValidationBalance)
                       includeInvestigatory = FALSE, # default to not running plotting and other add ons from background jobs
                       includeSetup = FALSE,
+                      minHeight = 1.37, # m, minimum valid height for prediction bounds checks in get_goodness_of_fit_statistics()
+                      minDbh = 0.4, # cm, minimum valid DBH for prediction bounds
                       rangerThreads = 0.5 * future::availableCores(), # actually available threads, assume all cores hyperthreaded (Ryzen) by default
                       rangerTrees = 500,
                       retainModelThreshold = 5) # cross validation retains model objects if folds * repetitions is less than or equal to this threshold, e.g. 25 = retaining models up to and including 5x5 cross validation
+
+# not a vector, so doesn't easily become a column of the htDiaOptions tibble
+furrrOptions = furrr::furrr_options(chunk_size = if (htDiaOptions$folds * htDiaOptions$repetitions >= htDiaOptions$rangerThreads) { min(25, round(htDiaOptions$folds * htDiaOptions$repetitions / 8)) } else { NULL }, # default is htDiaOptions$folds * htDiaOptions$repetitions / future::nbrOfWorkers()
+                                    seed = TRUE) # avoid warning when fitting GAMs
 
 # for bootstrap DBH prediction
 acmaDiameterFromHeightPreferred = readRDS("trees/height-diameter/data/ACMA3 preferred diameter models.Rds")
@@ -102,6 +109,7 @@ create_fit_statistics = function(name, fittingMethod, fitSet = "primary", distin
   # https://github.com/tidyverse/tibble/issues/1569
   return(tibble::tibble_row(fitSet = fitSet, fitting = fittingMethod, name = name, 
                             estimatedParameters = NA_real_, 
+                            predictors = vector("list", length = 1),
                             fixedEffects = vector("list", length = 1),
                             training = tibble(.rows = 1), validation = tibble(.rows = 1),
                             isConverged = NA_real_, distinct = distinct,
@@ -125,7 +133,7 @@ create_fit_statistics = function(name, fittingMethod, fitSet = "primary", distin
 # 5                      57
 # 6                      85
 # 7                      331
-fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, random = NULL, randomTermIndex = NA_integer_, threads = 1, distinct = TRUE, tDegreesOfFreedom = 8)
+fit_gam = function(name, formula, data, family = gaussian(), crossValidation = htDiaOptions$crossValidation, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, random = NULL, randomTermIndex = NA_integer_, threads = 1, distinct = TRUE, tDegreesOfFreedom = 8)
 {
   if (is.null(random) == FALSE)
   {
@@ -139,21 +147,13 @@ fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOption
     }
   }
   
-  responseVariable = formula[2] # displays as height or dbh but compares as height() or dbh()
-  
-  if (responseVariable == "height()")
+  responseVariable = get_response_variable(formula)
+  if (responseVariable == "height")
   {
-    responseVariable = "height"
     allFitWeights = data$dbhWeight
   }
   else
   {
-    if (responseVariable != "dbh()")
-    {
-      stop("Expected response variable to be DBH.")
-    }
-    
-    responseVariable = "DBH"
     allFitWeights = data$heightWeight
   }
   if (is.null(random))
@@ -163,6 +163,7 @@ fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOption
     fittingMethod = "gamm"
   }
   
+  predictorVariables = all.vars(rlang::f_rhs(formula)) # GAM formulas don't include coefficients
   if (distinct == FALSE)
   {
     # don't fit GAMs which are marked as not distinct
@@ -171,6 +172,7 @@ fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOption
     message(paste0(name, " for ", folds, "x", repetitions, " ", responseVariable, " not fit using ", fittingMethod, "() as it is not a distinct model form."))
     notDistinctFitStats = create_fit_statistics(name = name, fittingMethod = fittingMethod, fitSet = "primary")
     notDistinctFitStats$distinct = FALSE
+    notDistinctFitStats$predictors[[1]] = predictorVariables
     return(notDistinctFitStats)
   }
   
@@ -183,32 +185,29 @@ fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOption
     { 
       if (is.null(random))
       {
-        gamModel = gam(formula = formula, data = data, family = family, method = "REML", select = TRUE, weights = dbhWeight, nthreads = threads)
+        allFitGam = gam(formula = formula, data = data, family = family, method = "REML", select = TRUE, weights = dbhWeight, nthreads = threads)
       } else {
-        gamModel = gamm(formula = formula, data = data, random = random, family = family, method = "REML", weights = dbhWeight, verbosePQL = FALSE)
+        allFitGam = gamm(formula = formula, data = data, random = random, family = family, method = "REML", weights = dbhWeight, verbosePQL = FALSE)
       }
     } else { 
       if (is.null(random))
       {
-        gamModel = gam(formula = formula, data = data, family = family, method = "REML", select = TRUE, weights = heightWeight, nthreads = threads)
+        allFitGam = gam(formula = formula, data = data, family = family, method = "REML", select = TRUE, weights = heightWeight, nthreads = threads)
       } else {
-        gamModel = gamm(formula = formula, data = data, random = random, family = family, method = "REML", weights = heightWeight, verbosePQL = FALSE)
+        allFitGam = gamm(formula = formula, data = data, random = random, family = family, method = "REML", weights = heightWeight, verbosePQL = FALSE)
       }
     }
-    estimatedParameters = sum(gamModel$edf)
-    if (is.na(randomTermIndex))
-    {
-      validationPrediction = fitted(gamModel)
-    } else {
-      validationPrediction = predict(gamModel, validationData, exclude = paste0("s(", attr(gamModel$terms, "term.labels")[randomTermIndex], ")"), newdata.guaranteed = TRUE) # remove random smooth for consistency with cross validated cases
-    }
+    estimatedParameters = sum(allFitGam$edf)
+    validationPrediction = fitted(allFitGam)
+
     allFitStats = get_fit_statistics(name = name, fittingMethod = "gam", responseVariable = responseVariable, 
-                                     trainingData = data, trainingPrediction = fitted(gamModel), estimatedParameters = estimatedParameters, 
+                                     trainingData = data, trainingPrediction = fitted(allFitGam), estimatedParameters = estimatedParameters, 
                                      validationData = data, validationPrediction = validationPrediction,
                                      distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
     allFitStats$fitTimeInS = get_elapsed_time(startFit)
+    allFitStats$predictors[[1]] = predictorVariables
     progressBar()
-    return(get_fit_return_value(gamModel, allFitStats, returnModel))
+    return(get_fit_return_value(allFitGam, allFitStats, returnModel))
   }
 
   fit_gam_fold = function(dataFold)
@@ -219,72 +218,91 @@ fit_gam = function(name, formula, data, family = gaussian(), folds = htDiaOption
     { 
       if (is.null(random))
       {
-        gamModel = gam(formula = formula, data = trainingData, family = family, method = "REML", select = TRUE, weights = dbhWeight, nthreads = threads)
+        fittedGam = gam(formula = formula, data = trainingData, family = family, method = "REML", select = TRUE, weights = dbhWeight, nthreads = threads)
       } else {
-        gamModel = gamm(formula = formula, data = trainingData, random = random, family = family, method = "REML", weights = dbhWeight, verbosePQL = FALSE)
+        fittedGam = gamm(formula = formula, data = trainingData, random = random, family = family, method = "REML", weights = dbhWeight, verbosePQL = FALSE)
       }
     } else { 
       if (is.null(random))
       {
-        gamModel = gam(formula = formula, data = trainingData, family = family, method = "REML", select = TRUE, weights = heightWeight, nthreads = threads)
+        fittedGam = gam(formula = formula, data = trainingData, family = family, method = "REML", select = TRUE, weights = heightWeight, nthreads = threads)
       } else {
-        gamModel = gamm(formula = formula, data = trainingData, random = random, family = family, method = "REML", weights = heightWeight, verbosePQL = FALSE)
+        fittedGam = gamm(formula = formula, data = trainingData, random = random, family = family, method = "REML", weights = heightWeight, verbosePQL = FALSE)
       }
     }
-    estimatedParameters = sum(gamModel$edf)
+    estimatedParameters = sum(fittedGam$edf)
     
     validationData = rsample::assessment(dataFold)
     if (is.na(randomTermIndex))
     {
       if (is.null(random))
       {
-        validationPrediction = predict(gamModel, validationData)
+        validationPrediction = predict(fittedGam, validationData) # fixed effect gams()
       } else {
-        validationPrediction = predict(gamModel$gam, validationData) # population prediction with random effects zeroed per gamm() documentation
+        # gam component of fit makes population prediction with random effects zeroed per mgcv::gamm() documentation
+        # When blocking by stand there's no overlap between the training and validation datasets and predictions are population level.
+        validationPrediction = predict(fittedGam$gam, validationData)
+        if (crossValidation != "blockedByStand")
+        {
+          # with unblocked cross validation, most stands and plots will be present in the training data and thus have random effects estimated
+          #trainingData = rsample::analysis(otherHeightFromDiameterMixed$gam$splits[[1]])
+          #validationData = rsample::assessment(otherHeightFromDiameterMixed$gam$splits[[1]])
+          #intersect(validationData$stand, trainingData$stand)
+          validationPrediction = validationPrediction + get_random_effects(fittedGam$lme, validationData, levelOffset = 1)
+        }
       }
     } else {
-      validationPrediction = predict(gamModel, validationData, exclude = paste0("s(", attr(gamModel$terms, "term.labels")[randomTermIndex], ")"), newdata.guaranteed = TRUE) # random effect must be removed to make predict outside of the training dataset
+      if (htDiaOptions$crossValidation == "blockedByStand")
+      {
+        # mixed effect gam() with disjoint training and validation data
+        # All predictions are population predictions, meaning random effect needs to be excluded to prevent errors from predict.gam().
+        validationPrediction = predict(fittedGam, validationData, exclude = paste0("s(", attr(fittedGam$terms, "term.labels")[randomTermIndex], ")"), newdata.guaranteed = TRUE)
+      } else {
+        # mixed effect gam() with likely overlapping training and validation data
+        # TODO: if this case ends up in use, probably need to split validation data along groups, predict with random effects where available,
+        # and reassemble.
+        validationPrediction = predict(fittedGam, validationData)
+      }
     }
     
     fitStatistics = get_fit_statistics(name = name, fittingMethod = fittingMethod, responseVariable = responseVariable, 
-                                       trainingData = trainingData, trainingPrediction = fitted(gamModel), estimatedParameters = estimatedParameters, 
+                                       trainingData = trainingData, trainingPrediction = fitted(fittedGam), estimatedParameters = estimatedParameters, 
                                        validationData = validationData, validationPrediction = validationPrediction,
                                        distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
     # fitStatistics$fixedEffects not very useful to set: GAM object is required for prediction and intercept, parametric guide term multiplier, and smooth coefficients all have to be used together
     fitStatistics$fitTimeInS = get_elapsed_time(startFit)
+    fitStatistics$predictors[[1]] = predictorVariables
     progressBar()
-    return(get_fit_return_value(gamModel, fitStatistics, returnModel))
+    return(get_fit_return_value(fittedGam, fitStatistics, returnModel))
   }
   
-  splitsAndFits = rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand, balance = htDiaOptions$crossValidationBalance) %>% 
-    mutate(fit = furrr::future_map(splits, fit_gam_fold, .options = furrr::furrr_options(seed = TRUE)))
+  splitsAndFits = get_cross_validation_folds(data, folds, repetitions) %>% mutate(fit = furrr::future_map(splits, fit_gam_fold, .options = furrrOptions))
   return(get_cross_validation_return_value(splitsAndFits, returnModel))
 }
 
 fit_gsl_nls = function(name, formula, data, start, control = gsl_nls_control(maxiter = 100), folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
 {
-  responseVariable = formula[2]
+  responseVariable = get_response_variable(formula)
+  if (distinct == FALSE)
+  {
+    # don't fit nonlinear regressions which are marked as not distinct
+    # This bypass reduces runtime but is primarily motivated by avoiding future's instability and consequent tendency to error out during 
+    # cross validation of subsequent model fits. The probability of an internal error in future increases as k decreases.
+    message(paste0(name, " for ", folds, "x", repetitions, " ", responseVariable, " not fit using gsl_nls() as it is not a distinct model form."))
+    notDistinctFitStats = create_fit_statistics(name = name, fittingMethod = "gsl_nls", fitSet = "primary")
+    notDistinctFitStats$distinct = FALSE
+    notDistinctFitStats$predictors[[1]] = get_predictors_nonlinear_formula_only(formula)
+    return(notDistinctFitStats)
+  }
+  
   message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using gsl_nls()..."))
   progressBar = progressr::progressor(steps = folds * repetitions)
-  
-  # gsl_nls() 1.4.1 documentation states weights should be a vector but this is incorrect, the name of column in data is required
-  if (responseVariable == "height()")
-  {
-    responseVariable = "height"
-  } else {
-    if (responseVariable != "dbh()")
-    {
-      stop("Expected response variable to be DBH.")
-    }
-    
-    responseVariable = "DBH"
-  }
-    
   startFit = Sys.time()
   if ((folds == 1) & (repetitions == 1))
   {
     if (responseVariable == "height")
     {
+      # gsl_nls() 1.4.1 documentation states weights should be a vector but this is incorrect, the name of column in data is required
       allFitNonlinear = gsl_nls(fn = formula, data = data, start = start, weights = dbhWeight, control = control)
     } else {
       allFitNonlinear = gsl_nls(fn = formula, data = data, start = start, weights = heightWeight, control = control)
@@ -295,6 +313,7 @@ fit_gsl_nls = function(name, formula, data, start, control = gsl_nls_control(max
                                      distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
     allFitStats$fixedEffects[[1]] = bind_rows(coef(allFitNonlinear))
     allFitStats$fitTimeInS = get_elapsed_time(startFit)
+    allFitStats$predictors[[1]] = get_predictors_nonlinear(allFitNonlinear, formula)
     progressBar()
     return(get_fit_return_value(allFitNonlinear, allFitStats, returnModel))
   }
@@ -317,28 +336,29 @@ fit_gsl_nls = function(name, formula, data, start, control = gsl_nls_control(max
                                        distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
     fitStatistics$fixedEffects[[1]] = bind_rows(coef(nonlinearModel))
     fitStatistics$fitTimeInS = get_elapsed_time(startFit)
+    fitStatistics$predictors[[1]] = get_predictors_nonlinear(nonlinearModel, formula)
     progressBar()
     return(get_fit_return_value(nonlinearModel, fitStatistics, returnModel))
   }
 
-  return(tryCatch({ splitsAndFits = rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand, balance = htDiaOptions$crossValidationBalance) %>% 
-                                      mutate(fit = furrr::future_map(splits, fit_gsl_nls_fold))
+  return(tryCatch({ splitsAndFits = get_cross_validation_folds(data, folds, repetitions) %>% mutate(fit = furrr::future_map(splits, fit_gsl_nls_fold, .options = furrrOptions))
                     return(get_cross_validation_return_value(splitsAndFits, returnModel)) },
                   error = function(e) { 
                     print(e)
                     reset_future()
-                    create_fit_statistics(name, fittingMethod = "gsl_nls") 
+                    create_fit_statistics(name, fittingMethod = "gsl_nls", distinct = distinct) 
                   }))
 }
 
 fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
 {
-  responseVariable = formula[2]
+  responseVariable = get_response_variable(formula)
   message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using lm()..."))
   progressBar = progressr::progressor(steps = folds * repetitions)
-  
+
   # separate height and diameter all fit cases and cross validation setups since height prediction uses offset
-  if (responseVariable == "height()")
+  predictorVariables = all.vars(rlang::f_rhs(formula)) # lm() formulas don't include coefficients
+  if (responseVariable == "height")
   {
     if ((folds == 1) & (repetitions == 1))
     {
@@ -350,6 +370,7 @@ fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions =
                                        distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
       allFitStats$fixedEffects[[1]] = bind_rows(coef(allFit))
       allFitStats$fitTimeInS = get_elapsed_time(startFit)
+      allFitStats$predictors[[1]] = predictorVariables
       progressBar()
       return(get_fit_return_value(allFit, allFitStats, returnModel))
     }
@@ -366,13 +387,14 @@ fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions =
                                          distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
       fitStatistics$fixedEffects[[1]] = bind_rows(coef(linearModel))
       fitStatistics$fitTimeInS = get_elapsed_time(startFit)
+      fitStatistics$predictors[[1]] = predictorVariables
       progressBar()
       return(get_fit_return_value(linearModel, fitStatistics, returnModel))
     }
   }
   else
   {
-    if (responseVariable != "dbh()")
+    if (responseVariable != "DBH")
     {
       stop("Expected response variable to be DBH.")
     }
@@ -387,6 +409,7 @@ fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions =
                                        distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
       allFitStats$fixedEffects[[1]] = bind_rows(coef(allFit))
       allFitStats$fitTimeInS = get_elapsed_time(startFit)
+      allFitStats$predictors[[1]] = predictorVariables
       progressBar()
       return(get_fit_return_value(allFit, allFitStats, returnModel))
     }
@@ -403,88 +426,176 @@ fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions =
                                          distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
       fitStatistics$fixedEffects[[1]] = bind_rows(coef(linearModel))
       fitStatistics$fitTimeInS = get_elapsed_time(startFit)
+      fitStatistics$predictors[[1]] = predictorVariables
       progressBar()
       return(get_fit_return_value(linearModel, fitStatistics, returnModel))
     }
   }
   
-  splitsAndFits = rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand, balance = htDiaOptions$crossValidationBalance) %>% 
-    mutate(fit = furrr::future_map(splits, fit_lm_fold))
+  splitsAndFits = get_cross_validation_folds(data, folds, repetitions) %>% mutate(fit = furrr::future_map(splits, fit_lm_fold, .options = furrrOptions))
   return(get_cross_validation_return_value(splitsAndFits, returnModel))
 }
 
-# nlmeControl(opt) left at nlimb default per https://stats.stackexchange.com/questions/9535/when-should-i-not-use-rs-nlm-function-for-mle
-fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start, control = nlmeControl(maxIter = 100), folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
+fit_lme = function(name, data, fixedFormula, randomFormula, start, control = lmeControl(maxIter = 100), crossValidation = htDiaOptions$crossValidation, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
 {
-  responseVariable = modelFormula[2]
-  message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using nlme()..."))
+  responseVariable = get_response_variable(fixedFormula)
+  message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using lme()..."))
   progressBar = progressr::progressor(steps = folds * repetitions)
   
-  if (responseVariable == "height()")
+  predictorVariables = all.vars(rlang::f_rhs(fixedFormula)) # lme() formulas don't include coefficients
+  startFit = Sys.time()
+  if ((folds == 1) & (repetitions == 1))
   {
-    responseVariable = "height"
-    # https://stackoverflow.com/questions/11778773/using-predict-in-a-function-call-with-nlme-objects-and-a-formula
-    # Debatable if varFixed() should include treeCount. While variance is independent of the count nlme()'s offers no separate
-    # mechanism capturing the number of observations. This does not appear to be an issue with varFixed() but might affect cases
-    # such as varPower() where variance fitting is done within nlme() rather than externally as performed here.
-    allFitNonlinear = do.call(nlme, list(model = modelFormula, data = data, fixed = fixedFormula, random = randomFormula, start = start, weights = varFixed(~1/dbhWeight), control = control))
-  } else {
-    if (responseVariable != "dbh()")
+    if (responseVariable == "height()")
     {
-      stop("Expected response variable to be DBH.")
+      allFitLinear = do.call(lme, list(data = data, fixed = fixedFormula, random = randomFormula, weights = varFixed(~1/dbhWeight), control = control))
+    } else {
+      allFitLinear = do.call(lme, list(data = data, fixed = fixedFormula, random = randomFormula, weights = varFixed(~1/heightWeight), control = control))
     }
     
-    responseVariable = "DBH"
-    allFitNonlinear = do.call(nlme, list(model = modelFormula, data = data, fixed = fixedFormula, random = randomFormula, start = start, weights = varFixed(~1/heightWeight), control = control))
+    validationPrediction = predict(allFitLinear, validationData, level = 0)
+    if (crossValidation != "blockedByStand")
+    {
+      validationPrediction = validationPrediction + get_random_effects(allFitLinear, validationData)
+    }
+    allFitStats = get_fit_statistics(name = name, fittingMethod = "lme", responseVariable = responseVariable, 
+                                     trainingData = data, trainingPrediction = fitted(allFitLinear), estimatedParameters = length(fixed.effects(allFitLinear)) + length(random.effects(allFitLinear)), 
+                                     validationData = data, validationPrediction = validationPrediction,
+                                     distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom, randomEffect = "a0ra") # colnames(allFitLinear$coefficients$random$stand) = "(Intercept)"
+    allFitStats$fixedEffects[[1]] = bind_rows(fixed.effects(allFitLinear)) # see remarks on fixed.effects() below
+    allFitStats$fitTimeInS = get_elapsed_time(startFit)
+    allFitStats$predictors[[1]] = predictorVariables
+    progressBar()
+    return(get_fit_return_value(allFitLinear, allFitStats, returnModel))
   }
+  
+  fit_lme_fold = function(dataFold)
+  {
+    startFit = Sys.time()
+    trainingData = rsample::analysis(dataFold)
+    if (responseVariable == "height")
+    {
+      linearModel = do.call(lme, list(data = trainingData, fixed = fixedFormula, random = randomFormula, weights = varFixed(~1/dbhWeight), control = control))
+    } else {
+      linearModel = do.call(lme, list(data = trainingData, fixed = fixedFormula, random = randomFormula, weights = varFixed(~1/heightWeight), control = control))
+    }
+    
+    validationData = rsample::assessment(dataFold)
+    validationPrediction = predict(linearModel, validationData, level = 0)
+    if (crossValidation != "blockedByStand")
+    {
+      validationPrediction = validationPrediction + get_random_effects(linearModel, validationData)
+    }
+    fitStatistics = get_fit_statistics(name = name, fittingMethod = "lme", responseVariable = responseVariable, 
+                                       trainingData = trainingData, trainingPrediction = fitted(linearModel), estimatedParameters = length(fixed.effects(linearModel)) + length(random.effects(linearModel)),
+                                       validationData = validationData, validationPrediction = validationPrediction,
+                                       distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom, randomEffect = "a0ra")
+    # lme.coefficients() returns a data frame repeating fixed effects for every random effect level, increasing result .Rds sizes by an order of magnitude
+    # If needed, random effects can be persisted as a vector from random.effects().
+    fitStatistics$fixedEffects[[1]] = bind_rows(fixed.effects(linearModel))
+    fitStatistics$fitTimeInS = get_elapsed_time(startFit)
+    fitStatistics$predictors[[1]] = predictorVariables
+    progressBar()
+    return(get_fit_return_value(linearModel, fitStatistics, returnModel))
+  }
+  
+  # rather than require error handling by all callers, just return fit failed here
+  return(tryCatch({ splitsAndFits = get_cross_validation_folds(data, folds, repetitions) %>% mutate(fit = furrr::future_map(splits, fit_lme_fold, .options = furrrOptions))
+                    return(get_cross_validation_return_value(splitsAndFits, returnModel)) },
+         error = function(e) { 
+           print(e)
+           reset_future()
+           create_fit_statistics(name, fittingMethod = "lme", distinct = distinct) 
+         }))
+}
+
+# nlmeControl(opt) left at nlimb default per https://stats.stackexchange.com/questions/9535/when-should-i-not-use-rs-nlm-function-for-mle
+fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start, control = nlmeControl(maxIter = 100), crossValidation = htDiaOptions$crossValidation, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
+{
+  responseVariable = get_response_variable(modelFormula)
+  if (distinct == FALSE)
+  {
+    # don't fit nonlinear regressions which are marked as not distinct
+    # This bypass reduces runtime but is primarily motivated by avoiding future's instability and consequent tendency to error out during 
+    # cross validation of subsequent model fits. The probability of an internal error in future increases as k decreases.
+    message(paste0(name, " for ", folds, "x", repetitions, " ", responseVariable, " not fit using nlme() as it is not a distinct model form."))
+    notDistinctFitStats = create_fit_statistics(name = name, fittingMethod = "gsl_nls", fitSet = "primary")
+    notDistinctFitStats$distinct = FALSE
+    notDistinctFitStats$predictors[[1]] = get_predictors_nonlinear_formula_only(modelFormula)
+    return(notDistinctFitStats)
+  }
+  
+  message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using nlme()..."))
+  progressBar = progressr::progressor(steps = folds * repetitions)
   
   startFit = Sys.time()
   if ((folds == 1) & (repetitions == 1))
   {
+    if (responseVariable == "height()")
+    {
+      # https://stackoverflow.com/questions/11778773/using-predict-in-a-function-call-with-nlme-objects-and-a-formula
+      # Debatable if varFixed() should include treeCount. While variance is independent of the count nlme()'s offers no separate
+      # mechanism capturing the number of observations. This does not appear to be an issue with varFixed() but might affect cases
+      # such as varPower() where variance fitting is done within nlme() rather than externally as performed here.
+      allFitNonlinear = do.call(nlme, list(model = modelFormula, data = data, fixed = fixedFormula, random = randomFormula, start = start, weights = varFixed(~1/dbhWeight), control = control))
+    } else {
+      allFitNonlinear = do.call(nlme, list(model = modelFormula, data = data, fixed = fixedFormula, random = randomFormula, start = start, weights = varFixed(~1/heightWeight), control = control))
+    }
+    
+    validationPrediction = predict(allFitNonlinear, validationData, level = 0)
+    if (crossValidation != "blockedByStand")
+    {
+      validationPrediction = validationPrediction + get_random_effects(allFitNonlinear, validationData)
+    }
     allFitStats = get_fit_statistics(name = name, fittingMethod = "nlme", responseVariable = responseVariable, 
                                      trainingData = data, trainingPrediction = fitted(allFitNonlinear), estimatedParameters = length(fixed.effects(allFitNonlinear)) + length(random.effects(allFitNonlinear)), 
-                                     validationData = data, validationPrediction = predict(allFitNonlinear, newdata = data, level = 0),
+                                     validationData = data, validationPrediction = validationPrediction,
                                      distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom, randomEffect = colnames(allFitNonlinear$coefficients$random$stand))
     allFitStats$fixedEffects[[1]] = bind_rows(fixed.effects(allFitNonlinear)) # see remarks on fixed.effects() below
     allFitStats$fitTimeInS = get_elapsed_time(startFit)
+    allFitStats$predictors[[1]] = get_predictors_nonlinear(allFitNonlinear, modelFormula)
     progressBar()
     return(get_fit_return_value(allFitNonlinear, allFitStats, returnModel))
   }
   
-  allFitFixedEffects = fixed.effects(allFitNonlinear)
   fit_nlme_fold = function(dataFold)
   {
     startFit = Sys.time()
     trainingData = rsample::analysis(dataFold)
     if (responseVariable == "height")
     {
-      nonlinearModel = do.call(nlme, list(model = modelFormula, data = trainingData, fixed = fixedFormula, random = randomFormula, start = allFitFixedEffects, weights = varFixed(~1/dbhWeight), control = control))
+      nonlinearModel = do.call(nlme, list(model = modelFormula, data = trainingData, fixed = fixedFormula, random = randomFormula, start = start, weights = varFixed(~1/dbhWeight), control = control))
     } else {
-      nonlinearModel = do.call(nlme, list(model = modelFormula, data = trainingData, fixed = fixedFormula, random = randomFormula, start = allFitFixedEffects, weights = varFixed(~1/heightWeight), control = control))
+      nonlinearModel = do.call(nlme, list(model = modelFormula, data = trainingData, fixed = fixedFormula, random = randomFormula, start = start, weights = varFixed(~1/heightWeight), control = control))
     }
     
     validationData = rsample::assessment(dataFold)
+    validationPrediction = predict(nonlinearModel, validationData, level = 0)
+    if (crossValidation != "blockedByStand")
+    {
+      validationPrediction = validationPrediction + get_random_effects(nonlinearModel, validationData)
+    }
     fitStatistics = get_fit_statistics(name = name, fittingMethod = "nlme", responseVariable = responseVariable, 
                                        trainingData = trainingData, trainingPrediction = fitted(nonlinearModel), estimatedParameters = length(fixed.effects(nonlinearModel)) + length(random.effects(nonlinearModel)),
-                                       validationData = validationData, validationPrediction = predict(nonlinearModel, validationData, level = 0),
+                                       validationData = validationData, validationPrediction = validationPrediction,
                                        distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom, randomEffect = colnames(nonlinearModel$coefficients$random$stand))
     # nlme.coefficients() returns a data frame repeating fixed effects for every random effect level, increasing result .Rds sizes by an order of magnitude
     # If needed, random effects can be persisted as a vector from random.effects().
     fitStatistics$fixedEffects[[1]] = bind_rows(fixed.effects(nonlinearModel))
     fitStatistics$fitTimeInS = get_elapsed_time(startFit)
+    fitStatistics$predictors[[1]] = get_predictors_nonlinear(nonlinearModel, modelFormula)
     progressBar()
     return(get_fit_return_value(nonlinearModel, fitStatistics, returnModel))
   }
   
   # nlme is increasingly prone to step halving and iteration runaway as number of folds decreases
   # Rather than require error handling by all callers, just return fit failed here.
-  return(tryCatch({ splitsAndFits = rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand, balance = htDiaOptions$crossValidationBalance) %>% 
-                      mutate(fit = furrr::future_map(splits, fit_nlme_fold))
+  return(tryCatch({ splitsAndFits = get_cross_validation_folds(data, folds, repetitions) %>% mutate(fit = furrr::future_map(splits, fit_nlme_fold, .options = furrrOptions))
                     return(get_cross_validation_return_value(splitsAndFits, returnModel)) },
                   error = function(e) { 
                     print(e)
                     reset_future()
-                    create_fit_statistics(name, fittingMethod = "nlme") 
+                    create_fit_statistics(name, fittingMethod = "nlme", distinct = distinct) 
                     }))
 }
 
@@ -507,6 +618,7 @@ fit_ranger = function(name, variables, data, trees = htDiaOptions$rangerTrees, m
   message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using ranger()..."))
   progressBar = progressr::progressor(steps = folds * repetitions)
   
+  predictorVariables = variables[2:length(variables)]
   startFit = Sys.time()
   if ((folds == 1) & (repetitions == 1))
   {
@@ -523,6 +635,7 @@ fit_ranger = function(name, variables, data, trees = htDiaOptions$rangerTrees, m
                                         validationData = data, validationPrediction = allForest$predictions,
                                         distinct = distinct, tDegreesOfFreedom = NA_real_)
     allForestStats$fitTimeInS = get_elapsed_time(startFit)
+    allForestStats$predictors[[1]] = predictorVariables
     progressBar()
     return(get_fit_return_value(allForest, allForestStats, returnModel))
   }
@@ -546,13 +659,32 @@ fit_ranger = function(name, variables, data, trees = htDiaOptions$rangerTrees, m
                                        validationData = validationData, validationPrediction = predict(forest, validationData)$predictions,
                                        distinct = distinct, tDegreesOfFreedom = NA_real_)
     fitStatistics$fitTimeInS = get_elapsed_time(startFit)
+    fitStatistics$predictors[[1]] = predictorVariables
     progressBar()
     return(get_fit_return_value(forest, fitStatistics, returnModel))
   }
   
-  splitsAndFits = rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand, balance = htDiaOptions$crossValidationBalance) %>% 
-    mutate(fit = purrr::map(splits, fit_ranger_fold))
+  splitsAndFits = get_cross_validation_folds(data, folds, repetitions) %>% mutate(fit = purrr::map(splits, fit_ranger_fold))
   return(get_cross_validation_return_value(splitsAndFits, returnModel))
+}
+
+get_cross_validation_data_suffix = function()
+{
+  return(paste0(htDiaOptions$folds, "x", htDiaOptions$repetitions, if (htDiaOptions$crossValidation == "blockedByStand") { "" } else { " random" }))
+}
+
+get_cross_validation_folds = function(data, folds, repetitions)
+{
+  if (htDiaOptions$crossValidation == "blockedByStand")
+  {
+    return(rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand, balance = htDiaOptions$crossValidationBalance))
+  } else {
+    if (htDiaOptions$crossValidation != "randomByCruiseRecord")
+    {
+      stop(paste0("Unknown cross validation method ", htDiaOptions$crossValidation, "."))
+    }
+    return(return(rsample::vfold_cv(data, v = folds, repeats = repetitions)))
+  }
 }
 
 get_cross_validation_return_value = function(splitsAndFits, returnModel)
@@ -563,15 +695,15 @@ get_cross_validation_return_value = function(splitsAndFits, returnModel)
     # if full models are retained retain also the training-validation data splits for each model fit
     return(splitsAndFits %>% 
              mutate(repetition = as.numeric(str_replace(id, "Repeat", "")), 
-                    fold = as.numeric(str_replace(id2, "Resample", ""))) %>%
+                    fold = as.numeric(str_replace(id2, "Fold|Resample", ""))) %>% # rsample::vfold_cv() labels folds Fold1, Fold2, ..., group_vfold_cv() labels folds Resample1, Resample2, ...
              select(-id, -id2) %>%
              relocate(repetition, fold, fit, splits))
   }
   # if only model statistics are kept then drop the data splits and bind together each fit's single 
   # row statistics tibble into one tibble with kr rows (k-folds x r-repetitions = kr fits)
   return(bind_rows(splitsAndFits$fit) %>% 
-           mutate(repetition = as.numeric(str_replace(splitsAndFits$id, "Repeat", "")), 
-                  fold = as.numeric(str_replace(splitsAndFits$id2, "Resample", ""))) %>%
+           mutate(repetition = as.numeric(str_replace(splitsAndFits$id, "Repeat", "")),
+                  fold = as.numeric(str_replace(splitsAndFits$id2, "Fold|Resample", ""))) %>%
            relocate(repetition, fold))
 }
 
@@ -593,6 +725,11 @@ get_fit_return_value = function(model, fitStatistics, returnModel)
 
 get_fit_statistics = function(name, fittingMethod, responseVariable, trainingData, trainingPrediction, estimatedParameters, validationData, validationPrediction, fitSet = "primary", isConverged = TRUE, distinct = TRUE, tDegreesOfFreedom = 8, randomEffect = NA_character_)
 {
+  if (length(validationPrediction) != nrow(validationData))
+  {
+    stop(paste0(length(validationPrediction), " values predicted for validation fold with ", nrow(validationData), " rows of data."))
+  }
+  
   fitStatistics = create_fit_statistics(name = name, fittingMethod = fittingMethod, fitSet = fitSet)
   fitStatistics$estimatedParameters = estimatedParameters
   fitStatistics$isConverged = isConverged
@@ -602,10 +739,10 @@ get_fit_statistics = function(name, fittingMethod, responseVariable, trainingDat
   if (responseVariable == "DBH")
   {
     trainingHeightDiameterRatio = trainingData$height / (0.01 * trainingPrediction)
-    fitStatistics$training = get_goodness_of_fit_statistics(trainingData, trainingPrediction, trainingData$dbh, trainingData$heightWeight, estimatedParameters, trainingHeightDiameterRatio, 0.04, trainingData$dbhMax, tDegreesOfFreedom = tDegreesOfFreedom)
+    fitStatistics$training = get_goodness_of_fit_statistics(trainingData, trainingPrediction, trainingData$dbh, trainingData$heightWeight, estimatedParameters, trainingHeightDiameterRatio, htDiaOptions$minDbh, trainingData$dbhMax, tDegreesOfFreedom = tDegreesOfFreedom)
     
     validationHeightDiameterRatio = validationData$height / (0.01 * validationPrediction)
-    fitStatistics$validation = get_goodness_of_fit_statistics(validationData, validationPrediction, validationData$dbh, validationData$heightWeight, estimatedParameters, validationHeightDiameterRatio, 0.04, validationData$dbhMax, tDegreesOfFreedom = tDegreesOfFreedom)
+    fitStatistics$validation = get_goodness_of_fit_statistics(validationData, validationPrediction, validationData$dbh, validationData$heightWeight, estimatedParameters, validationHeightDiameterRatio, htDiaOptions$minDbh, validationData$dbhMax, tDegreesOfFreedom = tDegreesOfFreedom)
     
     validationResiduals = validationPrediction - validationData$dbh
     dbhByHeightClass = validationData %>% mutate(residuals = validationResiduals) %>%
@@ -630,10 +767,10 @@ get_fit_statistics = function(name, fittingMethod, responseVariable, trainingDat
     fitStatistics$validation$meanAbsolutePercentPlantationEffect = sum(dbhByHeightClass$minPlantationNaturalRegenN * abs(dbhByHeightClass$plantationEffectPct), na.rm = TRUE) / sum(dbhByHeightClass$minPlantationNaturalRegenN * (is.na(dbhByHeightClass$plantationEffect) == FALSE), na.rm = TRUE)
   } else if (responseVariable == "height") {
     trainingHeightDiameterRatio = trainingPrediction / (0.01 * trainingData$dbh)
-    fitStatistics$training = get_goodness_of_fit_statistics(trainingData, trainingPrediction, trainingData$height, trainingData$dbhWeight, estimatedParameters, trainingHeightDiameterRatio, 1.37, trainingData$heightMax, tDegreesOfFreedom = tDegreesOfFreedom)
+    fitStatistics$training = get_goodness_of_fit_statistics(trainingData, trainingPrediction, trainingData$height, trainingData$dbhWeight, estimatedParameters, trainingHeightDiameterRatio, htDiaOptions$minHeight, trainingData$heightMax, tDegreesOfFreedom = tDegreesOfFreedom)
     
     validationHeightDiameterRatio = validationPrediction / (0.01 * validationData$dbh)
-    fitStatistics$validation = get_goodness_of_fit_statistics(validationData, validationPrediction, validationData$height, validationData$dbhWeight, estimatedParameters, validationHeightDiameterRatio, 1.37, validationData$heightMax, tDegreesOfFreedom = tDegreesOfFreedom)
+    fitStatistics$validation = get_goodness_of_fit_statistics(validationData, validationPrediction, validationData$height, validationData$dbhWeight, estimatedParameters, validationHeightDiameterRatio, htDiaOptions$minHeight, validationData$heightMax, tDegreesOfFreedom = tDegreesOfFreedom)
     
     validationResiduals = validationPrediction - validationData$height
     heightByDbhClass = validationData %>% mutate(residuals = validationResiduals) %>%
@@ -726,6 +863,66 @@ get_goodness_of_fit_statistics = function(data, predicted, measured, weights, es
   return(fitStatistics)
 }
 
+# separate predictor variables in nonlinear regression formula
+# Formulas for nonlinear regressions contain both coefficients and predictors as variables.
+get_predictors_nonlinear = function(model, formula)
+{
+  return(setdiff(all.vars(rlang::f_rhs(formula)), names(coef(model))))
+}
+
+get_predictors_nonlinear_formula_only = function(formula)
+{
+  # if only formula is available, filter out known coefficient names
+  return(setdiff(all.vars(rlang::f_rhs(formula)), c("a0", "a1", "a1p", "a1rd", "a1rh", "a1bal", "a1balr", "a1aba", "a1aat", "a1e", "a1s", "a1as", "a1ac", "a1tr", "a1tw", "a2", "a2rd", "a2bal", "a2balr", "a2p", "a3", "a3p", "b1", "b1p", "b1rd", "b1ba", "b1bal", "b1balr", "b1aba", "b1abap", "b1aat", "b1aatp", "b1rh", "b1as", "b1ac", "b1e", "b1tw", "b2", "b2p", "b2rd", "b2rdp", "b2rh", "b2ba", "b2bal", "b2balr", "b2aba", "b2aat", "b2s", "b2as", "b2ac", "b2e", "b2tw", "b3", "b3rd", "b3bal", "b3balr", "b3tr", "b4", "b4p", "b4d", "b4rd", "b4ba", "b4bal", "b4balr", "b4e", "b4as", "b4ac", "b4tw", "Ha", "Hap", "d", "dp", "kU")))
+}
+
+get_preferred_model_linetype_legend = function()
+{
+  return(ggplot() +
+           geom_segment(aes(x = x, xend = xend, y = y, yend = yend, color = color, linetype = linetype), tibble(x = 0, xend = 1, y = 0, yend = 0, color = c("previous model", FALSE, TRUE), linetype = c("previous model", FALSE, TRUE)), alpha = 0, show.legend = TRUE) +
+           guides(color = guide_legend(order = 1, position = "inside"), linetype = guide_legend(order = 1, position = "inside", override.aes = list(alpha = 1))) +
+           labs(x = NULL, y = NULL, color = NULL, linetype = NULL) +
+           scale_color_manual(breaks = c("previous model", FALSE, TRUE), labels = c("previous model", "natural regeneration", "plantation"), values = c("grey70", "grey25", "grey25")) +
+           # scale_linetype_manual() set by caller
+           theme(axis.line = element_blank(), axis.text = element_blank(), axis.ticks = element_blank(), legend.direction = "horizontal", legend.position.inside = c(0.5, 0.5), panel.grid = element_blank()))
+}
+
+# assumes mixedEffectModel is from lme() or nlme() and thus that predict() resolves to predict.lme() or predict.nlme()
+# mgcv::gamm()'s use of lme() introduces an additional level with mean random effects. Per gamm()'s documentation these are ignored (observed values have been small, ~1E-8)
+# by specifying levelOffset = 1.
+get_random_effects = function(mixedEffectModel, data, levelOffset = 0)
+{
+  standEffects = random.effects(mixedEffectModel, level = 1 + levelOffset)
+  plotEffects = random.effects(mixedEffectModel, level = 2 + levelOffset)
+  
+  randomEffects = replace_na(standEffects[paste0("1/", data$stand), 1], 0) + # stand level effects with fallback back to population if stand isn't in training data
+                  replace_na(plotEffects[paste0("1/", data$stand, "/", data$plot), 1], 0) # plot level effects with fallback
+  #print(paste0(length(randomEffects), " random effects predicted for ", nrow(data), " rows of data from ", nrow(standEffects), " stand effects and ", nrow(plotEffects), " plot effects."))
+  
+  return(randomEffects)
+  #tibble(stand = data$stand,
+  #       plot = data$plot,
+  #       meanRandomEffect = meanRandomEffect,
+  #       standEffect = replace_na(standEffects[paste0("1/", data$stand), 1], 0),
+  #       plotEffect = replace_na(plotEffects[paste0("1/", data$stand, "/", data$plot), 1], 0)) %>%
+  #  arrange(stand, plot)
+}
+
+get_response_variable = function(formula)
+{
+  responseVariable = rlang::f_lhs(formula)
+  if (responseVariable == "dbh")
+  {
+    responseVariable = "DBH"
+  } else {
+    if (responseVariable != "height")
+    {
+      stop("Expected response variable in formula ", formula, " to be height or DBH.")
+    }
+  }
+  return(responseVariable)
+}
+
 plot_auc_bank = function(aucs1, aucs2 = NULL, generalized = FALSE, fillLabel = "median AUC", xLimits = c("Douglas-fir", "grand fir", "bigleaf maple", "other species"), nPreferredModelBoxes = 2, legendHjustification = 1.8, plotRightMargin = 8, bounds = FALSE)
 {
   aucColorbarTheme = theme(legend.key.width = unit(6.5, "lines"), legend.title = element_text(size = 9, vjust = 0.85))
@@ -778,8 +975,8 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, generalized = FALSE, fillLabel = "
       geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
       geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucMaeRank <= nPreferredModelBoxes, aucMaeRank <= nPreferredModelBoxes)), fill = "transparent") +
       scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-      #labs(title = paste0("**", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1], " ", aucsToDisplay1$responseVariable[1], "**<br>", plotLetters[1], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-      labs(title = paste0("**", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1], " ", aucsToDisplay1$responseVariable[1], "**"), subtitle  = paste0(plotLetters[1], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+      #labs(title = paste0("**", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1], " ", aucsToDisplay1$responseVariable[1], " cross validation**<br>", plotLetters[1], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+      labs(title = paste0("**", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1], " ", aucsToDisplay1$responseVariable[1], " cross validation**"), subtitle  = paste0(plotLetters[1], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
       scale_y_discrete(limits = yAxisLimits, drop = FALSE) +
     ggplot() +
       geom_tile(aes(x = species, y = nameAndFit, fill = aucRmse), aucsToDisplay1) +
@@ -828,8 +1025,8 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, generalized = FALSE, fillLabel = "
           geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2) +
           geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucMaeRank <= nPreferredModelBoxes, aucMaeRank <= nPreferredModelBoxes)), fill = "transparent") +
           scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-          #labs(title = paste0("**", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1], " ", aucsToDisplay2$responseVariable[1], "**<br>", plotLetters[5], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-          labs(title = paste0("**", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1], " ", aucsToDisplay2$responseVariable[1], "**"), subtitle = paste0(plotLetters[5], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          #labs(title = paste0("**", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1], " ", aucsToDisplay2$responseVariable[1], " cross validation**<br>", plotLetters[5], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          labs(title = paste0("**", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1], " ", aucsToDisplay2$responseVariable[1], " cross validation**"), subtitle = paste0(plotLetters[5], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
           scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE) +
         ggplot() +
           geom_tile(aes(x = species, y = nameAndFit, fill = aucRmse), aucsToDisplay2) +
@@ -871,8 +1068,8 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, generalized = FALSE, fillLabel = "
     plot_annotation(theme = theme(plot.margin =  margin())) +
     plot_layout(nrow = 1, guides = "collect") &
       guides(color = guide_legend(override.aes = list(linewidth = 0.5)), linewidth = "none") &
-      scale_color_manual(breaks = c(FALSE, TRUE), labels = c("preferred\ngeneralization", "preferred\nbase form"), values = c("dodgerblue", "grey25")) &
-      scale_linewidth_manual(breaks = c(FALSE, TRUE), values = c(0.3, 0.2)) &
+      scale_color_manual(breaks = c(FALSE, TRUE), labels = c("preferred\ngeneralization", "preferred\nbase form"), values = c("dodgerblue", "dodgerblue")) &
+      scale_linewidth_manual(breaks = c(FALSE, TRUE), values = c(0.3, 0.3)) &
       scale_x_discrete(limits = xLimits) &
       theme(axis.text.x = element_text(angle = 90, size = 10, hjust = 1, vjust = 0.5), axis.text.y = element_text(size = 10),
             legend.position = "bottom", legend.spacing.y = unit(0.4, "line"), legend.justification = c(legendHjustification, 0.5), legend.title = element_text(size = 11),
@@ -976,7 +1173,7 @@ unnest_coefficients = function(fit)
 {
   if (all(fit$fitting %in% c("gam", "gamm", "ranger")))
   {
-    # GAM coefficients aren't recorded and random forest lack coefficients, leading to fixedEffects being a column of null lists
+    # GAM coefficients aren't recorded and random forests lack coefficients, leading to fixedEffects being a column of null lists
     # In these cases unnest(fixedEffects) creates a NA column named fixedEffects, which has no use; suppress this behavior.
     # any_of(repetition, fold) is required as these columns are only present in cross validated fits
     coefficients = fit %>% select(fitSet, fitting, name, any_of(c("repetition", "fold")), distinct, isConverged)
@@ -1808,4 +2005,50 @@ if (htDiaOptions$includeInvestigatory)
     coord_cartesian(xlim = c(0, 60)) &
     scale_fill_manual(values = c("prediction" = "forestgreen", "interpretation" = "blue2", "thresholding" = "darkviolet")) &
     scale_x_continuous(expand = expansion(mult = c(0, 0.05)))
+}
+
+
+## more performant cross validation than group_vfold_cv()
+if (htDiaOptions$includeInvestigatory)
+{
+  # group_vfold_cv() performance for balanced and unbalanced blocked cross validation
+  #                             groups               observations
+  # cross validation  species   σ records  runtime   σ records  runtime
+  # 2x250             PSME      0.842      5.8m      139        1.6s
+  #                   ABGR      0.000      3.9m      66         1.6s
+  #                   ACMA3     0.504      6.5m      53         2.3s
+  #                   other     0.000      4.8m      77         2.3s
+  start = Sys.time()
+  crossValBalanced = rsample::group_vfold_cv(other2022, v = 2, repeats = 500, group = stand, balance = "observations")
+  Sys.time() - start
+  start = Sys.time()
+  crossValBlocked = rsample::group_vfold_cv(other2022, v = 2, repeats = 500, group = stand, balance = "groups")
+  Sys.time() - start
+  crossValBalanced %>% mutate(n = sapply(crossValBalanced$splits, function(split) { return(length(split$in_id)) })) %>% summarize(sd = sd(n))
+  crossValBlocked %>% mutate(n = sapply(crossValBlocked$splits, function(split) { return(length(split$in_id)) })) %>% summarize(sd = sd(n))
+
+  # blocked cross validation balanced by oversample and discard
+  # cross validation  species  oversampling  σ trees  runtime, s  speedup
+  # 2x500             PSME       10          24.7     0.12
+  #                             100          2.22     2.3
+  #                             200          0.88     4.5         72x over group_vfold_cv(balance = "observations")
+  #                             500          0.49     8.4
+  #                            1000          0.15     21
+  #                   ABGR      200          0.46     2.5         94x
+  #                   ACMA      200          0.45     2.8         139x
+  #                   other     200          0.62     2.5         115x
+  folds = 2
+  repetitions = 500
+  oversampling = 200
+  start = Sys.time() 
+  crossValidationStands = other2022 %>% group_by(stand) %>% summarize(trees = sum(treeCount)) # cruiseRecords = n()
+  crossValidationOversampled = crossing(crossValidationStands, repetition = seq(1, repetitions), oversample = seq(1, oversampling)) %>% mutate(fold = sample(seq(1, folds), n(), replace = TRUE)) %>% 
+    group_by(repetition, fold, oversample) %>% 
+    mutate(trees = sum(trees)) %>% # cruiseRecords = sum(cruiseRecords)
+    ungroup() %>%
+    mutate(treeCountDeparture = trees - mean(trees)) %>%
+    group_by(repetition) %>%
+    slice_min(abs(treeCountDeparture), n = 1, with_ties = FALSE)
+  Sys.time() - start
+  crossValidationOversampled %>% group_by(repetition) %>% summarize(trees = trees[1], .groups = "drop") %>% summarize(treeStdDev = sd(trees))
 }

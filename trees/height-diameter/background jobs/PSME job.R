@@ -1,8 +1,10 @@
-library(dplyr)
-
 # processor  cross validation   workers   height runtime   DBH runtime
 # 9900X      10x10              10        9.2 min          2.5 + 2.9 min
+#            5x200               8        3:43 + 6:52      3:49 + 5:30
 jobStartTime = Sys.time()
+source("trees/height-diameter/setup.R")
+message(paste0(htDiaOptions$folds, "x", htDiaOptions$repetitions, " cross validation ", htDiaOptions$crossValidation, "..."))
+
 psmeOptions = tibble(fitHeightPrimary = TRUE,
                      fitHeightMixed = TRUE,
                      fitDbhPrimary = TRUE,
@@ -10,10 +12,9 @@ psmeOptions = tibble(fitHeightPrimary = TRUE,
                      fitPhysioGams = TRUE,
                      recalcPreferredModels = FALSE)
 
-source("trees/height-diameter/setup.R")
 progressr::handlers(global = TRUE)
 progressr::handlers("progress")
-future::plan(future::multisession, workers = 10)
+future::plan(future::multisession, workers = 8)
 
 source("trees/height-diameter/PSME.R")
 warnings()

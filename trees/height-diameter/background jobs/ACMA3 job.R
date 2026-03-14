@@ -1,9 +1,10 @@
-library(dplyr)
-
 # processor  cross validation   workers   runtime
-# 9950X      10x10              10        20 min          
+# 9950X      10x10              10        20 min
+#            5x200              8         1:41 + 1:43 + 1:15 + 27 = 5h11m
 jobStartTime = Sys.time()
 source("trees/height-diameter/setup.R")
+message(paste0(htDiaOptions$folds, "x", htDiaOptions$repetitions, " cross validation ", htDiaOptions$crossValidation, "..."))
+
 acmaOptions = tibble(fitHeight = TRUE,
                      fitHeightMixed = TRUE,
                      fitDbh = TRUE,
@@ -12,7 +13,7 @@ acmaOptions = tibble(fitHeight = TRUE,
 
 progressr::handlers(global = TRUE)
 progressr::handlers("progress")
-future::plan(future::multisession, workers = 10)
+future::plan(future::multisession, workers = 8)
 
 source("trees/height-diameter/ACMA3.R")
 warnings()
