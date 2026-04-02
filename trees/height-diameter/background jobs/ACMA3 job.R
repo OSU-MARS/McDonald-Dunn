@@ -3,6 +3,11 @@
 #            5x200              8         1:41 + 1:43 + 1:15 + 27 = 5h11m
 jobStartTime = Sys.time()
 source("trees/height-diameter/setup.R")
+
+htDiaOptions$folds = 5
+htDiaOptions$repetitions = 100
+htDiaOptions$crossValidation = "randomByCruiseRecord" # blockedByStand, randomByCruiseRecord
+
 message(paste0(htDiaOptions$folds, "x", htDiaOptions$repetitions, " cross validation ", htDiaOptions$crossValidation, "..."))
 
 acmaOptions = tibble(fitHeight = TRUE,

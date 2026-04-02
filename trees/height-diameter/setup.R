@@ -248,7 +248,7 @@ fit_gam = function(name, formula, data, family = gaussian(), crossValidation = h
           #trainingData = rsample::analysis(otherHeightFromDiameterMixed$gam$splits[[1]])
           #validationData = rsample::assessment(otherHeightFromDiameterMixed$gam$splits[[1]])
           #intersect(validationData$stand, trainingData$stand)
-          validationPrediction = validationPrediction + get_random_effects(fittedGam$lme, validationData, levelOffset = 1)
+          validationPrediction = validationPrediction + get_random_effects(fittedGam$lme, validationData, includePlotEffects = (responseVariable == "height"), levelOffset = 1)
         }
       }
     } else {
@@ -353,11 +353,21 @@ fit_gsl_nls = function(name, formula, data, start, control = gsl_nls_control(max
 fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
 {
   responseVariable = get_response_variable(formula)
+  predictorVariables = all.vars(rlang::f_rhs(formula)) # lm() formulas don't include coefficients
+  if (distinct == FALSE)
+  {
+    # reduce runtime by skipping linear regressions which are marked as not distinct
+    message(paste0(name, " for ", folds, "x", repetitions, " ", responseVariable, " not fit using lme() as it is not a distinct model form."))
+    notDistinctFitStats = create_fit_statistics(name = name, fittingMethod = "lm", fitSet = "primary")
+    notDistinctFitStats$distinct = FALSE
+    notDistinctFitStats$predictors[[1]] = predictorVariables
+    return(notDistinctFitStats)
+  }
+  
   message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using lm()..."))
   progressBar = progressr::progressor(steps = folds * repetitions)
 
   # separate height and diameter all fit cases and cross validation setups since height prediction uses offset
-  predictorVariables = all.vars(rlang::f_rhs(formula)) # lm() formulas don't include coefficients
   if (responseVariable == "height")
   {
     if ((folds == 1) & (repetitions == 1))
@@ -439,10 +449,21 @@ fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions =
 fit_lme = function(name, data, fixedFormula, randomFormula, start, control = lmeControl(maxIter = 100), crossValidation = htDiaOptions$crossValidation, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
 {
   responseVariable = get_response_variable(fixedFormula)
+  predictorVariables = all.vars(rlang::f_rhs(fixedFormula)) # lme() formulas don't include coefficients
+  if (distinct == FALSE)
+  {
+    # don't fit linear regressions which are marked as not distinct
+    # This bypass reduces runtime but also reduces risk of hitting future's instability should lme() fail on an internal error.
+    message(paste0(name, " for ", folds, "x", repetitions, " ", responseVariable, " not fit using lme() as it is not a distinct model form."))
+    notDistinctFitStats = create_fit_statistics(name = name, fittingMethod = "lme", fitSet = "primary")
+    notDistinctFitStats$distinct = FALSE
+    notDistinctFitStats$predictors[[1]] = predictorVariables
+    return(notDistinctFitStats)
+  }
+  
   message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using lme()..."))
   progressBar = progressr::progressor(steps = folds * repetitions)
   
-  predictorVariables = all.vars(rlang::f_rhs(fixedFormula)) # lme() formulas don't include coefficients
   startFit = Sys.time()
   if ((folds == 1) & (repetitions == 1))
   {
@@ -456,7 +477,7 @@ fit_lme = function(name, data, fixedFormula, randomFormula, start, control = lme
     validationPrediction = predict(allFitLinear, validationData, level = 0)
     if (crossValidation != "blockedByStand")
     {
-      validationPrediction = validationPrediction + get_random_effects(allFitLinear, validationData)
+      validationPrediction = validationPrediction + get_random_effects(allFitLinear, validationData, includePlotEffects = (responseVariable == "height"))
     }
     allFitStats = get_fit_statistics(name = name, fittingMethod = "lme", responseVariable = responseVariable, 
                                      trainingData = data, trainingPrediction = fitted(allFitLinear), estimatedParameters = length(fixed.effects(allFitLinear)) + length(random.effects(allFitLinear)), 
@@ -484,7 +505,7 @@ fit_lme = function(name, data, fixedFormula, randomFormula, start, control = lme
     validationPrediction = predict(linearModel, validationData, level = 0)
     if (crossValidation != "blockedByStand")
     {
-      validationPrediction = validationPrediction + get_random_effects(linearModel, validationData)
+      validationPrediction = validationPrediction + get_random_effects(linearModel, validationData, includePlotEffects = (responseVariable == "height"))
     }
     fitStatistics = get_fit_statistics(name = name, fittingMethod = "lme", responseVariable = responseVariable, 
                                        trainingData = trainingData, trainingPrediction = fitted(linearModel), estimatedParameters = length(fixed.effects(linearModel)) + length(random.effects(linearModel)),
@@ -519,7 +540,7 @@ fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start
     # This bypass reduces runtime but is primarily motivated by avoiding future's instability and consequent tendency to error out during 
     # cross validation of subsequent model fits. The probability of an internal error in future increases as k decreases.
     message(paste0(name, " for ", folds, "x", repetitions, " ", responseVariable, " not fit using nlme() as it is not a distinct model form."))
-    notDistinctFitStats = create_fit_statistics(name = name, fittingMethod = "gsl_nls", fitSet = "primary")
+    notDistinctFitStats = create_fit_statistics(name = name, fittingMethod = "nlme", fitSet = "primary")
     notDistinctFitStats$distinct = FALSE
     notDistinctFitStats$predictors[[1]] = get_predictors_nonlinear_formula_only(modelFormula)
     return(notDistinctFitStats)
@@ -545,7 +566,7 @@ fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start
     validationPrediction = predict(allFitNonlinear, validationData, level = 0)
     if (crossValidation != "blockedByStand")
     {
-      validationPrediction = validationPrediction + get_random_effects(allFitNonlinear, validationData)
+      validationPrediction = validationPrediction + get_random_effects(allFitNonlinear, validationData, includePlotEffects = (responseVariable == "height"))
     }
     allFitStats = get_fit_statistics(name = name, fittingMethod = "nlme", responseVariable = responseVariable, 
                                      trainingData = data, trainingPrediction = fitted(allFitNonlinear), estimatedParameters = length(fixed.effects(allFitNonlinear)) + length(random.effects(allFitNonlinear)), 
@@ -573,7 +594,7 @@ fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start
     validationPrediction = predict(nonlinearModel, validationData, level = 0)
     if (crossValidation != "blockedByStand")
     {
-      validationPrediction = validationPrediction + get_random_effects(nonlinearModel, validationData)
+      validationPrediction = validationPrediction + get_random_effects(nonlinearModel, validationData, includePlotEffects = (responseVariable == "height"))
     }
     fitStatistics = get_fit_statistics(name = name, fittingMethod = "nlme", responseVariable = responseVariable, 
                                        trainingData = trainingData, trainingPrediction = fitted(nonlinearModel), estimatedParameters = length(fixed.effects(nonlinearModel)) + length(random.effects(nonlinearModel)),
@@ -867,13 +888,14 @@ get_goodness_of_fit_statistics = function(data, predicted, measured, weights, es
 # Formulas for nonlinear regressions contain both coefficients and predictors as variables.
 get_predictors_nonlinear = function(model, formula)
 {
-  return(setdiff(all.vars(rlang::f_rhs(formula)), names(coef(model))))
+  return(setdiff(all.vars(rlang::f_rhs(formula)), names(coef(model)))) # lets pi through from gsl_nls() formulas using aspect
 }
 
 get_predictors_nonlinear_formula_only = function(formula)
 {
-  # if only formula is available, filter out known coefficient names
-  return(setdiff(all.vars(rlang::f_rhs(formula)), c("a0", "a1", "a1p", "a1rd", "a1rh", "a1bal", "a1balr", "a1aba", "a1aat", "a1e", "a1s", "a1as", "a1ac", "a1tr", "a1tw", "a2", "a2rd", "a2bal", "a2balr", "a2p", "a3", "a3p", "b1", "b1p", "b1rd", "b1ba", "b1bal", "b1balr", "b1aba", "b1abap", "b1aat", "b1aatp", "b1rh", "b1as", "b1ac", "b1e", "b1tw", "b2", "b2p", "b2rd", "b2rdp", "b2rh", "b2ba", "b2bal", "b2balr", "b2aba", "b2aat", "b2s", "b2as", "b2ac", "b2e", "b2tw", "b3", "b3rd", "b3bal", "b3balr", "b3tr", "b4", "b4p", "b4d", "b4rd", "b4ba", "b4bal", "b4balr", "b4e", "b4as", "b4ac", "b4tw", "Ha", "Hap", "d", "dp", "kU")))
+  # if only formula is available, filter out known coefficient names for fixed and and random effects
+  # Also filter out pi as it's used with aspect in non-GAM physiographic pfits.
+  return(setdiff(all.vars(rlang::f_rhs(formula)), c("a0", "a1", "a1p", "a1rd", "a1rh", "a1ba", "a1bal", "a1balr", "a1aba", "a1aat", "a1aatr", "a1e", "a1s", "a1as", "a1ac", "a1tr", "a1tw", "a1ra", "a1rm", "a2", "a2rd", "a2bal", "a2balr", "a2p", "a3", "a3p", "b1", "b1p", "b1rd", "b1ba", "b1bal", "b1balr", "b1aba", "b1abap", "b1aat", "b1aatp", "b1aatr", "b1rh", "b1as", "b1ac", "b1e", "b1tw", "b1ra", "b1rm", "b2", "b2p", "b2rd", "b2rdp", "b2rh", "b2ba", "b2bal", "b2balr", "b2aba", "b2aat", "b2aatr", "b2s", "b2as", "b2ac", "b2e", "b2tw", "b2ra", "b2rm", "b3", "b3rd", "b3bal", "b3balr", "b3tr", "b3ra", "b3rm", "b4", "b4p", "b4d", "b4rd", "b4ba", "b4bal", "b4balr", "b4e", "b4as", "b4ac", "b4tw", "b4ra", "b4rm", "Ha", "Hap", "d", "dp", "kU", "pi")))
 }
 
 get_preferred_model_linetype_legend = function()
@@ -890,13 +912,15 @@ get_preferred_model_linetype_legend = function()
 # assumes mixedEffectModel is from lme() or nlme() and thus that predict() resolves to predict.lme() or predict.nlme()
 # mgcv::gamm()'s use of lme() introduces an additional level with mean random effects. Per gamm()'s documentation these are ignored (observed values have been small, ~1E-8)
 # by specifying levelOffset = 1.
-get_random_effects = function(mixedEffectModel, data, levelOffset = 0)
+get_random_effects = function(mixedEffectModel, data, includePlotEffects = TRUE, levelOffset = 0)
 {
   standEffects = random.effects(mixedEffectModel, level = 1 + levelOffset)
-  plotEffects = random.effects(mixedEffectModel, level = 2 + levelOffset)
-  
-  randomEffects = replace_na(standEffects[paste0("1/", data$stand), 1], 0) + # stand level effects with fallback back to population if stand isn't in training data
-                  replace_na(plotEffects[paste0("1/", data$stand, "/", data$plot), 1], 0) # plot level effects with fallback
+  randomEffects = replace_na(standEffects[paste0("1/", data$stand), 1], 0) # stand level effects with fallback back to population predictions if stand isn't in training data
+  if (includePlotEffects)
+  {
+    plotEffects = random.effects(mixedEffectModel, level = 2 + levelOffset)
+    randomEffects = randomEffects + replace_na(plotEffects[paste0("1/", data$stand, "/", data$plot), 1], 0) # plot level effects with population fallback if plot isn't in training data
+  }
   #print(paste0(length(randomEffects), " random effects predicted for ", nrow(data), " rows of data from ", nrow(standEffects), " stand effects and ", nrow(plotEffects), " plot effects."))
   
   return(randomEffects)
@@ -923,9 +947,20 @@ get_response_variable = function(formula)
   return(responseVariable)
 }
 
-plot_auc_bank = function(aucs1, aucs2 = NULL, generalized = FALSE, fillLabel = "median AUC", xLimits = c("Douglas-fir", "grand fir", "bigleaf maple", "other species"), nPreferredModelBoxes = 2, legendHjustification = 1.8, plotRightMargin = 8, bounds = FALSE)
+plot_auc_bank = function(aucs1, aucs2 = NULL, aucs3 = NULL, aucs4 = NULL, generalized = FALSE, fillLabel = "median AUC", xLimits = c("Douglas-fir", "grand fir", "bigleaf maple", "other species"), nPreferredModelBoxes = 2, legendHjustification = 1.8, plotRightMargin = 0, bounds = FALSE)
 {
+  if ((bounds == FALSE) & ((is.null(aucs3) == FALSE) | (is.null(aucs4) == FALSE)))
+  {
+    stop("aucs3 and 4 are only supported with bounds = TRUE.")
+  }
+  
   aucColorbarTheme = theme(legend.key.width = unit(6.5, "lines"), legend.title = element_text(size = 9, vjust = 0.85))
+  if (aucs1$crossValidation[1] == "blockedByStand")
+  {
+    crossValidationTitleSuffix1 = " by stand"
+  } else {
+    crossValidationTitleSuffix1 = " by record"
+  }
   if (generalized)
   {
     nameAndFitToDisplay1 = unique((aucs1 %>% filter(isBaseForm == FALSE, (isMixed == FALSE) | isMixedGeneralizedDisplay) %>% group_by(nameAndFit) %>% filter(any(distinct)))$nameAndFit) # exclude mixed models unless preferred and generalizations which are never distinct
@@ -943,45 +978,102 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, generalized = FALSE, fillLabel = "
     aucBank = ggplot() +
       geom_tile(aes(x = species, y = nameAndFit, fill = aucOutOfRange), aucsToDisplay1) + 
       labs(fill = fillLabel) +
-      scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
+      scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
       ggnewscale::new_scale_fill() +
       geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
       scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
       #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucOutOfRangeRank <= nPreferredModelBoxes, aucOutOfRangeRank <= nPreferredModelBoxes)), fill = "transparent") +
-      labs(title = paste0(plotLetters[1], " ", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1]), x = NULL, y = NULL, color = NULL, fill = NULL) +
+      labs(title = paste0(plotLetters[1], " ", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1], " ", crossValidationTitleSuffix1), x = NULL, y = NULL, color = NULL, fill = NULL) +
       scale_y_discrete(limits = yAxisLimits, drop = FALSE)
     
     if (is.null(aucs2) == FALSE)
     {
+      if (aucs2$crossValidation[1] == "blockedByStand")
+      {
+        crossValidationTitleSuffix2 = " by stand"
+      } else {
+        crossValidationTitleSuffix2 = " by record"
+      }
+      
       aucsToDisplay2 = aucs2 %>% filter(nameAndFit %in% yAxisLimits)
       aucBank = aucBank + 
         ggplot() +
           geom_tile(aes(x = species, y = nameAndFit, fill = aucOutOfRange), aucsToDisplay2) +
           labs(fill = fillLabel) +
-          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
+          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
           ggnewscale::new_scale_fill() +
           geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2) +
           scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
           #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucOutOfRangeRank <= nPreferredModelBoxes, aucOutOfRangeRank <= nPreferredModelBoxes)), fill = "transparent") +
-          labs(title = paste0(plotLetters[2], " ", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1]), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          labs(title = paste0(plotLetters[2], " ", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1], " ", crossValidationTitleSuffix2), x = NULL, y = NULL, color = NULL, fill = NULL) +
           scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE)
+      
+      if (is.null(aucs3) == FALSE)
+      {
+        if (aucs3$crossValidation[1] == "blockedByStand")
+        {
+          crossValidationTitleSuffix3 = " by stand"
+        } else {
+          crossValidationTitleSuffix3 = " by record"
+        }
+        
+        aucsToDisplay3 = aucs3 %>% filter(nameAndFit %in% yAxisLimits)
+        aucBank = aucBank + 
+          ggplot() +
+          geom_tile(aes(x = species, y = nameAndFit, fill = aucOutOfRange), aucsToDisplay3) +
+          labs(fill = fillLabel) +
+          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
+          ggnewscale::new_scale_fill() +
+          geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay3) +
+          scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+          #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay3 %>% filter(if_else(isBaseForm, aucOutOfRangeRank <= nPreferredModelBoxes, aucOutOfRangeRank <= nPreferredModelBoxes)), fill = "transparent") +
+          labs(title = paste0(plotLetters[3], " ", aucsToDisplay3$folds[1], "×", aucsToDisplay3$repetitions[1], " ", crossValidationTitleSuffix3), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE)
+       
+        if (is.null(aucs4) == FALSE)
+        {
+          if (aucs4$crossValidation[1] == "blockedByStand")
+          {
+            crossValidationTitleSuffix4 = " by stand"
+          } else {
+            crossValidationTitleSuffix4 = " by record"
+          }
+          
+          aucsToDisplay4 = aucs4 %>% filter(nameAndFit %in% yAxisLimits)
+          aucBank = aucBank + 
+            ggplot() +
+            geom_tile(aes(x = species, y = nameAndFit, fill = aucOutOfRange), aucsToDisplay4) +
+            labs(fill = fillLabel) +
+            scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
+            ggnewscale::new_scale_fill() +
+            geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay4) +
+            scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+            #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay4 %>% filter(if_else(isBaseForm, aucOutOfRangeRank <= nPreferredModelBoxes, aucOutOfRangeRank <= nPreferredModelBoxes)), fill = "transparent") +
+            labs(title = paste0(plotLetters[4], " ", aucsToDisplay4$folds[1], "×", aucsToDisplay4$repetitions[1], " ", crossValidationTitleSuffix4), x = NULL, y = NULL, color = NULL, fill = NULL) +
+            scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE)
+        } 
+      } else if (is.null(aucs4) == FALSE) {
+        stop("aucs4 is only supported if aucs3 is not null.")
+      }
+    } else if ((is.null(aucs3) == FALSE) | (is.null(aucs4) == FALSE)) {
+      stop("aucs3 and 4 are only supported if aucs2 is not null.")
     }
   } else {
     aucBank = ggplot() +
       geom_tile(aes(x = species, y = nameAndFit, fill = aucMae), aucsToDisplay1) +
       labs(fill = fillLabel) +
-      scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
+      scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
       ggnewscale::new_scale_fill() +
       geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
       geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucMaeRank <= nPreferredModelBoxes, aucMaeRank <= nPreferredModelBoxes)), fill = "transparent") +
       scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-      #labs(title = paste0("**", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1], " ", aucsToDisplay1$responseVariable[1], " cross validation**<br>", plotLetters[1], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-      labs(title = paste0("**", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1], " ", aucsToDisplay1$responseVariable[1], " cross validation**"), subtitle  = paste0(plotLetters[1], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+      #labs(title = paste0("**", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1], " ", aucsToDisplay1$responseVariable[1], " cross validation", crossValidationTitleSuffix1 ,"**<br>", plotLetters[1], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+      labs(title = paste0("**", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1], " ", aucsToDisplay1$responseVariable[1], " cross validation", crossValidationTitleSuffix1, "**"), subtitle  = paste0(plotLetters[1], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
       scale_y_discrete(limits = yAxisLimits, drop = FALSE) +
     ggplot() +
       geom_tile(aes(x = species, y = nameAndFit, fill = aucRmse), aucsToDisplay1) +
       labs(fill = fillLabel) +
-      scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
+      scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
       ggnewscale::new_scale_fill() +
       geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
       geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucRmseRank <= nPreferredModelBoxes, aucRmseRank <= nPreferredModelBoxes)), fill = "transparent") +
@@ -992,9 +1084,9 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, generalized = FALSE, fillLabel = "
     ggplot() +
       geom_tile(aes(x = species, y = nameAndFit, fill = aucDeltaAicN), aucsToDisplay1) +
       labs(fill = fillLabel) +
-      scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "grey70") +
+      scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
       ggnewscale::new_scale_fill() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
+      geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1 %>% mutate(distinct = if_else(fitting == "ranger", FALSE, distinct))) +
       geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucDeltaAicNRank <= nPreferredModelBoxes, aucDeltaAicNRank <= nPreferredModelBoxes)), fill = "transparent") +
       scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
       #labs(title = paste0("<br>", plotLetters[3], " ΔAICn"), x = NULL, y = NULL, color = NULL, fill = NULL) +
@@ -1003,7 +1095,7 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, generalized = FALSE, fillLabel = "
     ggplot() +
       geom_tile(aes(x = species, y = nameAndFit, fill = aucNse), aucsToDisplay1) +
       labs(fill = fillLabel) +
-      scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
+      scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
       ggnewscale::new_scale_fill() +
       geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
       geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucNseRank <= nPreferredModelBoxes, aucNseRank <= nPreferredModelBoxes)), fill = "transparent") +
@@ -1014,24 +1106,31 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, generalized = FALSE, fillLabel = "
   
     if (is.null(aucs2) == FALSE)
     {
+      if (aucs2$crossValidation[1] == "blockedByStand")
+      {
+        crossValidationTitleSuffix2 = " by stand"
+      } else {
+        crossValidationTitleSuffix2 = " by record"
+      }
+      
       # have to repeat all the code as patchwork treats a group of plots returned by a function as being nested within a plot, failing to honor plot_layout(nrow, widths)
       aucsToDisplay2 = aucs2 %>% filter(nameAndFit %in% yAxisLimits)
       aucBank = aucBank +
         ggplot() +
           geom_tile(aes(x = species, y = nameAndFit, fill = aucMae), aucsToDisplay2) +
           labs(fill = fillLabel) +
-          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
+          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
           ggnewscale::new_scale_fill() +
           geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2) +
           geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucMaeRank <= nPreferredModelBoxes, aucMaeRank <= nPreferredModelBoxes)), fill = "transparent") +
           scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-          #labs(title = paste0("**", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1], " ", aucsToDisplay2$responseVariable[1], " cross validation**<br>", plotLetters[5], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-          labs(title = paste0("**", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1], " ", aucsToDisplay2$responseVariable[1], " cross validation**"), subtitle = paste0(plotLetters[5], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          #labs(title = paste0("**", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1], " ", aucsToDisplay2$responseVariable[1], " cross validation", crossValidationTitleSuffix2, "**<br>", plotLetters[5], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          labs(title = paste0("**", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1], " ", aucsToDisplay2$responseVariable[1], " cross validation", crossValidationTitleSuffix2, "**"), subtitle = paste0(plotLetters[5], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
           scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE) +
         ggplot() +
           geom_tile(aes(x = species, y = nameAndFit, fill = aucRmse), aucsToDisplay2) +
           labs(fill = fillLabel) +
-          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
+          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
           ggnewscale::new_scale_fill() +
           geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2) +
           geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucRmseRank <= nPreferredModelBoxes, aucRmseRank <= nPreferredModelBoxes)), fill = "transparent") +
@@ -1042,9 +1141,9 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, generalized = FALSE, fillLabel = "
         ggplot() +
           geom_tile(aes(x = species, y = nameAndFit, fill = aucDeltaAicN), aucsToDisplay2) +
           labs(fill = fillLabel) +
-          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "grey70") +
+          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
           ggnewscale::new_scale_fill() +
-          geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2) +
+          geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2 %>% mutate(distinct = if_else(fitting == "ranger", FALSE, distinct))) +
           geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucDeltaAicNRank <= nPreferredModelBoxes, aucDeltaAicNRank <= nPreferredModelBoxes)), fill = "transparent") +
           scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
           #labs(title = paste0("<br>", plotLetters[7], " ΔAICn"), x = NULL, y = NULL, color = NULL, fill = NULL) +
@@ -1053,7 +1152,7 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, generalized = FALSE, fillLabel = "
         ggplot() +
           geom_tile(aes(x = species, y = nameAndFit, fill = aucNse), aucsToDisplay2) +
           labs(fill = fillLabel) +
-          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme)) +
+          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
           ggnewscale::new_scale_fill() +
           geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2) +
           geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucNseRank <= nPreferredModelBoxes, aucNseRank <= nPreferredModelBoxes)), fill = "transparent") +
@@ -1122,11 +1221,27 @@ predict_bootstrap_dbh = function(trees)
                             "ACMA" ~ trees$dbh + rnorm(n = nrow(trees), mean = 0, sd = sqrt(0.0258 * trees$dbh^1.613)),
                             .default = trees$dbh + rnorm(n = nrow(trees), mean = 0, sd = sqrt(0.000661 * trees$dbh^2.037))),
                  # height measured: predict DBH from bootstrap models selected by 10x10 cross validation
+                 # bootstrap DBH model selection on RMSE AUC basis
+                 # species  cross validation  top model (highest AUC)    second model               third model
+                 # PSME     2x500             Ruark                      Chapman-Richards replace   Michaelis-Menten replace   Ruark by ~0.013
+                 #          5x200             Ruark                      Chapman-Richards replace   Michaelis-Menten replace   spread < 0.0002
+                 #          10x100            Chapman-Richards replace   Sibbesen replace           Ruark                      spread < 0.0002 
+                 # ABGR     2x500             linear                     Sibbesen replace physio    Schnute inverse
+                 #          5x200             linear mixed               linear                     Sibbesen replace physio
+                 #          10x100            linear mixed               linear                     Sibbesen replace physio
+                 # ACMA     2x500             random forest              REML GAM                   power mixed
+                 #          5x200             random forest              REML GAM                   power mixed
+                 #          10x100            random forest              REML GAM                   power mixed
+                 # other    2x500             REML GAM physio            REML GAM physio mixed      REML GAM
+                 #          5x200             REML GAM physio            REML GAM physio mixed      REML GAM
+                 #          10x100            REML GAM physio            REML GAM physio mixed      REML GAM
                  case_match(trees$species,
-                            "PSME" ~ (1.941428 - 0.088674 * cos(3.14159/180 * trees$aspect)) * (trees$height - 1.37)^(0.851545) * exp((0.008463 + 0.002658 * trees$relativeHeight) * (trees$height - 1.37)), # Ruark RelHt physio, could also use Sibbesen replace RelHt physio
-                            "ABGR" ~ (2.0238 + 0.4090 * trees$relativeHeight) * (trees$height - 1.37)^(0.8846), # power RelHt
+                            "PSME" ~ 1.92785 * (trees$height - 1.37)^(0.84484) * exp((0.01328 - 0.00111 * trees$isPlantation) * (trees$height - 1.37)), # Ruark
+                            #"PSME" ~ (1.941428 - 0.088674 * cos(3.14159/180 * trees$aspect)) * (trees$height - 1.37)^(0.851545) * exp((0.008463 + 0.002658 * trees$relativeHeight) * (trees$height - 1.37)), # Ruark RelHt physio
+                            "ABGR" ~ 0.3416 + 1.6565 * (trees$height - 1.37), # linear
+                            #"ABGR" ~ (2.0238 + 0.4090 * trees$relativeHeight) * (trees$height - 1.37)^(0.8846), # power RelHt
                             "ACMA" ~ predict(acmaDiameterFromHeightPreferred$randomForest, trees)$predictions,
-                            .default = predict(otherDiameterFromHeightPreferred$gam, trees))))
+                            .default = predict(otherDiameterFromHeightPreferred$gamPhysio, trees))))
 }
 
 # called to reset future's workers if one fails with an error
@@ -1169,6 +1284,18 @@ to_parameter_confidence_intervals = function(crossValidationWithModels)
           arrange(parameter, repetition, fold))
 }
 
+unnest_and_bind = function(species, heightFromDiameter, heightFromDiameterMixed, diameterFromHeight, diameterFromHeightMixed, unnestFunction)
+{
+  return(bind_rows(bind_rows(bind_rows(lapply(heightFromDiameter, unnestFunction)),
+                             bind_rows(lapply(heightFromDiameterMixed, unnestFunction))) %>%
+                     mutate(responseVariable = "height"),
+                   bind_rows(bind_rows(lapply(diameterFromHeight, unnestFunction)),
+                             bind_rows(lapply(diameterFromHeightMixed, unnestFunction))) %>%
+                     mutate(responseVariable = "DBH")) %>%
+           mutate(species = species) %>%
+           relocate(fitSet, species, responseVariable))
+}
+
 unnest_coefficients = function(fit)
 {
   if (all(fit$fitting %in% c("gam", "gamm", "ranger")))
@@ -1183,9 +1310,15 @@ unnest_coefficients = function(fit)
   
   # standardize naming of linear model coefficients, if present
   coefficients %<>% rename(any_of(c(a0 = "(Intercept)", 
-                                    a1 = "dbh", a1 = "I(height - 1.37)", a1p = "I(isPlantation * dbh)", a1p = "I(isPlantation * (height - 1.37))",
+                                    a1 = "dbh", a1 = "I(height - 1.37)", a1p = "I(isPlantation * dbh)", a1p = "I(isPlantation * (height - 1.37))", a1rh = "relativeHeight", a1rhp = "I(isPlantation*relativeHeight)", a1aba = "I(1/bootstrapStandBasalAreaPerHectare)", a1aat = "I(1/(1 + basalAreaTaller))",
                                     a2 = "I(dbh^2)", a2 = "I((height - 1.37)^2)", a2p = "I(isPlantation * dbh^2)", a2p = "I(isPlantation * (height - 1.37)^2)")))
   return(coefficients)
+}
+
+unnest_predictors = function(fit)
+{
+  return(tibble(fitSet = fit$fitSet[1], name = fit$name[1], fitting = fit$fitting[1], distinct = fit$distinct[1],
+                !!!setNames(rep(TRUE, length(fit$predictors[[1]])), fit$predictors[[1]])))
 }
 
 unnest_validation_statistics = function(fit)
@@ -1489,7 +1622,7 @@ if (htDiaOptions$includeSetup)
     scale_color_manual(breaks = c("GAM", "power"), values = c("red", "cyan2")) &
     scale_linetype_manual(breaks = c(FALSE, TRUE), labels = c("unfactored\nor natural\nregeneration", "plantation"), values = c("solid", "longdash")) &
     theme(legend.justification = c(0.5, 0.9), legend.spacing.y = unit(0.2, "line"))
-  #ggsave("trees/height-diameter/figures/Figure S variance models.png", height = 12, width = 16.5, units = "cm", dpi = 300)
+  #ggsave("trees/height-diameter/figures/Figure S01 variance models.png", height = 12, width = 16.5, units = "cm", dpi = 300)
 }
 
 

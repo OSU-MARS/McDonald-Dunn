@@ -222,7 +222,7 @@ if (abgrOptions$fitHeightMixed)
   #                                                                start = list(fixed = c(a1 = 65, b1 = -0.02, b1ac = -0.001, b2 = 1.2, b2ba = 0.004, b2bal = 3.6, b2balr = 3.6)), distinct = FALSE)
   abgrHeightFromDiameterMixed$chapmanRichardsBalPhysio = fit_nlme("Chapman-Richards BA+L physio", height ~ 1.37 + (a1 + a1ra + a1ba * standBasalAreaPerHectare + a1bal * basalAreaLarger) * (1 - exp((b1 + b1ac * cos(3.14159/180 * aspect))*dbh))^b2, abgr2022,
                                                                   fixedFormula = a1 + a1ba + a1bal + b1 + b1ac + b2 ~ 1, randomFormula = a1ra ~ 1|stand/plot,
-                                                                  start = list(fixed = c(a1 = 65, a1ba = -0.1, a1bal = 0.3, b1 = -0.01, b1ac = 0, b2 = 1.3)))
+                                                                  start = list(fixed = c(a1 = 65, a1ba = -0.1, a1bal = 0.3, b1 = -0.01, b1ac = 0, b2 = 1.3))) # 5x200 random singularity in backsolve
   #abgrHeightFromDiameterMixed$chapmanRichardsBalPhysioRelDbh = fit_nlme("Chapman-Richards RelDbh BA+L physio", height ~ 1.37 + (a1 + a1ra) * (1 - exp((b1 + b1rd * relativeDiameter + b1ac * cos(3.14159/180 * aspect))*dbh))^(b2 + b2ba * standBasalAreaPerHectare + b2bal / (b2balr + basalAreaLarger)), abgr2022, 
   #                                                                     fixedFormula = a1 + a1bal + a1balp + b1 + b1rd + b1ac + b2 + b1bal + b2balr ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                                      start = list(fixed = c(a1 = 65, b1 = -0.02, b1rd = 0.001, b1ac = -0.001, b2 = 1.2, b2ba = 0.004, b2bal = 3.6, b2balr = 3.6)), distinct = FALSE)
@@ -273,7 +273,7 @@ if (abgrOptions$fitHeightMixed)
   #                                            start = list(fixed = c(a1 = 200, b1 = -8, b2 = -0.2)))
   abgrHeightFromDiameterMixed$korf = fit_nlme("Korf", height ~ 1.37 + a1*exp(b1*dbh^(b2 * (1 + b2rm))), abgr2022, # b1rm step halving, 10x10 MAE 1.93, AIC 632
                                               fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b2rm ~ 1|stand/plot, 
-                                              start = list(fixed = c(a1 = 200, b1 = -8, b2 = -0.2))) # 5x200, 10x100 step halving
+                                              start = list(fixed = c(a1 = 200, b1 = -8, b2 = -0.2))) # 5x200, 5x200 random, 10x100 step halving
   #abgrHeightFromDiameterMixed$korfA1 = fit_nlme("Korf", height ~ 1.37 + a1 * (1 + a1rm) * exp(b1 * dbh^(b2)), abgr2022, # 10x10 MAE 1.97, AIC 639
   #                                              fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = a1rm ~ 1|stand/plot, 
   #                                              start = list(fixed = c(a1 = 200, b1 = -8, b2 = -0.2)))
@@ -415,9 +415,9 @@ if (abgrOptions$fitHeightMixed)
   #abgrHeightFromDiameterMixed$sharmaPartonRelDbh = fit_nlme("Sharma-Parton RelDbh", height ~ 1.37 + a1*topHeight^(b1 + b1rd * relativeDiameter + b1ra)*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3)*dbh))^b4, abgr2022, # a1ra step halving, b2ra, b2rm, b3ra, b4ra singularity in backsolve, 10x10 MAE 1.85, AIC 582
   #                                                          fixedFormula = a1 + b1 + b1rd + b2 + b3 + b4 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                          start = list(fixed = c(a1 = 25, b1 = 0.3, b1rd = -0.03, b2 = -0.02, b3 = 0.1, b4 = 1.3)))
-  abgrHeightFromDiameter$sharmaPartonRelDbhPhysio = fit_nlme("Sharma-Parton RelDbh physio", height ~ 1.37 + (a1 + a1ac * cos(pi/180*aspect))*topHeight^(b1 + b1rd * relativeDiameter + b1ra) * (1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^b3*dbh))^(b4), abgr2022, 
-                                                             fixedFormula = a1 + a1ac + b1 + b1rd + b2 + b3 + b4 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
-                                                             start = list(a1 = 25, a1ac = 0, b1 = 0.3, b1rd = -0.03, b2 = -0.02, b3 = 0.1, b4 = 1.3), distinct = FALSE)
+  abgrHeightFromDiameterMixed$sharmaPartonRelDbhPhysio = fit_nlme("Sharma-Parton RelDbh physio", height ~ 1.37 + (a1 + a1ac * cos(pi/180*aspect))*topHeight^(b1 + b1rd * relativeDiameter + b1ra) * (1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^b3*dbh))^(b4), abgr2022, 
+                                                                  fixedFormula = a1 + a1ac + b1 + b1rd + b2 + b3 + b4 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
+                                                                  start = list(a1 = 25, a1ac = 0, b1 = 0.3, b1rd = -0.03, b2 = -0.02, b3 = 0.1, b4 = 1.3), distinct = FALSE)
   abgrHeightFromDiameterMixed$sharmaZhang = fit_nlme("Sharma-Zhang", height ~ 1.37 + a1*standBasalAreaPerHectare^(b1)*(1 - exp(b2*standTreesPerHectare^(b3 + b3ra)*dbh))^(b4 + b4p * isPlantation), abgr2022, # a1ra, b2ra, b4ra singularity in backsolve, 10x10 MAE 1.78, AIC 611
                                                      fixedFormula = a1 + b1 + b2 + b3 + b4 + b4p ~ 1, randomFormula = b3ra ~ 1|stand/plot,
                                                      start = list(fixed = c(a1 = 33, b1 = 0.15, b2 = -0.03, b3 = -0.06, b4 = 1.2, b4p = -0.1)))
@@ -429,7 +429,7 @@ if (abgrOptions$fitHeightMixed)
   #                                                     start = list(fixed = c(a1 = 38, b1 = 0.1, b2 = -0.03, b3 = 0, b4 = 1.3, b4p = -0.1)))
   abgrHeightFromDiameterMixed$sharmaZhangBal = fit_nlme("Sharma-Zhang BA+L", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1) * (1 - exp((b2)*standTreesPerHectare^(b3 + b3ra) * dbh))^(b4 + b4ba * standBasalAreaPerHectare), abgr2022, # a1ra, b2ra, b4ra singularity in backsolve, 10x10 MAE 1.80, AIC 583
                                                         fixedFormula = a1 + b1 + b2 + b3 + b4 + b4ba ~ 1, randomFormula = b3ra ~ 1|stand/plot,
-                                                        start = list(fixed = c(a1 = 20, b1 = 0.2, b2 = -0.03, b3 = -0.1, b4 = 1.0, b4ba = 0.007))) # 2x500, 5x200 singularity in backsolve
+                                                        start = list(fixed = c(a1 = 20, b1 = 0.2, b2 = -0.03, b3 = -0.1, b4 = 1.0, b4ba = 0.007))) # 2x500, 5x200, 5x200 random singularity in backsolve
   #abgrHeightFromDiameterMixed$sharmaZhangBalB1 = fit_nlme("Sharma-Zhang BA+L", height ~ 1.37 + (a1)*standBasalAreaPerHectare^(b1 + b1ra) * (1 - exp((b2)*standTreesPerHectare^(b3) * dbh))^(b4 + b4ba * standBasalAreaPerHectare), abgr2022, # 10x10 MAE 1.91, AIC 591
   #                                                        fixedFormula = a1 + b1 + b2 + b3 + b4 + b4ba ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                        start = list(fixed = c(a1 = 20, b1 = 0.2, b2 = -0.03, b3 = -0.1, b4 = 1.0, b4ba = 0.007)))
@@ -465,7 +465,7 @@ if (abgrOptions$fitHeightMixed)
   #                                                  start = list(fixed = c(a1 = 0.2, b1 = 1.8, b2 = -0.1)))
   abgrHeightFromDiameterMixed$weibull = fit_nlme("Weibull", height ~ 1.37 + (a1)*(1 - exp(b1*dbh^(b2*(1 + b2rm)))), abgr2022, # 10x10 MAE 1.88, AIC 612
                                                  fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b2rm ~ 1|stand/plot,
-                                                 start = list(fixed = c(a1 = 61, b1 = -0.01, b2 = 1.2))) # 2x50, 2x250, 2x500, 5x100, 5x200, 10x25, 10x100 max iterations, 5x200 max iterations
+                                                 start = list(fixed = c(a1 = 61, b1 = -0.01, b2 = 1.2))) # 2x50, 2x250, 2x500, 5x100, 5x200, 5x200 random, 10x25, 10x100 max iterations, 5x200 max iterations
   #abgrHeightFromDiameterMixed$weibullB1 = fit_nlme("Weibull", height ~ 1.37 + (a1)*(1 - exp(b1*(1 + b1rm)*dbh^(b2))), abgr2022, # a1rm max iterations, 10x10 MAE 1.94, AIC604
   #                                                 fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b1rm ~ 1|stand/plot,
   #                                                 start = list(fixed = c(a1 = 64, b1 = -0.01, b2 = 1.2)))
@@ -477,7 +477,7 @@ if (abgrOptions$fitHeightMixed)
   #                                                 start = list(fixed = c(a1 = 58, b1 = -0.01, b2 = 1.2)))
   abgrHeightFromDiameterMixed$weibullBal = fit_nlme("Weibull BA+L", height ~ 1.37 + (a1) * (1 - exp((b1 + b1bal / (b1balr + basalAreaLarger))*dbh^(b2*(1 + b2rm)))), abgr2022, # 10x10 MAE 1.75, AIC 598
                                                     fixedFormula = a1 + b1 + b1bal + b1balr + b2 ~ 1, randomFormula = b2rm ~ 1|stand/plot,
-                                                    start = list(fixed = c(a1 = 75, b1 = -0.006, b1bal = 0.02, b1balr = 10, b2 = 1.2))) # 2x50, 2x500 max iterations, 5x200 step halving
+                                                    start = list(fixed = c(a1 = 75, b1 = -0.006, b1bal = 0.02, b1balr = 10, b2 = 1.2))) # 2x50, 2x500, 5x200 random max iterations, 5x200 step halving
   #abgrHeightFromDiameterMixed$weibullBalA1 = fit_nlme("Weibull BA+L", height ~ 1.37 + (a1 + a1ra) * (1 - exp((b1 + b1bal / (b1balr + basalAreaLarger))*dbh^(b2))), abgr2022, # b1ra max iterations, 10x10 MAE 1.94, AIC 601
   #                                                    fixedFormula = a1 + b1 + b1bal + b1balr + b2 ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                    start = list(fixed = c(a1 = 70, b1 = -0.006, b1bal = 0.02, b1balr = 5, b2 = 1.2)))
@@ -498,7 +498,7 @@ if (abgrOptions$fitHeightMixed)
   #                                                     start = list(fixed = c(a1 = 100, a1rd = -10, b1 = -0.01, b2 = 1.2)))
   abgrHeightFromDiameterMixed$weibullRelDbh = fit_nlme("Weibull RelDbh", height ~ 1.37 + (a1 + a1rd * relativeDiameter)*(1 - exp((b1)*dbh^(b2*(1 + b2rm)))), abgr2022, # 10x10 MAE 1.82, AIC 578
                                                        fixedFormula = a1 + a1rd + b1 + b2 ~ 1, randomFormula = b2rm ~ 1|stand/plot,
-                                                       start = list(fixed = c(a1 = 90, a1rd = -6, b1 = -0.01, b2 = 1.2))) # 2x50, 2x250, 2x500, 5x100, 5x200 max iterations
+                                                       start = list(fixed = c(a1 = 90, a1rd = -6, b1 = -0.01, b2 = 1.2))) # 2x50, 2x250, 2x500, 5x100, 5x200, 5x200 random max iterations
   #to_fixed_coeffficients(abgrHeightFromDiameterMixed$weibullBal)
   #print(to_parameter_confidence_intervals(abgrHeightFromDiameterMixed$sharmaZhang), n = 40)
   #abgrHeightFromDiameterMixed$weibullBal$validation %>% summarize(maeMin = min(mae), maeMedian = median(mae), maeMean = mean(mae), maeMax = max(mae), aicMin = min(aic), aicMedian = median(aic), aicMean = mean(aic), aicMax = max(aic))
@@ -524,6 +524,9 @@ if (abgrOptions$fitDbhPrimary)
 {
   # linear regressions
   abgrDiameterFromHeight = list(linear = fit_lm("linear", dbh ~ I(height - 1.37), abgr2022)) # plantation not significant
+  abgrDiameterFromHeight$linearAbat = fit_lm("linear ABA+T", dbh ~ I(height - 1.37) + I(1/(1 + basalAreaTaller)), abgr2022, distinct = FALSE) # a1aba, a1abar, a1aat, a1aatr not significant
+  abgrDiameterFromHeight$linearAbatRelHt = fit_lm("linear RelHt ABA+T", dbh ~ I(height - 1.37) + relativeHeight + I(1/(1 + basalAreaTaller)), abgr2022, distinct = FALSE) # by propagation
+  abgrDiameterFromHeight$linearRelHt = fit_lm("linear RelHt", dbh ~ I(height - 1.37) + relativeHeight, abgr2022, distinct = FALSE) # a1rh, a1rhr not significant
   #abgrDiameterFromHeight$linearRelHtTopHt = fit_lm("linear", dbh ~ I(height - 1.37) + relativeHeight + topHeight, abgr2022, distinct = FALSE) # relativeHeight and topHeight not significant
   abgrDiameterFromHeight$parabolic = fit_lm("parabolic", dbh ~ I(height - 1.37) + I((height - 1.37)^2), abgr2022, distinct = FALSE) # dbh^2, plantation^2 not significant
   #lapply(abgrDiameterFromHeight$linearRelHt$fit, summary)
@@ -672,6 +675,9 @@ if (abgrOptions$fitDbhPrimary)
 if (abgrOptions$fitDbhMixed)
 {
   abgrDiameterFromHeightMixed = list(linear = fit_lme("linear", fixedFormula = dbh ~ I(height - 1.37), abgr2022, randomFormula = ~1|stand/plot)) # 2x500 false convergence, 5x200 singular convergence
+  abgrDiameterFromHeightMixed$linearAbat = fit_lme("linear ABA+T", fixedFormula = dbh ~ I(height - 1.37) + I(1/bootstrapStandBasalAreaPerHectare) + I(1/(1 + basalAreaTaller)), abgr2022, randomFormula = ~1|stand/plot, distinct = FALSE)
+  abgrDiameterFromHeightMixed$linearAbatRelHt = fit_lme("linear RelHt ABA+T", fixedFormula = dbh ~ I(height - 1.37) + relativeHeight + I(1/(1 + basalAreaTaller)), abgr2022, randomFormula = ~1|stand/plot, distinct = FALSE)
+  abgrDiameterFromHeightMixed$linearRelHt = fit_lme("linear RelHt", fixedFormula = dbh ~ I(height - 1.37) + relativeHeight, abgr2022, randomFormula = ~1|stand/plot, distinct = FALSE)
   abgrDiameterFromHeightMixed$parabolic = fit_lme("parabolic", fixedFormula = dbh ~ I((height - 1.37)^2), abgr2022, randomFormula = ~1|stand/plot)
   
   #abgrDiameterFromHeightMixed$chapmanReplace = fit_nlme("Chapman-Richards replace", dbh ~ (a1) * (exp((b1)*(height - 1.37)) - 1)^(b2 + b2ra), abgr2022, # a1ra max iterations, b1ra, b2ra singularity in backsolve
@@ -921,30 +927,23 @@ if (abgrOptions$fitHeightPrimary & abgrOptions$fitHeightMixed & abgrOptions$fitD
   if (exists("abgrDiameterFromHeight") == FALSE)
   { 
     abgrDiameterFromHeight = readRDS(paste0("trees/height-diameter/data/ABGR DBH ", get_cross_validation_data_suffix(), ".Rds")) 
+    #abgrDiameterFromHeight = list()
   }
   if (exists("abgrDiameterFromHeightMixed") == FALSE) 
   { 
-    abgrDiameterFromHeightMixed = readRDS(paste0("trees/height-diameter/data/ABGR DBH mixed ", get_cross_validation_data_suffix(), ".Rds")) 
+    abgrDiameterFromHeightMixed = readRDS(paste0("trees/height-diameter/data/ABGR DBH mixed ", get_cross_validation_data_suffix(), ".Rds"))
+    #abgrDiameterFromHeightMixed = list()
   }
   
-  abgrCoeffcients = bind_rows(bind_rows(bind_rows(lapply(abgrHeightFromDiameter, unnest_coefficients)),
-                                         bind_rows(lapply(abgrHeightFromDiameterMixed, unnest_coefficients))) %>%
-                                 mutate(responseVariable = "height"),
-                               bind_rows(bind_rows(lapply(abgrDiameterFromHeight, unnest_coefficients)),
-                                         bind_rows(lapply(abgrDiameterFromHeightMixed, unnest_coefficients))) %>%
-                                 mutate(responseVariable = "DBH")) %>%
-    mutate(species = "ABGR")
-  abgrFitStats = bind_rows(bind_rows(bind_rows(lapply(abgrHeightFromDiameter, unnest_validation_statistics)),
-                                    bind_rows(lapply(abgrHeightFromDiameterMixed, unnest_validation_statistics))) %>%
-                            mutate(responseVariable = "height"),
-                          bind_rows(bind_rows(lapply(abgrDiameterFromHeight, unnest_validation_statistics)),
-                                    bind_rows(lapply(abgrDiameterFromHeightMixed, unnest_validation_statistics))) %>%
-                            mutate(responseVariable = "DBH")) %>%
-    mutate(species = "ABGR")
+  abgrCoefficients = unnest_and_bind("ABGR", abgrHeightFromDiameter, abgrHeightFromDiameterMixed, abgrDiameterFromHeight, abgrDiameterFromHeightMixed, unnest_coefficients)
+  abgrFitStats = unnest_and_bind("ABGR", abgrHeightFromDiameter, abgrHeightFromDiameterMixed, abgrDiameterFromHeight, abgrDiameterFromHeightMixed, unnest_validation_statistics)
+  abgrPredictors = unnest_and_bind("ABGR", abgrHeightFromDiameter, abgrHeightFromDiameterMixed, abgrDiameterFromHeight, abgrDiameterFromHeightMixed, unnest_predictors) %>%
+    mutate(across(where(is.logical), ~replace_na(.x, FALSE)))
 
   check_plot_fit_stats(abgrFitStats)
-  saveRDS(abgrCoeffcients, paste0("trees/height-diameter/data/ABGR coefficients ", get_cross_validation_data_suffix(), ".Rds"))
+  saveRDS(abgrCoefficients, paste0("trees/height-diameter/data/ABGR coefficients ", get_cross_validation_data_suffix(), ".Rds"))
   saveRDS(abgrFitStats, paste0("trees/height-diameter/data/ABGR fit stats ", get_cross_validation_data_suffix(), ".Rds"))
+  saveRDS(abgrPredictors, paste0("trees/height-diameter/data/ABGR predictors ", get_cross_validation_data_suffix(), ".Rds"))
 }
 
 
@@ -965,6 +964,8 @@ if (abgrOptions$recalcPreferredModels)
                                                 threads = 2, folds = 1, repetitions = 1)
   abgrHeightFromDiameterPreferred$hossfeld = fit_gsl_nls("Hossfeld IV", height ~ 1.37 + a1 / (1 + a2 * dbh^b1), abgr2022, 
                                                          start = list(a1 = 80, a2 = 200, b1 = -1.3), folds = 1, repetitions = 1)
+  abgrHeightFromDiameterPreferred$michaelisMenten = fit_gsl_nls("Michaelis-Menten", height ~ 1.37 + a1*dbh^b1 / (a2 + dbh^b1), abgr2022, 
+                                                                start = list(a1 = 85, a2 = 200, b1 = 1.3), folds = 1, repetitions = 1)
   abgrHeightFromDiameterPreferred$randomForest = fit_ranger("random forest", c("height", "dbh"), abgr2022, mtry = 1, minNodeSize = 15, sampleFraction = 0.220, folds = 1, repetitions = 1)
   #abgrHeightFromDiameterPreferred$randomForestBalPhysioRelDbh = fit_ranger("random forest RelDbh BA+L physio", c("height", "dbh", "relativeDiameter", "basalAreaLarger", "standQmd", "topHeight", "standBasalAreaPerHectare", "terrainRoughness", "slope"),
   #                                                                         abgr2022, mtry = 4, minNodeSize = 2, sampleFraction = 0.513, folds = 1, repetitions = 1)
@@ -973,9 +974,11 @@ if (abgrOptions$recalcPreferredModels)
   saveRDS(abgrHeightFromDiameterPreferred, "trees/height-diameter/data/abgr preferred height models.Rds")
   
   abgrDiameterFromHeightPreferred = list(linear = fit_lm("linear", dbh ~ I(height - 1.37), abgr2022, folds = 1, repetitions = 1))
-  abgrDiameterFromHeightPreferred$powerAbat = fit_gsl_nls("power ABA+T", dbh ~ (a1)*(height - 1.37)^(b1 + b1aat * basalAreaTaller), abgr2022, start = list(a1 = 2.1, b1aat = -0.001, b1 = 0.9), folds = 1, repetitions = 1)
-  #abgrDiameterFromHeightPreferred = list(gam = fit_gam("REML GAM", dbh ~ I(1.9505 * (height - 1.37)^0.9556) + s(height, bs = "ts", k = 3), data = abgr2022, threads = 2, folds = 1, repetitions = 1))
-  #abgrDiameterFromHeightPreferred$ruark = fit_gsl_nls("Ruark", dbh ~ a1*(height - 1.37)^b1 * exp(b2 * (height - 1.37)), abgr2022, start = list(a1 = 2.2, b1 = 0.8, b2 = 0.007), folds = 1, repetitions = 1)
+  #abgrDiameterFromHeightPreferred$gam = gam = fit_gam("REML GAM", dbh ~ I(1.9505 * (height - 1.37)^0.9556) + s(height, bs = "ts", k = 3), data = abgr2022, threads = 2, folds = 1, repetitions = 1)
+  abgrDiameterFromHeightPreferred$powerAbat = fit_gsl_nls("power ABA+T", dbh ~ (a1)*(height - 1.37)^(b1 + b1aat * basalAreaTaller), abgr2022, 
+                                                          start = list(a1 = 2.1, b1aat = -0.001, b1 = 0.9), folds = 1, repetitions = 1)
+  abgrDiameterFromHeightPreferred$ruark = fit_gsl_nls("Ruark", dbh ~ a1*(height - 1.37)^b1 * exp(b2 * (height - 1.37)), abgr2022, 
+                                                      start = list(a1 = 2.2, b1 = 0.8, b2 = 0.007), folds = 1, repetitions = 1)
   #abgrDiameterFromHeightPreferred$ruarkMixed = fit_nlme("Ruark", dbh ~ (a1) * (height - 1.37)^(b1 + b1ra) * exp((b2) * (height - 1.37)), abgr2022,
   #                                                      fixedFormula = a1 + b1 + b2 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
   #                                                      start = list(fixed = c(a1 = 2.2, b1 = 0.8, b2 = 0.007)), folds = 1, repetitions = 1)

@@ -4,14 +4,15 @@ inventory/
 Stand*/
 
 # QGIS, RStudio, and other user data
-McDonald-Dunn.qgz
-McDonald-Dunn.Rproj
 .Rhistory
 .Rproj.user/
+**/*.gpkg
 **/*.jpg
 **/*.jpeg
 **/*.png
+**/*.qgz
 **/*.Rds
+**/*.Rproj
 **/*.svg
 **/*.xlsx
 **/*.xlsx#

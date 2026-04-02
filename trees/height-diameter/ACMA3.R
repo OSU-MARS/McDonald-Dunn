@@ -283,12 +283,12 @@ if (acmaOptions$fitHeightMixed)
   #acmaHeightFromDiameterMixed$richardsW = fit_nlme("unified Richards", height ~ 1.37 + (Ha + Har) * (1 + ((1.37/(Ha + Hara))^(1 - d) - 1) * exp((-kU * dbh)/d^(d/(1 - d))))^(1/(1 - d)), acma2022, # kUr singularity in backsolve, dr step halving, 10x10 MAE 2.68, AIC 1337
   #                                                 fixedFormula = Ha + d + kU ~ 1, randomFormula = Hara ~ 1|stand/plot,
   #                                                 start = list(fixed = c(Ha = 24, d = 0.7, kU = 0.04)))
-  acmaHeightFromDiameterMixed$sharmaParton = fit_nlme("Sharma-Parton", height ~ 1.37 + a1*topHeight^(b1 + b1ra)*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^b3*dbh))^b4, acma2022, # a1ra, b2ra, b4ra singularity in backsolve, b3ra max iterations, 10x10 MAE 2.38, AIC 1195
-                                                      fixedFormula = a1 + b1 + b2 + b3 + b4 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
-                                                      start = list(fixed = c(a1 = 12, b1 = 0.25, b2 = -0.04, b3 = 0.1, b4 = 1.1)))
+  #acmaHeightFromDiameterMixed$sharmaParton = fit_nlme("Sharma-Parton", height ~ 1.37 + a1*topHeight^(b1 + b1ra)*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^b3*dbh))^b4, acma2022, # a1ra, b2ra, b4ra singularity in backsolve, b3ra max iterations, 10x10 MAE 2.38, AIC 1195
+  #                                                    fixedFormula = a1 + b1 + b2 + b3 + b4 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
+  #                                                    start = list(fixed = c(a1 = 12, b1 = 0.25, b2 = -0.04, b3 = 0.1, b4 = 1.1)))
   acmaHeightFromDiameterMixed$sharmaPartonB4 = fit_nlme("Sharma-Parton", height ~ 1.37 + (a1)*topHeight^(b1 + b1ra)*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^b3*dbh^b4d)), acma2022, # a1ra, b2ra step halving, b3ra, b4ra max iterations, 10x10 MAE 2.41, AIC 1205
                                                         fixedFormula = a1 + b1 + b2 + b3 + b4d ~ 1, randomFormula = b1ra ~ 1|stand/plot,
-                                                        start = list(fixed = c(a1 = 10, b1 = 0.3, b2 = -0.03, b3 = 0.1, b4 = 1.0)), distinct = FALSE)
+                                                        start = list(fixed = c(a1 = 10, b1 = 0.3, b2 = -0.03, b3 = 0.1, b4 = 1.0)))
   #acmaHeightFromDiameterMixed$sharmaParton = fit_nlme("Sharma-Parton", height ~ 1.37 + a1*(1 + a1rm)*topHeight^(b1)*(1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3)*dbh))^(b4), acma2022, # b1rm, b3rm, b4rm singularity in backsolve, b2rm max iterations, b3 not significant, 10x10 RMSE 2.43, AIC 1211
   #                                                    fixedFormula = a1 + b1 + b2 + b3 + b4 ~ 1, randomFormula = a1rm ~ 1|stand/plot,
   #                                                    start = list(fixed = c(a1 = 12, b1 = 0.3, b2 = -0.04, b3 = 0.1, b4 = 1.1)))
@@ -304,9 +304,9 @@ if (acmaOptions$fitHeightMixed)
   acmaHeightFromDiameterMixed$sharmaPartonBalPhysio = fit_nlme("Sharma-Parton BA+L physio", height ~ 1.37 + (a1 + a1ra + a1as * sin(3.14159/180 * aspect) + a1ra)*topHeight^(b1 + b1p * isPlantation) * (1 - exp(b2*(standTreesPerHectare/(standBasalAreaPerHectare + basalAreaLarger))^b3*dbh))^b4, acma2022, # fixed effects not significant
                                                                fixedFormula = a1 + a1as + b1 + b1 + b1p + b2 + b3 + b4 ~ 1, randomFormula = a1ra ~ 1|stand/plot,
                                                                start = list(fixed = c(a1 = 12, a1as = 0.4, b1 = 0.2, b1p = 0.04, b2 = -0.037, b3 = -0.046, b4 = 1.06)), distinct = FALSE)
-  acmaHeightFromDiameter$sharmaPartonBalPhysioRelDbh = fit_nlme("Sharma-Parton RelDbh BA+L physio", height ~ 1.37 + (a1 + a1ra)*topHeight^b1 * (1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3rd * relativeDiameter + b3bal / (b3balr + basalAreaLarger) + b3tr * terrainRoughness)*dbh))^b4, acma2022, 
-                                                                fixedFormula = a1 + a1as + b1 + b1 + b1p + b2 + b3 + b4 ~ 1, randomFormula = a1ra ~ 1|stand/plot,
-                                                                start = list(a1 = 13, b1 = 0.2, b2 = -0.05, b3 = 0.1, b3rd = -0.04, b3bal = 0, b3balr = 10, b3tr = 0, b4 = 1.1), distinct = FALSE)
+  acmaHeightFromDiameterMixed$sharmaPartonBalPhysioRelDbh = fit_nlme("Sharma-Parton RelDbh BA+L physio", height ~ 1.37 + (a1 + a1ra)*topHeight^b1 * (1 - exp(b2*(standTreesPerHectare/standBasalAreaPerHectare)^(b3 + b3rd * relativeDiameter + b3bal / (b3balr + basalAreaLarger) + b3tr * terrainRoughness)*dbh))^b4, acma2022, 
+                                                                     fixedFormula = a1 + a1as + b1 + b1 + b1p + b2 + b3 + b4 ~ 1, randomFormula = a1ra ~ 1|stand/plot,
+                                                                     start = list(a1 = 13, b1 = 0.2, b2 = -0.05, b3 = 0.1, b3rd = -0.04, b3bal = 0, b3balr = 10, b3tr = 0, b4 = 1.1), distinct = FALSE)
   acmaHeightFromDiameterMixed$sharmaPartonBalRelDbh = fit_nlme("Sharma-Parton RelDbh BA+L", height ~ 1.37 + a1*topHeight^(b1 + b1ra) * (1 - exp(b2*(standTreesPerHectare/(standBasalAreaPerHectare + basalAreaLarger))^(b3 + b3rd * relativeDiameter)*dbh))^(b4), acma2022, # a1ra, b4ra singularity in backsolve, b2ra step halving, b3ra also tractable but slow to converge
                                                                fixedFormula = a1 + b1 + b2 + b3 + b3rd + b4 ~ 1, randomFormula = b1ra ~ 1|stand/plot,
                                                                start = list(fixed = c(a1 = 11, b1 = 0.25, b2 = -0.04, b3 = 0.1, b3rd = -0.05, b4 = 1.0)), distinct = FALSE)
@@ -373,7 +373,7 @@ if (acmaOptions$fitHeightMixed)
   #to_fixed_coeffficients(acmaHeightFromDiameterMixed$weibullBal)
   #print(to_parameter_confidence_intervals(acmaHeightFromDiameterMixed$weibullBal), n = 16)
 
-  acmaHeightFromDiameterMixed$gam = fit_gam("REML GAM", height ~ I(1.9315 * dbh^0.666) + s(dbh, bs = "ts", by = as.factor(isPlantation), k = 7), random = list(stand = ~1, plot = ~1), data = acma2022)
+  acmaHeightFromDiameterMixed$gam = fit_gam("REML GAM", height ~ I(1.9315 * dbh^0.666) + s(dbh, bs = "ts", by = as.factor(isPlantation), k = 7), random = list(stand = ~1, plot = ~1), data = acma2022) # 2x250, 5x100 dgesv exactly singular
   acmaHeightFromDiameterMixed$gamBal = fit_gam("REML GAM BA+L", height ~ I(1.9315 * dbh^0.666) + s(dbh, basalAreaLarger, bs = "ts", by = as.factor(isPlantation), k = 10), random = list(stand = ~1, plot = ~1), data = acma2022)
   acmaHeightFromDiameterMixed$gamBalPhysio = fit_gam("REML GAM BA+L physio", height ~ I(1.9315 * dbh^0.666) + s(dbh, basalAreaLarger, slope, terrainRoughness, bs = "ts", by = as.factor(isPlantation), k = 16), random = list(stand = ~1, plot = ~1), data = acma2022, distinct = FALSE)
   acmaHeightFromDiameterMixed$gamBalPhysioRelDbh = fit_gam("REML GAM RelDbh BA+L physio", height ~ I(1.9315 * dbh^0.666) + s(dbh, basalAreaLarger, slope, sin(3.14159/180 * aspect), cos(3.14159/180 * aspect), relativeDiameter, bs = "ts", by = as.factor(isPlantation), k = 16), random = list(stand = ~1, plot = ~1), data = acma2022, distinct = FALSE)
@@ -392,8 +392,12 @@ if (acmaOptions$fitHeightMixed)
 if (acmaOptions$fitDbh)
 {
   acmaDiameterFromHeight = list(linear = fit_lm("linear", dbh ~ I(height - 1.37), acma2022)) # plantation not significant
+  acmaDiameterFromHeight$linearAbat = fit_lm("linear ABA+T", dbh ~ I(height - 1.37) + I(1/bootstrapStandBasalAreaPerHectare) + I(1/(1 + basalAreaTaller)), acma2022, distinct = FALSE) # a1aba, a1aat not significant, a1abar, a1aatr not quite significant
+  acmaDiameterFromHeight$linearAbatRelHt = fit_lm("linear RelHt ABA+T", dbh ~ I(height - 1.37) + relativeHeight + I(1/(1 + basalAreaTaller)), acma2022, distinct = FALSE) # by propagation
+  acmaDiameterFromHeight$linearRelHt = fit_lm("linear RelHt", dbh ~ I(height - 1.37) + relativeHeight + I(isPlantation*relativeHeight), acma2022, distinct = FALSE) # a1rh not significant
   acmaDiameterFromHeight$parabolic = fit_lm("parabolic", dbh ~ I(height - 1.37) + I((height - 1.37)^2), acma2022) # plantation, plantation^2 not significant
-
+  #lapply(acmaDiameterFromHeight$linearRelHt$fit, summary)
+  
   acmaDiameterFromHeight$chapmanReplace = fit_gsl_nls("Chapman-Richards replace", dbh ~ a1*(exp(b1*(height - 1.37)) - 1)^b2, acma2022, 
                                                       start = list(a1 = 40, b1 = 0.02, b2 = 1.1)) # a1p, b1p, b2p not significant, a1-b1 evaporation
   acmaDiameterFromHeight$chapmanReplaceAbat = fit_gsl_nls("Chapman-Richards replace ABA+T", dbh ~ (a1 + a1aba * bootstrapStandBasalAreaPerHectare)*(exp((b1)*(height - 1.37)) - 1)^(b2), acma2022, 
@@ -412,7 +416,7 @@ if (acmaOptions$fitDbh)
                                                               start = list(a1 = -10, a2 = -10, b1 = 1.3)) # a1p, a2p, b1p not significant, prone to a1-a2 evaporation, 10x10 RMSE 11.0, AIC 1671
   acmaDiameterFromHeight$michaelisMentenReplaceAbat = fit_gsl_nls("Michaelis-Menten replace ABA+T", dbh ~ (a1 + a1aat / (a1aatr + basalAreaTaller)) * (height - 1.37)^(b1) / (a2 - (height - 1.37)^(b1)), acma2022, 
                                                                   start = list(a1 = -10, a1aat = 0, a1aatr = 10, a2 = -10, b1 = 1.30), distinct = FALSE) # a1aba, a1abar, a1aat, a1aat+4, a2aba, a2aat, a2aat+r, a1abar, b1aba, b1abar, b1aat, b1aat+r not significant
-  acmaDiameterFromHeight$michaelisMentenReplaceAbatRelHt = fit_gsl_nls("Michaelis-Menten replace ABA+T", dbh ~ (a1 + a1rh * relativeHeight + a1aat / (a1aatr + basalAreaTaller)) * (height - 1.37)^(b1) / (a2 - (height - 1.37)^(b1)), acma2022, 
+  acmaDiameterFromHeight$michaelisMentenReplaceAbatRelHt = fit_gsl_nls("Michaelis-Menten replace RelHt ABA+T", dbh ~ (a1 + a1rh * relativeHeight + a1aat / (a1aatr + basalAreaTaller)) * (height - 1.37)^(b1) / (a2 - (height - 1.37)^(b1)), acma2022, 
                                                                        start = list(a1 = -10, a1rh = 0, a1aat = 0, a1aatr = 10, a2 = -10, b1 = 1.30), distinct = FALSE) # by propagation
   acmaDiameterFromHeight$michaelisMentenReplaceRelHt = fit_gsl_nls("Michaelis-Menten replace RelHt", dbh ~ (a1 + a1rh * relativeHeight) * (height - 1.37)^(b1) / (a2 - (height - 1.37)^(b1)), acma2022, 
                                                                    start = list(a1 = -11, a1rh = 0, a2 = -12, b1 = 1.30), distinct = FALSE) # a1rh, a2rh, b1rh not significant
@@ -533,6 +537,9 @@ if (acmaOptions$fitDbh)
 if (acmaOptions$fitDbhMixed)
 {
   acmaDiameterFromHeightMixed = list(linear = fit_lme("linear", fixedFormula = dbh ~ I(height - 1.37), acma2022, randomFormula = ~1|stand/plot))
+  acmaDiameterFromHeightMixed$linearAbat = fit_lme("linear ABA+T", fixedFormula = dbh ~ I(height - 1.37) + I(1/bootstrapStandBasalAreaPerHectare) + I(1/(1 + basalAreaTaller)), acma2022, randomFormula = ~1|stand/plot, distinct = FALSE)
+  acmaDiameterFromHeightMixed$linearAbatRelHt = fit_lme("linear RelHt ABA+T", fixedFormula = dbh ~ I(height - 1.37) + relativeHeight + I(1/(1 + basalAreaTaller)), acma2022, randomFormula = ~1|stand/plot, distinct = FALSE)
+  acmaDiameterFromHeightMixed$linearRelHt = fit_lme("linear RelHt", fixedFormula = dbh ~ I(height - 1.37) + relativeHeight, acma2022, randomFormula = ~1|stand/plot, distinct = FALSE)
   acmaDiameterFromHeightMixed$parabolic = fit_lme("parabolic", fixedFormula = dbh ~ I(height - 1.37) + I((height - 1.37)^2), acma2022, randomFormula = ~1|stand/plot)
   
   #acmaDiameterFromHeightMixed$chapmanReplace = fit_nlme("Chapman-Richards replace", dbh ~ a1 * (exp(b1*(height - 1.37)) - 1)^(b2 + b2ra), acma2022, # a1ra, b1ra, b2ra step halving
@@ -574,7 +581,7 @@ if (acmaOptions$fitDbhMixed)
   acmaDiameterFromHeightMixed$michaelisMentenReplaceAbat = fit_nlme("Michaelis-Menten replace ABA+T", dbh ~ (a1 + a1aat / (a1aatr + basalAreaTaller)) * (1 + a1rm) * (height - 1.37)^(b1) / (a2 - (height - 1.37)^(b1)), acma2022, 
                                                                     fixedFormula = a1 + a1aat + a1aatr + a2 + b1 ~ 1, randomFormula = a1rm ~ 1|stand/plot,
                                                                     start = list(a1 = -10, a1aat = 0, a1aatr = 10, a2 = -10, b1 = 1.30), distinct = FALSE)
-  acmaDiameterFromHeightMixed$michaelisMentenReplaceAbatRelHt = fit_nlme("Michaelis-Menten replace ABA+T", dbh ~ (a1 + a1rh * relativeHeight + a1aat / (a1aatr + basalAreaTaller)) * (1 + a1rm) * (height - 1.37)^(b1) / (a2 - (height - 1.37)^(b1)), acma2022, 
+  acmaDiameterFromHeightMixed$michaelisMentenReplaceAbatRelHt = fit_nlme("Michaelis-Menten replace RelHt ABA+T", dbh ~ (a1 + a1rh * relativeHeight + a1aat / (a1aatr + basalAreaTaller)) * (1 + a1rm) * (height - 1.37)^(b1) / (a2 - (height - 1.37)^(b1)), acma2022, 
                                                                          fixedFormula = a1 + a1rh + a1aat + a1aatr + a2 + b1 ~ 1, randomFormula = a1rm ~ 1|stand/plot,
                                                                          start = list(a1 = -10, a1rh = 0, a1aat = 0, a1aatr = 10, a2 = -10, b1 = 1.30), distinct = FALSE)
   acmaDiameterFromHeightMixed$michaelisMentenReplaceRelHt = fit_nlme("Michaelis-Menten replace RelHt", dbh ~ (a1 + a1rh * relativeHeight) * (1 + a1rm) * (height - 1.37)^(b1) / (a2 - (height - 1.37)^(b1)), acma2022, 
@@ -717,30 +724,23 @@ if (acmaOptions$fitHeight & acmaOptions$fitHeightMixed & acmaOptions$fitDbh & ac
   if (exists("acmaDiameterFromHeight") == FALSE)
   { 
     acmaDiameterFromHeight = readRDS(paste0("trees/height-diameter/data/ACMA3 DBH ", get_cross_validation_data_suffix(), ".Rds"))
+    #acmaDiameterFromHeight = list()
   }
   if (exists("acmaDiameterFromHeightMixed") == FALSE)
   { 
     acmaDiameterFromHeightMixed = readRDS(paste0("trees/height-diameter/data/ACMA3 DBH mixed ", get_cross_validation_data_suffix(), ".Rds"))
+    #acmaDiameterFromHeightMixed = list()
   }
   
-  acmaCoefficients = bind_rows(bind_rows(bind_rows(lapply(acmaHeightFromDiameter, unnest_coefficients)),
-                                         bind_rows(lapply(acmaHeightFromDiameterMixed, unnest_coefficients))) %>%
-                                 mutate(responseVariable = "height"),
-                               bind_rows(bind_rows(lapply(acmaDiameterFromHeight, unnest_coefficients)),
-                                         bind_rows(lapply(acmaDiameterFromHeightMixed, unnest_coefficients))) %>%
-                                 mutate(responseVariable = "DBH")) %>%
-    mutate(species = "ACMA3")
-  acmaFitStats = bind_rows(bind_rows(bind_rows(lapply(acmaHeightFromDiameter, unnest_validation_statistics)),
-                                    bind_rows(lapply(acmaHeightFromDiameterMixed, unnest_validation_statistics))) %>%
-                            mutate(responseVariable = "height"),
-                          bind_rows(bind_rows(lapply(acmaDiameterFromHeight, unnest_validation_statistics)),
-                                    bind_rows(lapply(acmaDiameterFromHeightMixed, unnest_validation_statistics))) %>%
-                            mutate(responseVariable = "DBH")) %>%
-    mutate(species = "ACMA3")
-  
+  acmaCoefficients = unnest_and_bind("ACMA3", acmaHeightFromDiameter, acmaHeightFromDiameterMixed, acmaDiameterFromHeight, acmaDiameterFromHeightMixed, unnest_coefficients)
+  acmaFitStats = unnest_and_bind("ACMA3", acmaHeightFromDiameter, acmaHeightFromDiameterMixed, acmaDiameterFromHeight, acmaDiameterFromHeightMixed, unnest_validation_statistics)
+  acmaPredictors = unnest_and_bind("ACMA3", acmaHeightFromDiameter, acmaHeightFromDiameterMixed, acmaDiameterFromHeight, acmaDiameterFromHeightMixed, unnest_predictors) %>%
+    mutate(across(where(is.logical), ~replace_na(.x, FALSE)))
+
   check_plot_fit_stats(acmaFitStats)
   saveRDS(acmaCoefficients, paste0("trees/height-diameter/data/ACMA3 coefficients ", get_cross_validation_data_suffix(), ".Rds"))
   saveRDS(acmaFitStats, paste0("trees/height-diameter/data/ACMA3 fit stats ", get_cross_validation_data_suffix(), ".Rds"))
+  saveRDS(acmaPredictors, paste0("trees/height-diameter/data/ACMA3 predictors ", get_cross_validation_data_suffix(), ".Rds"))
 }
 
 

@@ -3,7 +3,11 @@
 #            5x200              8         23 + 46 + 38 + 59 = 2h46m
 jobStartTime = Sys.time()
 source("trees/height-diameter/setup.R")
-#htDiaOptions$crossValidation = "randomByCruiseRecord"
+
+htDiaOptions$folds = 5
+htDiaOptions$repetitions = 100
+htDiaOptions$crossValidation = "randomByCruiseRecord" # blockedByStand, randomByCruiseRecord
+
 message(paste0(htDiaOptions$folds, "x", htDiaOptions$repetitions, " cross validation ", htDiaOptions$crossValidation, "..."))
 
 otherOptions = tibble(fitHeight = TRUE,
