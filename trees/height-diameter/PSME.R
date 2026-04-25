@@ -919,19 +919,14 @@ if (psmeOptions$fitDbhMixed)
   psmeDiameterFromHeightMixed = list(linear = fit_lme("linear", fixedFormula = dbh ~ I(height - 1.37) + I(isPlantation*(height - 1.37)), psme2022, randomFormula = ~1|stand/plot)) # 10x100 false convergence
   psmeDiameterFromHeightMixed$linearAbat = fit_lme("linear ABA+T", fixedFormula = dbh ~ I(height - 1.37) + I(isPlantation*(height - 1.37)) + I(1/(1 + basalAreaTaller)), psme2022, randomFormula = ~1|stand/plot)
   psmeDiameterFromHeightMixed$linearAbatRelHt = fit_lme("linear RelHt ABA+T", fixedFormula = dbh ~ I(height - 1.37) + I(isPlantation*(height - 1.37)) + relativeHeight + I(1/(1 + basalAreaTaller)), psme2022, randomFormula = ~1|stand/plot)
-  psmeDiameterFromHeightMixed$linearRelHt = fit_lme("linear RelHt", fixedFormula = dbh ~ I(height - 1.37) + I(isPlantation*(height - 1.37)) + relativeHeight, psme2022, randomFormula = ~1|stand/plot) # a1rhp not significant
-  #lapply(psmeDiameterFromHeightMixed$linearAbat$fit, summary)
-  
-  psmeDiameterFromHeightMixed$linearAbat = fit_lme("linear ABA+T", fixedFormula = dbh ~ I(height - 1.37) + I(1/(1 + basalAreaTaller)), psme2022, randomFormula = ~1|stand/plot)
-  psmeDiameterFromHeightMixed$linearAbatRelHt = fit_lme("linear RelHt ABA+T", fixedFormula = dbh ~ I(height - 1.37) + relativeHeight + I(1/(1 + basalAreaTaller)), psme2022, randomFormula = ~1|stand/plot)
-  psmeDiameterFromHeightMixed$linearRelHt = fit_lme("linear RelHt", fixedFormula = dbh ~ I(height - 1.37) + relativeHeight, psme2022, randomFormula = ~1|stand/plot)
+  psmeDiameterFromHeightMixed$linearRelHt = fit_lme("linear RelHt", fixedFormula = dbh ~ I(height - 1.37) + I(isPlantation*(height - 1.37)), psme2022, randomFormula = ~1|stand/plot) # a1rhp not significant
   psmeDiameterFromHeightMixed$parabolic = fit_lme("parabolic", fixedFormula = dbh ~ I(height - 1.37) + I(isPlantation*(height - 1.37)) + I((height - 1.37)^2), psme2022, randomFormula = ~1|stand/plot) # I(isPlantation*(height - 1.37)^2) not significant
   #lapply(psmeDiameterFromHeightMixed$linearRelHt$fit, summary)
-  
-  #psmeDiameterFromHeightMixed = list(chapmanReplace = fit_nlme("Chapman-Richards replace", dbh ~ (a1 + a1p * isPlantation) * (exp((b1)*(height - 1.37)) - 1)^(b2 + b2ra), psme2022, # a1ra, b2ra max iterations, b1ra singularity in backsolve
-  #                                                             fixedFormula = a1 + a1p + b1 + b2 ~ 1, randomFormula = b2ra ~ 1|stand/plot, # |stand, |uniquePlotID max iterations
-  #                                                             start = list(fixed = c(a1 = 40, a1p = -1, b1 = 0.03, b2 = 0.8))))
-  psmeDiameterFromHeightMixed = list(chapmanReplace = create_fit_statistics(name = "Chapman-Richards replace", fitting = "nlme"))
+
+  #psmeDiameterFromHeightMixed$chapmanReplace = fit_nlme("Chapman-Richards replace", dbh ~ (a1 + a1p * isPlantation) * (exp((b1)*(height - 1.37)) - 1)^(b2 + b2ra), psme2022, # a1ra, b2ra max iterations, b1ra singularity in backsolve
+  #                                                      fixedFormula = a1 + a1p + b1 + b2 ~ 1, randomFormula = b2ra ~ 1|stand/plot, # |stand, |uniquePlotID max iterations
+  #                                                      start = list(fixed = c(a1 = 40, a1p = -1, b1 = 0.03, b2 = 0.8))))
+  psmeDiameterFromHeightMixed$chapmanReplace = create_fit_statistics(name = "Chapman-Richards replace", fitting = "nlme")
   #psmeDiameterFromHeightMixed$chapmanReplaceAbat = fit_nlme("Chapman-Richards replace ABA+T", dbh ~ (a1 + a1p * isPlantation + a1ra)*(exp((b1 + b1aba * bootstrapStandBasalAreaPerHectare + b1aat * basalAreaTaller)*(height - 1.37)) - 1)^(b2), psme2022, # a1ra, b1ra singularity in backsolve, b2ra max iterations
   #                                                          fixedFormula = a1 + a1p + b1 + b1aba + b1aat + b2 ~ 1, randomFormula = a1ra ~ 1|stand/plot,
   #                                                          start = list(fixed = c(a1 = 50, a1p = -3, b1 = 0.03, b1aba = -0.0001, b1aat = -0.0001, b2 = 0.9)))
@@ -1180,7 +1175,7 @@ if (psmeOptions$fitDbhMixed)
   saveRDS(psmeDiameterFromHeightMixed, paste0("trees/height-diameter/data/PSME DBH mixed ", get_cross_validation_data_suffix(), ".Rds"))
 }
 
-if (psmeOptions$fitHeightPrimary & psmeOptions$fitHeightMixed & psmeOptions$fitDbhPrimary & psmeOptions$fitDbhMixed)
+if (psmeOptions$recalcResultCollections)
 {
   # assemble parameter and results tibbles using incremental load and reduce to fit in memory
   # height primary + nlrob + gsl_nls + dbh primary + nlrob = 120 GB DDR at 10x10 cross validation with models dropped

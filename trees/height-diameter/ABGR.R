@@ -911,7 +911,7 @@ if (abgrOptions$fitDbhMixed)
   saveRDS(abgrDiameterFromHeightMixed, paste0("trees/height-diameter/data/ABGR DBH mixed ", get_cross_validation_data_suffix(), ".Rds"))
 }
 
-if (abgrOptions$fitHeightPrimary & abgrOptions$fitHeightMixed & abgrOptions$fitDbhPrimary & abgrOptions$fitDbhMixed)
+if (abgrOptions$recalcResultCollections)
 {
   # assemble parameter and results tibbles using incremental load and reduce to fit in memory
   # height primary + nlrob + gsl_nls + dbh primary + nlrob = 120 GB DDR at 10x10 cross validation with models dropped

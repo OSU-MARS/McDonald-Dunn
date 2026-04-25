@@ -61,7 +61,7 @@ get_model_aucs = function(heightDiameterFitStats)
           return(tibble(responseVariable = fitResults$responseVariable[1], species = fitResults$species[1], name = fitResults$name[1], fitting = fitResults$fitting[1], distinct = fitResults$distinct[1], isBaseForm = fitResults$isBaseForm[1],
                         otherModelName = NA_character_, otherModelFitting = NA_character_, otherModeldistinct = NA_integer_,
                         hasPhysio = fitResults$hasPhysio[1], hasStand = fitResults$hasStand[1], hasRelative = fitResults$hasRelative[1],
-                        aucDeltaAicN = NA_real_, aucMae = NA_real_, aucNse = NA_real_, aucOutOfRange = NA_real_, aucRmse = NA_real_,
+                        aucDeltaAicN = NA_real_, aucMae = NA_real_, aucNse = NA_real_, aucBounds = NA_real_, aucRmse = NA_real_,
                         speciesFraction = fitResults$speciesFraction[1]))
         }
         
@@ -82,7 +82,7 @@ get_model_aucs = function(heightDiameterFitStats)
             return(tibble(responseVariable = fitResults$responseVariable[1], species = fitResults$species[1], name = fitResults$name[1], fitting = fitResults$fitting[1], distinct = fitResults$distinct[1], isBaseForm = fitResults$isBaseForm[1],
                           otherModelName = otherModelName, otherModelFitting = otherModelFitting, otherModelDistinct = otherFitResults$distinct[1],
                           hasPhysio = fitResults$hasPhysio[1], hasStand = fitResults$hasStand[1], hasRelative = fitResults$hasRelative[1],
-                          aucDeltaAicN = NA_real_, aucMae = NA_real_, aucNse = NA_real_, aucOutOfRange = NA_real_, aucRmse = NA_real_,
+                          aucDeltaAicN = NA_real_, aucMae = NA_real_, aucNse = NA_real_, aucBounds = NA_real_, aucRmse = NA_real_,
                           speciesFraction = fitResults$speciesFraction[1]))
           }
           if (nrow(fitResults) != nrow(otherFitResults))
@@ -116,7 +116,7 @@ get_model_aucs = function(heightDiameterFitStats)
                         " rmse ", sum(is.na(fitResults$rmse)), " ", sum(is.na(otherFitResults$rmse))), quote = FALSE)
           }
           
-          outOfRangeGuess = c(fitResults$pctOutOfRange, otherFitResults$pctOutOfRange)
+          outOfBoundsGuess = c(fitResults$pctOutOfRange + fitResults$pctHtDiaRatioImplausible, otherFitResults$pctOutOfRange + otherFitResults$pctHtDiaRatioImplausible)
           maeGuess = c(fitResults$mae, otherFitResults$mae)
           nseGuess = c(fitResults$nse, otherFitResults$nse)
           rmseGuess = c(fitResults$rmse, otherFitResults$rmse)
@@ -141,7 +141,7 @@ get_model_aucs = function(heightDiameterFitStats)
                         otherModelName = otherModelName, otherModelFitting = otherModelFitting, otherModelDistinct = otherFitResults$distinct[1],
                         hasPhysio = fitResults$hasPhysio[1], hasStand = fitResults$hasStand[1], hasRelative = fitResults$hasRelative[1],
                         aucDeltaAicN = aucAicN,
-                        aucOutOfRange = WeightedAUC(WeightedROC(guess = outOfRangeGuess, label = lowerIsBetter)),
+                        aucBounds = WeightedAUC(WeightedROC(guess = outOfBoundsGuess, label = lowerIsBetter)),
                         aucMae = WeightedAUC(WeightedROC(guess = maeGuess, label = lowerIsBetter)),
                         aucNse = WeightedAUC(WeightedROC(guess = nseGuess, label = higherIsBetter)),
                         aucRmse = WeightedAUC(WeightedROC(guess = rmseGuess, label = lowerIsBetter)),
@@ -160,7 +160,7 @@ get_model_aucs = function(heightDiameterFitStats)
   #table(heightDiameterModelAucs$distinct, useNA = "ifany")
   #table(heightDiameterModelAucs$otherModelDistinct, useNA = "ifany")
   #ggplot() +
-  #  geom_histogram(aes(x = aucOutOfRange), heightDiameterModelAucs %>% filter(distinct, otherModelDistinct == 1), binwidth = 0.01) +
+  #  geom_histogram(aes(x = aucBounds), heightDiameterModelAucs %>% filter(distinct, otherModelDistinct == 1), binwidth = 0.01) +
   #ggplot() +
   #  geom_histogram(aes(x = aucMae), heightDiameterModelAucs %>% filter(distinct, otherModelDistinct == 1), binwidth = 0.01) +
   #ggplot() +
@@ -205,7 +205,7 @@ get_model_ranking = function(heightDiameterModelAucs)
   #heightDiameterModelAucs %>% filter(is.na(distinct)) # for debugging
   #heightDiameterModelRanking %>% filter(responseVariable == "height", name == "Chapman-Richards RelDbh") %>% group_by(species, name, fitting) %>% summarize(n = n())
   #ggplot() +
-  #  geom_histogram(aes(x = aucOutOfRange, fill = fitting, group = fitting), heightDiameterModelAucs %>% filter(distinct, otherModelDistinct == 1, responseVariable == "DBH", species == "other species", name == "REML GAM"), binwidth = 0.01) +
+  #  geom_histogram(aes(x = aucBounds, fill = fitting, group = fitting), heightDiameterModelAucs %>% filter(distinct, otherModelDistinct == 1, responseVariable == "DBH", species == "other species", name == "REML GAM"), binwidth = 0.01) +
   #  coord_cartesian(xlim = c(0, 1)) +
   #  labs(x = "AUC", y = "model fits", fill = NULL)
   heightDiameterModelRanking = heightDiameterModelAucs %>%
@@ -215,15 +215,15 @@ get_model_ranking = function(heightDiameterModelAucs)
               aucDeltaAicN = median(if_else((name != otherModelName) & distinct & (otherModelDistinct == 1), aucDeltaAicN, NA_real_), na.rm = TRUE),
               aucMae = median(if_else((name != otherModelName) & distinct & (otherModelDistinct == 1), aucMae, NA_real_), na.rm = TRUE),
               aucNse = median(if_else((name != otherModelName) & distinct & (otherModelDistinct == 1), aucNse, NA_real_), na.rm = TRUE),
-              aucOutOfRange = median(if_else((name != otherModelName) & distinct & (otherModelDistinct == 1), aucOutOfRange, NA_real_), na.rm = TRUE),
+              aucBounds = median(if_else((name != otherModelName) & distinct & (otherModelDistinct == 1), aucBounds, NA_real_), na.rm = TRUE),
               aucRmse = median(if_else((name != otherModelName) & distinct & (otherModelDistinct == 1), aucNse, NA_real_), na.rm = TRUE),
               distinct = distinct[1],
               speciesFraction = speciesFraction[1],
               .groups = "drop_last") %>%
     group_by(responseVariable, species, isBaseForm) %>%
-    mutate(aucBlended = if_else(distinct, 0.1 * aucOutOfRange + 0.3 * if_else(responseVariable == "height", aucMae, aucRmse) + 0.1 * if_else(responseVariable == "DBH", aucMae, aucRmse) + 0.4 * if_else(fitting == "ranger", 0.5, aucDeltaAicN) + 0.1 * aucNse, 0.5),
+    mutate(aucBlended = if_else(distinct, 0.1 * aucBounds + 0.3 * if_else(responseVariable == "height", aucMae, aucRmse) + 0.1 * if_else(responseVariable == "DBH", aucMae, aucRmse) + 0.4 * if_else(fitting == "ranger", 0.5, aucDeltaAicN) + 0.1 * aucNse, 0.5),
            aucDeltaAicNRank = min_rank(desc(round(aucDeltaAicN * distinct, 3))), 
-           aucOutOfRangeRank = min_rank(desc(round(aucOutOfRange * distinct, 3))), 
+           aucBoundsRank = min_rank(desc(round(aucBounds * distinct, 3))), 
            aucMaeRank = min_rank(desc(round(aucMae * distinct, 3))), 
            aucNseRank = min_rank(desc(round(aucNse * distinct, 3))), 
            aucRmseRank = min_rank(desc(round(aucRmse * distinct, 3)))) %>%
@@ -231,7 +231,7 @@ get_model_ranking = function(heightDiameterModelAucs)
     mutate(nameAndFit = paste0(name, if_else(fitting %in% mixedModelFittings, " mixed", "")))
   #print(heightDiameterModelDisplaySort, n = 177)
   #heightDiameterModelRanking %>% group_by(responseVariable, species) %>%
-  #  summarize(n = n(), outOfRangeN = sum(is.na(aucOutOfRange) == FALSE), maeN = sum(is.na(aucMae) == FALSE), rmseN = sum(is.na(aucRmse) == FALSE), nseN = sum(is.na(aucNse) == FALSE), .groups = "drop")
+  #  summarize(n = n(), outOfRangeN = sum(is.na(aucBounds) == FALSE), maeN = sum(is.na(aucMae) == FALSE), rmseN = sum(is.na(aucRmse) == FALSE), nseN = sum(is.na(aucNse) == FALSE), .groups = "drop")
   return(heightDiameterModelRanking)
 }
 
@@ -351,7 +351,7 @@ get_preferred_models = function(heightDiameterModelRanking, nPreferredModelForms
 {
   preferredForms = full_join(full_join(heightDiameterModelRanking %>% filter(distinct) %>% group_by(responseVariable, species, isBaseForm) %>% slice_max(aucMae, n = nPreferredModelForms, na_rm = TRUE) %>% arrange(desc(aucMae)) %>% mutate(maeName = name, maeFitting = fitting, rank = row_number()) %>% select(responseVariable, species, folds, repetitions, crossValidation, isBaseForm, rank, maeName, maeFitting, aucMae),
                                        #exclude out of range due to many-way ties
-                                       #full_join(heightDiameterModelRanking %>% filter(distinct) %>% group_by(responseVariable, species, isBaseForm) %>% slice_max(aucOutOfRange, n = nPreferredModelForms, na_rm = TRUE) %>% arrange(desc(aucOutOfRange)) %>% mutate(outOfRangeName = name, outOfRangeFitting = fitting, rank = row_number()) %>% select(responseVariable, species, folds, repetitions, crossValidation, isBaseForm, rank, outOfRangeName, outOfRangeFitting, aucOutOfRange),
+                                       #full_join(heightDiameterModelRanking %>% filter(distinct) %>% group_by(responseVariable, species, isBaseForm) %>% slice_max(aucBounds, n = nPreferredModelForms, na_rm = TRUE) %>% arrange(desc(aucBounds)) %>% mutate(outOfRangeName = name, outOfRangeFitting = fitting, rank = row_number()) %>% select(responseVariable, species, folds, repetitions, crossValidation, isBaseForm, rank, outOfRangeName, outOfRangeFitting, aucBounds),
                                        #          heightDiameterModelRanking %>% filter(distinct) %>% group_by(responseVariable, species, isBaseForm) %>% slice_max(aucMae, n = nPreferredModelForms, na_rm = TRUE) %>% arrange(desc(aucMae)) %>% mutate(maeName = name, maeFitting = fitting, rank = row_number()) %>% select(responseVariable, species, folds, repetitions, crossValidation, isBaseForm, rank, maeName, maeFitting, aucMae),
                                        #          by = join_by(responseVariable, species, folds, repetitions, crossValidation, isBaseForm, rank)),
                                        full_join(heightDiameterModelRanking %>% filter(distinct) %>% group_by(responseVariable, species, isBaseForm) %>% slice_max(aucRmse, n = nPreferredModelForms, na_rm = TRUE) %>% arrange(desc(aucRmse)) %>% mutate(rmseName = name, rmseFitting = fitting, rank = row_number()) %>% select(responseVariable, species, folds, repetitions, crossValidation, isBaseForm, rank, rmseName, rmseFitting, aucRmse),
@@ -400,7 +400,8 @@ read_fit_stats = function(crossValidation, folds, repetitions)
            hasRelative = str_detect(name, "RelDbh") | str_detect(name, "RelHt"),
            distinct = as.logical(distinct)) %>% # since R lacks NA_logical_ distinct can end up being either of type double (0/1/NA_real_) or logical (TRUE/FALSE), standardize back to logical (TRUE/FALSE/NA)
     group_by(fitSet, responseVariable, fitting, name, species, repetition, fold) %>% # calculate out of range fraction within each fold
-    mutate(pctOutOfRange = 100 * nPredictionOutOfRange / n) %>%
+    mutate(pctOutOfRange = 100 * (nPredictionNA + nPredictionBelowMin + nPredictionAboveMax) / n, # or nPredictionNA + nPredictionBelowZero + nPredictionAboveMax
+           pctHtDiaRatioImplausible = 100 * (nHtDiaRatioTooHigh + nHtDiaRatioTooLow) / n) %>%
     group_by(fitSet, responseVariable, species) %>% # ΔAICn within response variable and species, needed for AUCs and model selection
     mutate(deltaAicN = aic/n - min(aic/n, na.rm = TRUE)) %>%
     ungroup() %>%
@@ -487,32 +488,32 @@ read_predictor_results = function(crossValidation, folds, repetitions)
 }
 
 ## assemble result tibbles from species results
-#heightDiameterFitStats2x250 = read_fit_stats("blockedByStand", folds = 2, repetitions = 250)
-#heightDiameterCoefficients2x250 = read_model_coefficients("blockedByStand", heightDiameterFitStats2x250, folds = 2, repetitions = 250)
-#heightDiameterPredictors2x250 = read_predictor_results("blockedByStand", folds = 2, repetitions = 250)
-#heightDiameterFitStats5x100 = read_fit_stats("blockedByStand", folds = 5, repetitions = 100)
-#heightDiameterCoefficients5x100 = read_model_coefficients("blockedByStand", heightDiameterFitStats5x100, folds = 5, repetitions = 100)
-#heightDiameterPredictors5x100 = read_predictor_results("blockedByStand", folds = 5, repetitions = 100)
-#heightDiameterFitStats10x50 = read_fit_stats("blockedByStand", folds = 10, repetitions = 50)
-#heightDiameterCoefficients10x50 = read_model_coefficients("blockedByStand", heightDiameterFitStats10x50, folds = 10, repetitions = 50)
-#heightDiameterPredictors10x50 = read_predictor_results("blockedByStand", folds = 10, repetitions = 50)
+heightDiameterFitStats2x250 = read_fit_stats("blockedByStand", folds = 2, repetitions = 250)
+heightDiameterCoefficients2x250 = read_model_coefficients("blockedByStand", heightDiameterFitStats2x250, folds = 2, repetitions = 250)
+heightDiameterFitStats5x100 = read_fit_stats("blockedByStand", folds = 5, repetitions = 100)
+heightDiameterCoefficients5x100 = read_model_coefficients("blockedByStand", heightDiameterFitStats5x100, folds = 5, repetitions = 100)
+heightDiameterFitStats10x50 = read_fit_stats("blockedByStand", folds = 10, repetitions = 50)
+heightDiameterCoefficients10x50 = read_model_coefficients("blockedByStand", heightDiameterFitStats10x50, folds = 10, repetitions = 50)
 
-#heightDiameterFitStats5x100random = read_fit_stats("randomByCruiseRecord", folds = 5, repetitions = 100)
-#heightDiameterCoefficients5x100random = read_model_coefficients("randomByCruiseRecord", folds = 5, repetitions = 100, heightDiameterFitStats5x100random)
+heightDiameterFitStats5x100random = read_fit_stats("randomByCruiseRecord", folds = 5, repetitions = 100)
+heightDiameterCoefficients5x100random = read_model_coefficients("randomByCruiseRecord", folds = 5, repetitions = 100, heightDiameterFitStats5x100random)
+#heightDiameterPredictors2x250 = read_predictor_results("blockedByStand", folds = 2, repetitions = 250)
+#heightDiameterPredictors5x100 = read_predictor_results("blockedByStand", folds = 5, repetitions = 100)
+#heightDiameterPredictors10x50 = read_predictor_results("blockedByStand", folds = 10, repetitions = 50)
 #heightDiameterPredictors5x100random = read_predictor_results("randomByCruiseRecord", folds = 5, repetitions = 100)
 
 heightDiameterFitStats2x500 = read_fit_stats("blockedByStand", folds = 2, repetitions = 500)
 heightDiameterCoefficients2x500 = read_model_coefficients("blockedByStand", folds = 2, repetitions = 500, heightDiameterFitStats2x500)
-#heightDiameterPredictors2x500 = read_predictor_results("blockedByStand", folds = 2, repetitions = 500)
 heightDiameterFitStats5x200 = read_fit_stats("blockedByStand", folds = 5, repetitions = 200)
 heightDiameterCoefficients5x200 = read_model_coefficients("blockedByStand", folds = 5, repetitions = 200, heightDiameterFitStats5x200)
-#heightDiameterPredictors5x200 = read_predictor_results("blockedByStand", folds = 5, repetitions = 200)
 heightDiameterFitStats10x100 = read_fit_stats("blockedByStand", folds = 10, repetitions = 100)
 heightDiameterCoefficients10x100 = read_model_coefficients("blockedByStand", folds = 10, repetitions = 100, heightDiameterFitStats10x100)
-#heightDiameterPredictors10x200 = read_predictor_results("blockedByStand", folds = 10, repetitions = 100)
 
 heightDiameterFitStats5x200random = read_fit_stats("randomByCruiseRecord", folds = 5, repetitions = 200)
 heightDiameterCoefficients5x200random = read_model_coefficients("randomByCruiseRecord", folds = 5, repetitions = 200, heightDiameterFitStats5x200random)
+#heightDiameterPredictors2x500 = read_predictor_results("blockedByStand", folds = 2, repetitions = 500)
+#heightDiameterPredictors5x200 = read_predictor_results("blockedByStand", folds = 5, repetitions = 200)
+#heightDiameterPredictors10x200 = read_predictor_results("blockedByStand", folds = 10, repetitions = 100)
 #heightDiameterPredictors5x200random = read_predictor_results("randomByCruiseRecord", folds = 5, repetitions = 200)
 
 # predictorVariableStats = heightDiameterPredictors2x250 %>% # predictor variable selection is the same for all cross validations
@@ -550,38 +551,38 @@ heightDiameterCoefficients5x200random = read_model_coefficients("randomByCruiseR
 #writexl::write_xlsx(heightDiameterCoefficients2x250 %>% filter(fitSet == "primary") %>% select(-fitSet) %>% mutate(distict = as.logical(distinct)), "trees/height-diameter/data/height-diameter model coefficients 2x250.xlsx")
 #writexl::write_xlsx(heightDiameterCoefficients10x50 %>% filter(fitSet == "primary") %>% select(-fitSet) %>% mutate(distict = as.logical(distinct)), "trees/height-diameter/data/height-diameter model coefficients 10x50.xlsx")
 
-#heightDiameterModelAucs2x250 = get_model_aucs(heightDiameterFitStats2x250)
-#heightDiameterModelRanking2x250 = get_model_ranking(heightDiameterModelAucs2x250)
-#heightDiameterModelsPreferred2x250 = get_preferred_models(heightDiameterModelRanking2x250)
+heightDiameterModelAucs2x250 = get_model_aucs(heightDiameterFitStats2x250)
+heightDiameterModelRanking2x250 = get_model_ranking(heightDiameterModelAucs2x250)
+heightDiameterModelsPreferred2x250 = get_preferred_models(heightDiameterModelRanking2x250)
 
-#heightDiameterModelAucs5x100 = get_model_aucs(heightDiameterFitStats5x100)
-#heightDiameterModelRanking5x100 = get_model_ranking(heightDiameterModelAucs5x100)
-#heightDiameterModelsPreferred5x100 = get_preferred_models(heightDiameterModelRanking5x100)
+heightDiameterModelAucs5x100 = get_model_aucs(heightDiameterFitStats5x100)
+heightDiameterModelRanking5x100 = get_model_ranking(heightDiameterModelAucs5x100)
+heightDiameterModelsPreferred5x100 = get_preferred_models(heightDiameterModelRanking5x100)
 
-#heightDiameterModelAucs10x50 = get_model_aucs(heightDiameterFitStats10x50)
-#heightDiameterModelRanking10x50 = get_model_ranking(heightDiameterModelAucs10x50)
-#heightDiameterModelsPreferred10x50 = get_preferred_models(heightDiameterModelRanking10x50)
+heightDiameterModelAucs10x50 = get_model_aucs(heightDiameterFitStats10x50)
+heightDiameterModelRanking10x50 = get_model_ranking(heightDiameterModelAucs10x50)
+heightDiameterModelsPreferred10x50 = get_preferred_models(heightDiameterModelRanking10x50)
 
-#heightDiameterModelAucs5x100random = get_model_aucs(heightDiameterFitStats5x100random)
-#heightDiameterModelRanking5x100random = get_model_ranking(heightDiameterModelAucs5x100random)
-#heightDiameterModelsPreferred5x100random = get_preferred_models(heightDiameterModelRanking5x100random)
+heightDiameterModelAucs5x100random = get_model_aucs(heightDiameterFitStats5x100random)
+heightDiameterModelRanking5x100random = get_model_ranking(heightDiameterModelAucs5x100random)
+heightDiameterModelsPreferred5x100random = get_preferred_models(heightDiameterModelRanking5x100random)
 
 
-heightDiameterModelAucs2x500 = get_model_aucs(heightDiameterFitStats2x500)
-heightDiameterModelRanking2x500 = get_model_ranking(heightDiameterModelAucs2x500)
-heightDiameterModelsPreferred2x500 = get_preferred_models(heightDiameterModelRanking2x500)
+#heightDiameterModelAucs2x500 = get_model_aucs(heightDiameterFitStats2x500)
+#heightDiameterModelRanking2x500 = get_model_ranking(heightDiameterModelAucs2x500)
+#heightDiameterModelsPreferred2x500 = get_preferred_models(heightDiameterModelRanking2x500)
 
-heightDiameterModelAucs5x200 = get_model_aucs(heightDiameterFitStats5x200)
-heightDiameterModelRanking5x200 = get_model_ranking(heightDiameterModelAucs5x200)
-heightDiameterModelsPreferred5x200 = get_preferred_models(heightDiameterModelRanking5x200)
+#heightDiameterModelAucs5x200 = get_model_aucs(heightDiameterFitStats5x200)
+#heightDiameterModelRanking5x200 = get_model_ranking(heightDiameterModelAucs5x200)
+#heightDiameterModelsPreferred5x200 = get_preferred_models(heightDiameterModelRanking5x200)
 
-heightDiameterModelAucs10x100 = get_model_aucs(heightDiameterFitStats10x100)
-heightDiameterModelRanking10x100 = get_model_ranking(heightDiameterModelAucs10x100)
-heightDiameterModelsPreferred10x100 = get_preferred_models(heightDiameterModelRanking10x100)
+#heightDiameterModelAucs10x100 = get_model_aucs(heightDiameterFitStats10x100)
+#heightDiameterModelRanking10x100 = get_model_ranking(heightDiameterModelAucs10x100)
+#heightDiameterModelsPreferred10x100 = get_preferred_models(heightDiameterModelRanking10x100)
 
-heightDiameterModelAucs5x200random = get_model_aucs(heightDiameterFitStats5x200random)
-heightDiameterModelRanking5x200random = get_model_ranking(heightDiameterModelAucs5x200random)
-heightDiameterModelsPreferred5x200random = get_preferred_models(heightDiameterModelRanking5x200random)
+#heightDiameterModelAucs5x200random = get_model_aucs(heightDiameterFitStats5x200random)
+#heightDiameterModelRanking5x200random = get_model_ranking(heightDiameterModelAucs5x200random)
+#heightDiameterModelsPreferred5x200random = get_preferred_models(heightDiameterModelRanking5x200random)
 
 
 ## summary for Abstract (plus AUC counting for Section 2.3)
@@ -667,9 +668,9 @@ get_top_base_forms = function(preferredForms)
      arrange(desc(responseVariable)))
 }
 
-(topBaseForms = bind_rows(get_top_base_forms(heightDiameterModelsPreferred2x500),
-                          get_top_base_forms(heightDiameterModelsPreferred5x200), 
-                          get_top_base_forms(heightDiameterModelsPreferred10x100)) %>%
+(topBaseForms = bind_rows(get_top_base_forms(heightDiameterModelsPreferred2x250),
+                          get_top_base_forms(heightDiameterModelsPreferred5x100), 
+                          get_top_base_forms(heightDiameterModelsPreferred10x50)) %>%
     rename(mae = maeName, rmse = rmseName, aicN = aicName, nse = nseName) %>%
     relocate(responseVariable, species, folds, repetitions, mae, rmse, aicN, nse, maeFitting, rmseFitting, aicFitting, nseFitting) %>%
     arrange(rev(responseVariable), species, desc(folds)))
@@ -684,7 +685,7 @@ improvementThresholdProbability = 0.5
 heightDiameterModelAucs10x100 %>% filter(name != "REML GAM", otherModelName == "REML GAM", isBaseForm) %>%
   group_by(responseVariable, species) %>% # restriction to primary fit set and base forms is above
   summarize(deltaAic = 100 * sum(aucDeltaAicN > improvementThresholdProbability) / n(),
-            mab = 100 * sum(aucOutOfRange > improvementThresholdProbability) / n(),
+            mab = 100 * sum(aucBounds > improvementThresholdProbability) / n(),
             mae = 100 * sum(aucMae > improvementThresholdProbability) / n(),
             nse = 100 * sum(aucNse > improvementThresholdProbability) / n(),
             rmse = 100 * sum(aucRmse > improvementThresholdProbability) / n(),
@@ -701,7 +702,7 @@ heightDiameterFitStats10x100 %>% group_by(responseVariable, species) %>% # plant
 improvementThresholdProbability = 0.5
 heightDiameterModelAucs10x100 %>% 
   mutate(baseName = if_else(word(name) %in% c("REML", "modified", "unified"), paste(word(name, 1), word(name, 2)), word(name))) %>%
-  filter(isBaseForm == FALSE, fitting %in% c("gsl_nls", "nlrob"), distinct, baseName %in% c("Chapman-Richards", "Sharma-Parton", "Ruark", "Sibbesen"), (responseVariable == "height") | (baseName != "Sibbesen")) %>%
+  filter(isBaseForm == FALSE, fitting %in% c("gsl_nls", "lm"), distinct, baseName %in% c("Chapman-Richards", "Sharma-Parton", "Ruark", "Sibbesen"), (responseVariable == "height") | (baseName != "Sibbesen")) %>%
   group_by(responseVariable) %>%
   summarize(n = sum(is.na(aucDeltaAicN) == FALSE), 
             baseBetter = sum(aucDeltaAicN <= improvementThresholdProbability), # base form is ΔAICn preferable
@@ -724,7 +725,7 @@ predictorVariableStats %>%
 # Potential issue: while with_ties = FALSE avoids multijoin situations by forcing slice_max() to choose only one model the most parsimonious model is selected
 # only by chance.
 print(left_join(left_join(left_join(heightDiameterModelsPreferred10x100 %>% group_by(responseVariable, species) %>% slice_max(aucMae, n = 1, with_ties = FALSE) %>% select(responseVariable, species, maeName, maeFitting),
-                                    #left_join(heightDiameterModelsPreferred10x100 %>% group_by(responseVariable, species) %>% slice_max(aucOutOfRange, n = 1, with_ties = FALSE) %>% select(responseVariable, species, outOfRangeName, outOfRangeFitting),
+                                    #left_join(heightDiameterModelsPreferred10x100 %>% group_by(responseVariable, species) %>% slice_max(aucBounds, n = 1, with_ties = FALSE) %>% select(responseVariable, species, outOfRangeName, outOfRangeFitting),
                                     #          heightDiameterModelsPreferred10x100 %>% group_by(responseVariable, species) %>% slice_max(aucMae, n = 1, with_ties = FALSE) %>% select(responseVariable, species, maeName, maeFitting),
                                     #          by = join_by(responseVariable, species)),
                                     heightDiameterModelsPreferred10x100 %>% group_by(responseVariable, species) %>% slice_max(aucRmse, n = 1, with_ties = FALSE) %>% select(responseVariable, species, rmseName, rmseFitting),
@@ -805,69 +806,75 @@ standVariableSelection10x100 %>% group_by(responseVariable, species) %>%
 
 
 ## Figures 1 and 2: height-diameter AUCs
-#heightFromDiameterModelComparison2x250 = get_model_comparison(heightDiameterModelRanking2x250)
-#heightFromDiameterModelComparison5x100 = get_model_comparison(heightDiameterModelRanking5x100, heightDiameterModelRankingForDisplaySort = heightFromDiameterModelComparison2x250)
-#heightFromDiameterModelComparison10x50 = get_model_comparison(heightDiameterModelRanking10x50, heightDiameterModelRankingForDisplaySort = heightFromDiameterModelComparison2x250)
-#heightFromDiameterModelComparison5x100random = get_model_comparison(heightDiameterModelRanking5x100random, heightDiameterModelRankingForDisplaySort = heightFromDiameterModelComparison2x250)
+heightFromDiameterModelComparison2x250 = get_model_comparison(heightDiameterModelRanking2x250)
+heightFromDiameterModelComparison5x100 = get_model_comparison(heightDiameterModelRanking5x100, heightDiameterModelRankingForDisplaySort = heightFromDiameterModelComparison2x250)
+heightFromDiameterModelComparison10x50 = get_model_comparison(heightDiameterModelRanking10x50, heightDiameterModelRankingForDisplaySort = heightFromDiameterModelComparison2x250)
+heightFromDiameterModelComparison5x100random = get_model_comparison(heightDiameterModelRanking5x100random, heightDiameterModelRankingForDisplaySort = heightFromDiameterModelComparison2x250)
 
-heightFromDiameterModelComparison2x500 = get_model_comparison(heightDiameterModelRanking2x500)
-heightFromDiameterModelComparison5x200 = get_model_comparison(heightDiameterModelRanking5x200, heightDiameterModelRankingForDisplaySort = heightFromDiameterModelComparison2x500)
-heightFromDiameterModelComparison10x100 = get_model_comparison(heightDiameterModelRanking10x100, heightDiameterModelRankingForDisplaySort = heightFromDiameterModelComparison2x500)
-heightFromDiameterModelComparison5x200random = get_model_comparison(heightDiameterModelRanking5x200random, heightDiameterModelRankingForDisplaySort = heightFromDiameterModelComparison2x500)
+#heightFromDiameterModelComparison2x500 = get_model_comparison(heightDiameterModelRanking2x500)
+#heightFromDiameterModelComparison5x200 = get_model_comparison(heightDiameterModelRanking5x200, heightDiameterModelRankingForDisplaySort = heightFromDiameterModelComparison2x500)
+#heightFromDiameterModelComparison10x100 = get_model_comparison(heightDiameterModelRanking10x100, heightDiameterModelRankingForDisplaySort = heightFromDiameterModelComparison2x500)
+#heightFromDiameterModelComparison5x200random = get_model_comparison(heightDiameterModelRanking5x200random, heightDiameterModelRankingForDisplaySort = heightFromDiameterModelComparison2x500)
 
-#plot_auc_bank(heightFromDiameterModelComparison2x250, heightFromDiameterModelComparison10x50)
-plot_auc_bank(heightFromDiameterModelComparison2x500, heightFromDiameterModelComparison10x100)
+plot_auc_bank(heightFromDiameterModelComparison2x250, heightFromDiameterModelComparison10x50)
+#plot_auc_bank(heightFromDiameterModelComparison2x500, heightFromDiameterModelComparison10x100)
 #ggsave("trees/height-diameter/figures/Figure 01 height AUCs base.png", height = 20, width = 20, units = "cm", dpi = 150)
 #ggsave("trees/height-diameter/figures/Figure 01 height AUCs base.tif", height = 20, width = 20, units = "cm", dpi = figureDpi, compression = "lzw+p")
 #ggsave("trees/height-diameter/figures/Figure 01 height AUCs base.pdf", height = 20, width = 20, units = "cm", dpi = figureDpi, device = cairo_pdf, fallback_resolution = figureDpi)
-#plot_auc_bank(heightFromDiameterModelComparison2x250, heightFromDiameterModelComparison10x50, generalized = TRUE, legendHjustification = 0.4)
-plot_auc_bank(heightFromDiameterModelComparison2x500, heightFromDiameterModelComparison10x100, generalized = TRUE, legendHjustification = 0.4)
+plot_auc_bank(heightFromDiameterModelComparison2x250, heightFromDiameterModelComparison10x50, generalized = TRUE, legendHjustification = 0.4)
+#plot_auc_bank(heightFromDiameterModelComparison2x500, heightFromDiameterModelComparison10x100, generalized = TRUE, legendHjustification = 0.4)
 #ggsave("trees/height-diameter/figures/Figure 02 height AUCs generalized.png", height = 20, width = 20, units = "cm", dpi = 150)
 #ggsave("trees/height-diameter/figures/Figure 02 height AUCs generalized.tif", height = 20, width = 20, units = "cm", dpi = figureDpi, compression = "lzw+p")
 #ggsave("trees/height-diameter/figures/Figure 02 height AUCs generalized.pdf", height = 20, width = 20, units = "cm", dpi = figureDpi, device = cairo_pdf, fallback_resolution = figureDpi)
 
-#plot_auc_bank(heightFromDiameterModelComparison5x100, heightFromDiameterModelComparison5x100random)
-plot_auc_bank(heightFromDiameterModelComparison5x200, heightFromDiameterModelComparison5x200random)
+plot_auc_bank(heightFromDiameterModelComparison5x100, heightFromDiameterModelComparison5x100random)
+#plot_auc_bank(heightFromDiameterModelComparison5x200, heightFromDiameterModelComparison5x200random)
 #ggsave("trees/height-diameter/figures/Figure S02 height AUCs base.png", height = 20, width = 20, units = "cm", dpi = 150)
-#plot_auc_bank(heightFromDiameterModelComparison5x100, heightFromDiameterModelComparison5x100random, generalized = TRUE, legendHjustification = 0.4)
-plot_auc_bank(heightFromDiameterModelComparison5x200, heightFromDiameterModelComparison5x200random, generalized = TRUE, legendHjustification = 0.4)
+plot_auc_bank(heightFromDiameterModelComparison5x100, heightFromDiameterModelComparison5x100random, generalized = TRUE, legendHjustification = 0.4)
+#plot_auc_bank(heightFromDiameterModelComparison5x200, heightFromDiameterModelComparison5x200random, generalized = TRUE, legendHjustification = 0.4)
 #ggsave("trees/height-diameter/figures/Figure S03 height AUCs generalized.png", height = 20, width = 20, units = "cm", dpi = 150)
 
-plot_auc_bank(heightFromDiameterModelComparison2x500, heightFromDiameterModelComparison5x200, heightFromDiameterModelComparison10x100, heightFromDiameterModelComparison5x200random, bounds = TRUE)
-plot_auc_bank(heightFromDiameterModelComparison2x500, heightFromDiameterModelComparison5x200, heightFromDiameterModelComparison10x100, heightFromDiameterModelComparison5x200random, bounds = TRUE, generalized = TRUE)
+plot_auc_bank(heightFromDiameterModelComparison2x250, heightFromDiameterModelComparison5x100, heightFromDiameterModelComparison10x50, heightFromDiameterModelComparison5x100random, bounds = TRUE)
+#plot_auc_bank(heightFromDiameterModelComparison2x500, heightFromDiameterModelComparison5x200, heightFromDiameterModelComparison10x100, heightFromDiameterModelComparison5x200random, bounds = TRUE)
+#ggsave("trees/height-diameter/figures/Figure S04 height AUCs bounds.png", height = 20, width = 20, units = "cm", dpi = 150)
+plot_auc_bank(heightFromDiameterModelComparison2x250, heightFromDiameterModelComparison5x100, heightFromDiameterModelComparison10x50, heightFromDiameterModelComparison5x100random, bounds = TRUE, generalized = TRUE)
+#plot_auc_bank(heightFromDiameterModelComparison2x500, heightFromDiameterModelComparison5x200, heightFromDiameterModelComparison10x100, heightFromDiameterModelComparison5x200random, bounds = TRUE, generalized = TRUE)
 
 
 ## Figure 3: diameter AUCs
-#diameterFromHeightModelComparison2x250 = get_model_comparison(heightDiameterModelRanking2x250, "DBH")
-#diameterFromHeightModelComparison5x100 = get_model_comparison(heightDiameterModelRanking5x100, "DBH", heightDiameterModelRanking2x250)
-#diameterFromHeightModelComparison10x50 = get_model_comparison(heightDiameterModelRanking5x100, "DBH", heightDiameterModelRanking10x50)
-#diameterFromHeightModelComparison5x100random = get_model_comparison(heightDiameterModelRanking5x100random, "DBH", heightDiameterModelRanking2x250)
+diameterFromHeightModelComparison2x250 = get_model_comparison(heightDiameterModelRanking2x250, "DBH")
+diameterFromHeightModelComparison5x100 = get_model_comparison(heightDiameterModelRanking5x100, "DBH", heightDiameterModelRanking2x250)
+diameterFromHeightModelComparison10x50 = get_model_comparison(heightDiameterModelRanking5x100, "DBH", heightDiameterModelRanking10x50)
+diameterFromHeightModelComparison5x100random = get_model_comparison(heightDiameterModelRanking5x100random, "DBH", heightDiameterModelRanking2x250)
 
-diameterFromHeightModelComparison2x500 = get_model_comparison(heightDiameterModelRanking2x500, "DBH")
-diameterFromHeightModelComparison5x200 = get_model_comparison(heightDiameterModelRanking5x200, "DBH", heightDiameterModelRankingForDisplaySort = diameterFromHeightModelComparison2x500)
-diameterFromHeightModelComparison10x100 = get_model_comparison(heightDiameterModelRanking10x100, "DBH", heightDiameterModelRankingForDisplaySort = diameterFromHeightModelComparison2x500)
-diameterFromHeightModelComparison5x200random = get_model_comparison(heightDiameterModelRanking5x200random, "DBH", heightDiameterModelRankingForDisplaySort = diameterFromHeightModelComparison2x500)
+#diameterFromHeightModelComparison2x500 = get_model_comparison(heightDiameterModelRanking2x500, "DBH")
+#diameterFromHeightModelComparison5x200 = get_model_comparison(heightDiameterModelRanking5x200, "DBH", heightDiameterModelRankingForDisplaySort = diameterFromHeightModelComparison2x500)
+#diameterFromHeightModelComparison10x100 = get_model_comparison(heightDiameterModelRanking10x100, "DBH", heightDiameterModelRankingForDisplaySort = diameterFromHeightModelComparison2x500)
+#diameterFromHeightModelComparison5x200random = get_model_comparison(heightDiameterModelRanking5x200random, "DBH", heightDiameterModelRankingForDisplaySort = diameterFromHeightModelComparison2x500)
 
-#plot_auc_bank(diameterFromHeightModelComparison2x250, diameterFromHeightModelComparison10x50, legendHjustification = 1.02)
-plot_auc_bank(diameterFromHeightModelComparison2x500, diameterFromHeightModelComparison10x100, legendHjustification = 1.02)
+plot_auc_bank(diameterFromHeightModelComparison2x250, diameterFromHeightModelComparison10x50, legendHjustification = 1.02)
+#plot_auc_bank(diameterFromHeightModelComparison2x500, diameterFromHeightModelComparison10x100, legendHjustification = 1.02)
 #ggsave("trees/height-diameter/figures/Figure 03 diameter AUCs base.png", height = 20.5, width = 20, units = "cm", dpi = 150)
 #ggsave("trees/height-diameter/figures/Figure 03 diameter AUCs base.tif", height = 20.5, width = 20, units = "cm", dpi = figureDpi, compression = "lzw+p")
 #ggsave("trees/height-diameter/figures/Figure 03 diameter AUCs base", height = 20.5, width = 20, units = "cm", dpi = figureDpi, device = cairo_pdf, fallback_resolution = figureDpi)
-#plot_auc_bank(diameterFromHeightModelComparison2x250, diameterFromHeightModelComparison5x100, generalized = TRUE, legendHjustification = 1.02)
-plot_auc_bank(diameterFromHeightModelComparison2x500, diameterFromHeightModelComparison5x200, generalized = TRUE, legendHjustification = 1.02)
+plot_auc_bank(diameterFromHeightModelComparison2x250, diameterFromHeightModelComparison5x100, generalized = TRUE, legendHjustification = 1.02)
+#plot_auc_bank(diameterFromHeightModelComparison2x500, diameterFromHeightModelComparison5x200, generalized = TRUE, legendHjustification = 1.02)
 #ggsave("trees/height-diameter/figures/Figure 04 diameter AUCs generalized.png", height = 17.5, width = 20, units = "cm", dpi = 150)
 #ggsave("trees/height-diameter/figures/Figure 04 diameter AUCs generalized.tif", height = 20.5, width = 20, units = "cm", dpi = figureDpi, compression = "lzw+p")
 #ggsave("trees/height-diameter/figures/Figure 04 diameter AUCs generalized", height = 20.5, width = 20, units = "cm", dpi = figureDpi, device = cairo_pdf, fallback_resolution = figureDpi)
 
-#plot_auc_bank(diameterFromHeightModelComparison5x100, diameterFromHeightModelComparison5x100random)
-plot_auc_bank(diameterFromHeightModelComparison5x200, diameterFromHeightModelComparison5x200random)
-#ggsave("trees/height-diameter/figures/Figure S04 diameter AUCs base.png", height = 20, width = 20, units = "cm", dpi = 150)
-#plot_auc_bank(diameterFromHeightModelComparison5x100, diameterFromHeightModelComparison5x100random, generalized = TRUE, legendHjustification = 1.02)
-plot_auc_bank(diameterFromHeightModelComparison5x200, diameterFromHeightModelComparison5x200random, generalized = TRUE, legendHjustification = 1.02)
-#ggsave("trees/height-diameter/figures/Figure S05 diameter AUCs generalized.png", height = 20, width = 20, units = "cm", dpi = 150)
+plot_auc_bank(diameterFromHeightModelComparison5x100, diameterFromHeightModelComparison5x100random)
+#plot_auc_bank(diameterFromHeightModelComparison5x200, diameterFromHeightModelComparison5x200random)
+#ggsave("trees/height-diameter/figures/Figure S05 diameter AUCs base.png", height = 20, width = 20, units = "cm", dpi = 150)
+plot_auc_bank(diameterFromHeightModelComparison5x100, diameterFromHeightModelComparison5x100random, generalized = TRUE, legendHjustification = 1.02)
+#plot_auc_bank(diameterFromHeightModelComparison5x200, diameterFromHeightModelComparison5x200random, generalized = TRUE, legendHjustification = 1.02)
+#ggsave("trees/height-diameter/figures/Figure S06 diameter AUCs generalized.png", height = 20, width = 20, units = "cm", dpi = 150)
 
-plot_auc_bank(diameterFromHeightModelComparison2x500, diameterFromHeightModelComparison5x200, diameterFromHeightModelComparison10x100, diameterFromHeightModelComparison5x200random, bounds = TRUE)
-plot_auc_bank(diameterFromHeightModelComparison2x500, diameterFromHeightModelComparison5x200, diameterFromHeightModelComparison10x100, diameterFromHeightModelComparison5x200random, bounds = TRUE, generalized = TRUE)
+plot_auc_bank(diameterFromHeightModelComparison2x250, diameterFromHeightModelComparison5x100, diameterFromHeightModelComparison10x50, diameterFromHeightModelComparison5x100random, bounds = TRUE)
+#plot_auc_bank(diameterFromHeightModelComparison2x500, diameterFromHeightModelComparison5x200, diameterFromHeightModelComparison10x100, diameterFromHeightModelComparison5x200random, bounds = TRUE)
+#ggsave("trees/height-diameter/figures/Figure S07 diameter AUCs bounds.png", height = 20, width = 20, units = "cm", dpi = 150)
+plot_auc_bank(diameterFromHeightModelComparison2x250, diameterFromHeightModelComparison5x100, diameterFromHeightModelComparison10x50, diameterFromHeightModelComparison5x100random, bounds = TRUE, generalized = TRUE)
+#plot_auc_bank(diameterFromHeightModelComparison2x500, diameterFromHeightModelComparison5x200, diameterFromHeightModelComparison10x100, diameterFromHeightModelComparison5x200random, bounds = TRUE, generalized = TRUE)
 
 
 ## Figure 5: model efficiency
@@ -1136,7 +1143,7 @@ plot_layout(design = "12\n34\n55", heights = c(1, 1, 0)) &
 
 
 ## Figure 8: bigleaf maple and other species preferred models
-#print(heightDiameterModelsPreferred10x50 %>% filter(speciesModel %in% c("grand fir", "other")) %>% select(-outOfRangeName, -aucOutOfRange, -nseName, -aucNse) %>% rename(respVar = responseVariable, base = isBaseForm, aucAic = aucDeltaAicN) %>% mutate(species = factor(species, labels = c("PSME", "ABGR", "ACMA3", "other"), levels = c("Douglas-fir", "grand fir", "bigleaf maple", "other species")), maeName = str_trunc(maeName, 28, ellipsis = ""), rmseName = str_trunc(rmseName, 28, ellipsis = ""), aicName = str_trunc(aicName, 28, ellipsis = "")), n = 32)
+#print(heightDiameterModelsPreferred10x50 %>% filter(speciesModel %in% c("grand fir", "other")) %>% select(-outOfRangeName, -aucBounds, -nseName, -aucNse) %>% rename(respVar = responseVariable, base = isBaseForm, aucAic = aucDeltaAicN) %>% mutate(species = factor(species, labels = c("PSME", "ABGR", "ACMA3", "other"), levels = c("Douglas-fir", "grand fir", "bigleaf maple", "other species")), maeName = str_trunc(maeName, 28, ellipsis = ""), rmseName = str_trunc(rmseName, 28, ellipsis = ""), aicName = str_trunc(aicName, 28, ellipsis = "")), n = 32)
 if ((exists("acmaHeightFromDiameterPreferred") == FALSE) | (exists("acmaDiameterFromHeightPreferred") == FALSE))
 { 
   load("../Elliott/trees/height-diameter/data/ACMA3 preferred models.Rdata") # West and Strimbu 2025
@@ -1245,6 +1252,7 @@ plot_layout(design = "12\n34\n55", heights = c(1, 1, 0)) &
 ## Figure 9: comparison of goodness of fit statistics between reference and revised models
 selectedModels = bind_rows(psmeReference, abgrReference, acmaReference, otherReference) %>% 
   mutate(pctOutOfRange = 100 * validation$nPredictionOutOfRange / validation$n,
+         pctHtDiaRatioImplausible = 100 * validation$nHtDiaRatioImplausible / validation$n,
          deltaAicN = validation$aic/validation$n - min(validation$aic/validation$n, na.rm = TRUE),
          model = as.factor(model),
          species = factor(species, labels = c("Douglas-fir", "grand fir", "bigleaf maple", "other species"), levels = c("PSME", "ABGR", "ACMA3", "other")))
@@ -1341,21 +1349,21 @@ rankedModelForms = bind_rows(heightDiameterModelRanking2x500,
   group_by(responseVariable, species) %>% 
   arrange(desc(responseVariable), species, folds, isBaseForm, desc(aucBlended)) %>%
   select(-nameAndFit, -starts_with("has"), -distinct, -speciesFraction) %>%
-  relocate(responseVariable, species, crossValidation, folds, repetitions, name, fitting, isBaseForm, aucOutOfRange, aucMae, aucRmse, aucDeltaAicN, aucNse, aucOutOfRangeRank, aucMaeRank, aucRmseRank, aucDeltaAicNRank, aucNseRank, aucBlended)
+  relocate(responseVariable, species, crossValidation, folds, repetitions, name, fitting, isBaseForm, aucBounds, aucMae, aucRmse, aucDeltaAicN, aucNse, aucBoundsRank, aucMaeRank, aucRmseRank, aucDeltaAicNRank, aucNseRank, aucBlended)
 rankedModelFormsHeightNonPhysio = bind_rows(heightDiameterModelRanking2x500,
                                             heightDiameterModelRanking5x200,
                                             heightDiameterModelRanking10x100) %>% filter(distinct, hasPhysio == FALSE) %>% 
   group_by(responseVariable, species) %>% 
   arrange(desc(responseVariable), species, folds, isBaseForm, desc(aucBlended)) %>%
   select(-nameAndFit, -starts_with("has"), -distinct, -speciesFraction) %>%
-  relocate(responseVariable, species, crossValidation, folds, repetitions, name, fitting, isBaseForm, aucOutOfRange, aucMae, aucRmse, aucDeltaAicN, aucNse, aucOutOfRangeRank, aucMaeRank, aucRmseRank, aucDeltaAicNRank, aucNseRank, aucBlended)
+  relocate(responseVariable, species, crossValidation, folds, repetitions, name, fitting, isBaseForm, aucBounds, aucMae, aucRmse, aucDeltaAicN, aucNse, aucBoundsRank, aucMaeRank, aucRmseRank, aucDeltaAicNRank, aucNseRank, aucBlended)
 rankedModelFormsInitialDbh = bind_rows(heightDiameterModelRanking2x500,
                                        heightDiameterModelRanking5x200,
                                        heightDiameterModelRanking10x100) %>% filter(responseVariable == "DBH", distinct, hasStand == FALSE) %>% 
   group_by(responseVariable, species) %>% 
   arrange(desc(responseVariable), species, folds, isBaseForm, desc(aucBlended)) %>%
   select(-nameAndFit, -starts_with("has"), -distinct, -speciesFraction) %>%
-  relocate(responseVariable, species, crossValidation, folds, repetitions, name, fitting, isBaseForm, aucOutOfRange, aucMae, aucRmse, aucDeltaAicN, aucNse, aucOutOfRangeRank, aucMaeRank, aucRmseRank, aucDeltaAicNRank, aucNseRank, aucBlended)
+  relocate(responseVariable, species, crossValidation, folds, repetitions, name, fitting, isBaseForm, aucBounds, aucMae, aucRmse, aucDeltaAicN, aucNse, aucBoundsRank, aucMaeRank, aucRmseRank, aucDeltaAicNRank, aucNseRank, aucBlended)
 generalizedFormsForDisplay = rankedModelForms %>% filter(isBaseForm == FALSE) %>% group_by(responseVariable, species, folds) %>% slice_max(aucBlended) %>%
   arrange(desc(responseVariable), species, folds)
 #writexl::write_xlsx(list(aucs = rankedModelForms, heightNonPhysio = rankedModelFormsHeightNonPhysio, initialDbh = rankedModelFormsInitialDbh, topBase = topBaseForms, generalizedDisplay = generalizedFormsForDisplay), "trees/height-diameter/figures/height-diameter model AUCs.xlsx")
@@ -1432,9 +1440,9 @@ if (htDiaOptions$includeInvestigatory)
     plot_layout(nrow = 1, ncol = 2, guides = "collect") &
     scico::scale_fill_scico(palette = "vik", limits = c(-1, 1)) &
     theme(legend.spacing.y = unit(0.5, "line"))
-  #ggsave("trees/height-diameter/figures/Figure S06 goodness of fit correlation.png", height = 8.5, width = 20, units = "cm", dpi = figureDpi)
-  #ggsave("trees/height-diameter/figures/Figure S06 goodness of fit correlation.tif", height = 8.5, width = 20, units = "cm", dpi = figureDpi, compression = "lzw+p")
-  #ggsave("trees/height-diameter/figures/Figure S06 goodness of fit correlation.pdf", height = 8.5, width = 20, units = "cm", dpi = figureDpi, device = cairo_pdf, fallback_resolution = figureDpi)
+  #ggsave("trees/height-diameter/figures/Figure S08 goodness of fit correlation.png", height = 8.5, width = 20, units = "cm", dpi = figureDpi)
+  #ggsave("trees/height-diameter/figures/Figure S08 goodness of fit correlation.tif", height = 8.5, width = 20, units = "cm", dpi = figureDpi, compression = "lzw+p")
+  #ggsave("trees/height-diameter/figures/Figure S08 goodness of fit correlation.pdf", height = 8.5, width = 20, units = "cm", dpi = figureDpi, device = cairo_pdf, fallback_resolution = figureDpi)
 
   # Figure S7: height prediction accuracy
   # If axis limits, vertical dodges, or aesthetics are changed Figure S6 should be updated.
@@ -1508,9 +1516,9 @@ if (htDiaOptions$includeInvestigatory)
     scale_shape_manual(breaks = c("fixed weights", "not distinct"), labels = c("form distinct", "not distinct"), values = c(16, 3)) &
     scale_size_manual(breaks = c("fixed weights", "not distinct"), labels = c("form distinct", "not distinct"), values = c(1.9, 1.4)) &
     theme(legend.key.size = unit(0.2, "line"), legend.justification = "left", legend.position = "bottom")
-  #ggsave("trees/height-diameter/figures/Figure S07 height accuracy.png", height = 16, width = 20, units = "cm", dpi = figureDpi)
-  #ggsave("trees/height-diameter/figures/Figure S07 height accuracy.tif", height = 22, width = 20, units = "cm", dpi = figureDpi, compression = "lzw+p")
-  #ggsave("trees/height-diameter/figures/Figure S07 height accuracy.pdf", height = 22, width = 20, units = "cm", dpi = figureDpi, device = cairo_pdf, fallback_resolution = figureDpi)
+  #ggsave("trees/height-diameter/figures/Figure S09 height accuracy.png", height = 16, width = 20, units = "cm", dpi = figureDpi)
+  #ggsave("trees/height-diameter/figures/Figure S09 height accuracy.tif", height = 22, width = 20, units = "cm", dpi = figureDpi, compression = "lzw+p")
+  #ggsave("trees/height-diameter/figures/Figure S09 height accuracy.pdf", height = 22, width = 20, units = "cm", dpi = figureDpi, device = cairo_pdf, fallback_resolution = figureDpi)
   
   
   # Figure S8: DBH prediction accuracy
@@ -1581,12 +1589,12 @@ if (htDiaOptions$includeInvestigatory)
     plot_annotation(theme = theme(plot.margin = margin(0, 2, 0, 0, "pt"))) +
     plot_layout(nrow = 1, ncol = 5, guides = "collect") &
     guides(color = guide_legend(byrow = TRUE, order = 1, ncol = 4), alpha = guide_legend(byrow = TRUE, order = 2, ncol = 1), shape = guide_legend(byrow = TRUE, order = 2, ncol = 2), size = guide_legend(byrow = TRUE, order = 2, ncol = 2)) &
-    scale_alpha_manual(breaks = c("reweighted", "fixed weights", "not distinct"), labels = c("NLME/nlrob", "form distinct", "not distinct"), values = c(0.75, 0.75, 0.3)) &
+    scale_alpha_manual(breaks = c("fixed weights", "not distinct"), labels = c("form distinct", "not distinct"), values = c(0.75, 0.75, 0.3)) &
     scale_color_manual(breaks = levels(diameterFromHeightQuantiles10x50$species), limits = levels(diameterFromHeightQuantiles10x50$species), values = speciesGroupColors) &
-    scale_shape_manual(breaks = c("reweighted", "fixed weights", "not distinct"), labels = c("NLME/nlrob", "form distinct", "not distinct"), values = c(16, 18, 3)) &
-    scale_size_manual(breaks = c("reweighted", "fixed weights", "not distinct"), labels = c("NLME/nlrob", "form distinct", "not distinct"), values = c(1.5, 1.9, 1.4)) &
+    scale_shape_manual(breaks = c("fixed weights", "not distinct"), labels = c("form distinct", "not distinct"), values = c(16, 18, 3)) &
+    scale_size_manual(breaks = c("fixed weights", "not distinct"), labels = c("form distinct", "not distinct"), values = c(1.5, 1.9, 1.4)) &
     theme(legend.key.size = unit(0.2, "line"), legend.justification = "left", legend.position = "bottom")
-  #ggsave("trees/height-diameter/figures/Figure S08 DBH accuracy.png", height = 16, width = 20, units = "cm", dpi = figureDpi)
-  #ggsave("trees/height-diameter/figures/Figure S08 DBH accuracy.tif", height = 22, width = 20, units = "cm", dpi = figureDpi, compression = "lzw+p")
-  #ggsave("trees/height-diameter/figures/Figure S08 DBH accuracy.pdf", height = 22, width = 20, units = "cm", dpi = figureDpi, device = cairo_pdf, fallback_resolution = figureDpi)
+  #ggsave("trees/height-diameter/figures/Figure S10 DBH accuracy.png", height = 16, width = 20, units = "cm", dpi = figureDpi)
+  #ggsave("trees/height-diameter/figures/Figure S10 DBH accuracy.tif", height = 22, width = 20, units = "cm", dpi = figureDpi, compression = "lzw+p")
+  #ggsave("trees/height-diameter/figures/Figure S10 DBH accuracy.pdf", height = 22, width = 20, units = "cm", dpi = figureDpi, device = cairo_pdf, fallback_resolution = figureDpi)
 }

@@ -698,7 +698,7 @@ if (otherOptions$fitDbhMixed)
 
 
 ## collect model parameters
-if (otherOptions$fitHeight & otherOptions$fitHeightMixed & otherOptions$fitDbh & otherOptions$fitDbhMixed)
+if (otherOptions$recalcResultCollections)
 {
   if (exists("otherHeightFromDiameter") == FALSE)
   { 

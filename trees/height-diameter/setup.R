@@ -20,13 +20,13 @@ theme_set(theme_bw() + theme(axis.line = element_line(linewidth = 0.3),
 plotLetters = c("(a)", "(b)", "(c)", "(d)", "(e)", "(f)", "(g)", "(h)", "(i)", "(j)", "(k)", "(l)")
 
 htDiaOptions = tibble(folds = 5,
-                      repetitions = 200,
+                      repetitions = 100, # error in `validate_chunk_size()`: `chunk_size` must be greater than zero indicates number of folds x repetitions = validations should be increased or chunk size decreased
                       crossValidation = "blockedByStand", # blockedByStand or randomByCruiseRecord
                       crossValidationBalance = "observations", # groups (random stand selection without tree count stabilization) or observations (reduces standard deviation of fold size by an order of magnitude on Douglas fir and by ~3x for other species but increases overall runtime by ~40% due to more complex fold setup), passed directly as  group_vfold_cv(balance = htDiaOptions$crossValidationBalance)
                       includeInvestigatory = FALSE, # default to not running plotting and other add ons from background jobs
                       includeSetup = FALSE,
                       minHeight = 1.37, # m, minimum valid height for prediction bounds checks in get_goodness_of_fit_statistics()
-                      minDbh = 0.4, # cm, minimum valid DBH for prediction bounds
+                      minDbh = 0.5, # cm, minimum valid DBH for prediction bounds
                       rangerThreads = 0.5 * future::availableCores(), # actually available threads, assume all cores hyperthreaded (Ryzen) by default
                       rangerTrees = 500,
                       retainModelThreshold = 5) # cross validation retains model objects if folds * repetitions is less than or equal to this threshold, e.g. 25 = retaining models up to and including 5x5 cross validation
@@ -42,58 +42,58 @@ otherDiameterFromHeightPreferred = readRDS("trees/height-diameter/data/other pre
 check_plot_fit_stats = function(fitStatistics)
 {
   numberOfBins = 30 # specify default to suppress messages about binwidth
-  ggplot(fitStatistics) +
-    geom_histogram(aes(x = n, fill = responseVariable), bins = numberOfBins) +
+  ggplot() +
+    geom_histogram(aes(x = n, fill = responseVariable), fitStatistics, bins = numberOfBins) +
     labs(x = "cruise records") +
-  ggplot(fitStatistics) +
-    geom_histogram(aes(x = bias, fill = responseVariable), bins = numberOfBins) +
+  ggplot() +
+    geom_histogram(aes(x = bias, fill = responseVariable), fitStatistics, bins = numberOfBins) +
     labs(x = "bias, m or cm") +
-  ggplot(fitStatistics) +
-    geom_histogram(aes(x = mab, fill = responseVariable), bins = numberOfBins) +
+  ggplot() +
+    geom_histogram(aes(x = mab, fill = responseVariable), fitStatistics, bins = numberOfBins) +
     labs(x = "MAB, m or cm") +
-  ggplot(fitStatistics) +
-    geom_histogram(aes(x = mapb, fill = responseVariable), bins = numberOfBins) +
+  ggplot() +
+    geom_histogram(aes(x = mapb, fill = responseVariable), fitStatistics, bins = numberOfBins) +
     labs(x = "MAB, %") +
-  ggplot(fitStatistics) +
-    geom_histogram(aes(x = mae, fill = responseVariable), bins = numberOfBins) +
+  ggplot() +
+    geom_histogram(aes(x = mae, fill = responseVariable), fitStatistics, bins = numberOfBins) +
     labs(x = "MAE, m or cm") +
-  ggplot(fitStatistics) +
-    geom_histogram(aes(x = mape, fill = responseVariable), bins = numberOfBins) +
+  ggplot() +
+    geom_histogram(aes(x = mape, fill = responseVariable), fitStatistics, bins = numberOfBins) +
     labs(x = "MAE, %") +
-  ggplot(fitStatistics) +
-    geom_histogram(aes(x = nse, fill = responseVariable), bins = numberOfBins) +
+  ggplot() +
+    geom_histogram(aes(x = nse, fill = responseVariable), fitStatistics, bins = numberOfBins) +
     labs(x = "model efficiency") +
     scale_x_continuous(trans = scales::pseudo_log_trans()) +
-  ggplot(fitStatistics) +
-    geom_histogram(aes(x = rmse, fill = responseVariable), bins = numberOfBins) +
+  ggplot() +
+    geom_histogram(aes(x = rmse, fill = responseVariable), fitStatistics, bins = numberOfBins) +
     labs(x = "RMSE, m or cm") +
-  ggplot(fitStatistics) +
-    geom_histogram(aes(x = rmspe, fill = responseVariable), bins = numberOfBins) +
+  ggplot() +
+    geom_histogram(aes(x = rmspe, fill = responseVariable), fitStatistics, bins = numberOfBins) +
     labs(x = "RMSE, %") +
-  ggplot(fitStatistics) +
-    geom_histogram(aes(x = aic, fill = responseVariable), bins = numberOfBins) +
+  ggplot() +
+    geom_histogram(aes(x = aic, fill = responseVariable), fitStatistics, bins = numberOfBins) +
     labs(x = "AIC") +
-  ggplot(fitStatistics) +
-    geom_histogram(aes(x = aict, fill = responseVariable), bins = numberOfBins) +
+  ggplot() +
+    geom_histogram(aes(x = aict, fill = responseVariable), fitStatistics, bins = numberOfBins) +
     labs(x = "AIC, ~t") +
-  ggplot(fitStatistics) +
-    geom_histogram(aes(x = bic, fill = responseVariable), bins = numberOfBins) +
+  ggplot() +
+    geom_histogram(aes(x = bic, fill = responseVariable), fitStatistics, bins = numberOfBins) +
     labs(x = "BIC") +
-  ggplot(fitStatistics) +
-    geom_histogram(aes(x = bict, fill = responseVariable), bins = numberOfBins) +
+  ggplot() +
+    geom_histogram(aes(x = bict, fill = responseVariable), fitStatistics, bins = numberOfBins) +
     labs(x = "BIC, ~t") +
-  ggplot(fitStatistics) +
-    geom_histogram(aes(x = meanAbsolutePlantationEffect, fill = responseVariable), bins = numberOfBins) +
+  ggplot() +
+    geom_histogram(aes(x = meanAbsolutePlantationEffect, fill = responseVariable), fitStatistics, bins = numberOfBins) +
     labs(x = "MAPE, m or cm") +
-  ggplot(fitStatistics) +
-    geom_histogram(aes(x = meanAbsolutePercentPlantationEffect, fill = responseVariable), bins = numberOfBins) +
+  ggplot() +
+    geom_histogram(aes(x = meanAbsolutePercentPlantationEffect, fill = responseVariable), fitStatistics, bins = numberOfBins) +
     labs(x = "MAPE, %") +
-  ggplot(fitStatistics) +
-    geom_histogram(aes(x = 100 * nPredictionOutOfRange / n, fill = responseVariable), bins = numberOfBins) +
+  ggplot() +
+    geom_histogram(aes(x = 100 * (nPredictionNA + nPredictionBelowMin + nPredictionAboveMax + nHtDiaRatioTooHigh + nHtDiaRatioTooLow) / n, fill = responseVariable), fitStatistics, bins = numberOfBins) +
     labs(x = "out of range predictions, %") +
     scale_y_continuous(breaks = c(0, 1, 10, 100, 1000, 10000, 100000), trans = scales::pseudo_log_trans()) +
-  ggplot(fitStatistics) +
-    geom_histogram(aes(x = fitTimeInS, fill = responseVariable), bins = numberOfBins) +
+  ggplot() +
+    geom_histogram(aes(x = fitTimeInS, fill = responseVariable), fitStatistics, bins = numberOfBins) +
     labs(x = "fit time, s") +
     scale_x_log10() +
   guide_area() +
@@ -863,8 +863,12 @@ get_goodness_of_fit_statistics = function(data, predicted, measured, weights, es
                          nse = 1 - sum(data$treeCount * residuals^2) / sum(data$treeCount * (measured - sum(data$treeCount * measured) / nObservations)^2), # Nash-Sutcliffe model efficiency
                          rmse = sqrt(sum(data$treeCount * residuals^2) / nObservations), # root mean squared error
                          rmspe = 100 * sqrt(sum(data$treeCount * (residuals / measured)^2) / nObservations), # root mean squared percent error
-                         nPredictionOutOfRange = sum(data$treeCount * (is.na(predicted) | (predicted < minPrediction) | (predicted > maxPrediction))),
-                         nHtDiaRatioImplausible = sum(data$treeCount * ((heightDiameterRatio < data$heightDiameterRatioMin) | (heightDiameterRatio > data$heightDiameterRatioMax)), na.rm = TRUE),
+                         nPredictionNA = sum(data$treeCount * is.na(predicted)),
+                         nPredictionNegative = sum(data$treeCount * (predicted < 0), na.rm = TRUE),
+                         nPredictionBelowMin = sum(data$treeCount * (predicted < minPrediction), na.rm = TRUE),
+                         nPredictionAboveMax = sum(data$treeCount * (predicted > maxPrediction), na.rm = TRUE),
+                         nHtDiaRatioTooHigh = sum(data$treeCount * ((predicted >= minPrediction) & (heightDiameterRatio > data$heightDiameterRatioMax) & (predicted <= maxPrediction)), na.rm = TRUE),
+                         nHtDiaRatioTooLow = sum(data$treeCount * ((predicted >= minPrediction) & (heightDiameterRatio < data$heightDiameterRatioMin) & (predicted <= maxPrediction)), na.rm = TRUE),
                          biasNaturalRegen = sum(naturalRegenTreeCount * residualsNaturalRegen) / naturalRegenTreeCountTotal,
                          maeNaturalRegen = sum(naturalRegenTreeCount * abs(residualsNaturalRegen)) / naturalRegenTreeCountTotal,
                          mapeNaturalRegen = 100 * sum(naturalRegenTreeCount * abs(residualsNaturalRegen / measuredNaturalRegen)) / naturalRegenTreeCountTotal,
@@ -976,13 +980,13 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, aucs3 = NULL, aucs4 = NULL, genera
   if (bounds)
   {
     aucBank = ggplot() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = aucOutOfRange), aucsToDisplay1) + 
+      geom_tile(aes(x = species, y = nameAndFit, fill = aucBounds), aucsToDisplay1) + 
       labs(fill = fillLabel) +
       scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
       ggnewscale::new_scale_fill() +
       geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
       scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-      #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucOutOfRangeRank <= nPreferredModelBoxes, aucOutOfRangeRank <= nPreferredModelBoxes)), fill = "transparent") +
+      #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucBoundsRank <= nPreferredModelBoxes, aucBoundsRank <= nPreferredModelBoxes)), fill = "transparent") +
       labs(title = paste0(plotLetters[1], " ", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1], " ", crossValidationTitleSuffix1), x = NULL, y = NULL, color = NULL, fill = NULL) +
       scale_y_discrete(limits = yAxisLimits, drop = FALSE)
     
@@ -998,13 +1002,13 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, aucs3 = NULL, aucs4 = NULL, genera
       aucsToDisplay2 = aucs2 %>% filter(nameAndFit %in% yAxisLimits)
       aucBank = aucBank + 
         ggplot() +
-          geom_tile(aes(x = species, y = nameAndFit, fill = aucOutOfRange), aucsToDisplay2) +
+          geom_tile(aes(x = species, y = nameAndFit, fill = aucBounds), aucsToDisplay2) +
           labs(fill = fillLabel) +
           scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
           ggnewscale::new_scale_fill() +
           geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2) +
           scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-          #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucOutOfRangeRank <= nPreferredModelBoxes, aucOutOfRangeRank <= nPreferredModelBoxes)), fill = "transparent") +
+          #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucBoundsRank <= nPreferredModelBoxes, aucBoundsRank <= nPreferredModelBoxes)), fill = "transparent") +
           labs(title = paste0(plotLetters[2], " ", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1], " ", crossValidationTitleSuffix2), x = NULL, y = NULL, color = NULL, fill = NULL) +
           scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE)
       
@@ -1020,13 +1024,13 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, aucs3 = NULL, aucs4 = NULL, genera
         aucsToDisplay3 = aucs3 %>% filter(nameAndFit %in% yAxisLimits)
         aucBank = aucBank + 
           ggplot() +
-          geom_tile(aes(x = species, y = nameAndFit, fill = aucOutOfRange), aucsToDisplay3) +
+          geom_tile(aes(x = species, y = nameAndFit, fill = aucBounds), aucsToDisplay3) +
           labs(fill = fillLabel) +
           scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
           ggnewscale::new_scale_fill() +
           geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay3) +
           scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-          #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay3 %>% filter(if_else(isBaseForm, aucOutOfRangeRank <= nPreferredModelBoxes, aucOutOfRangeRank <= nPreferredModelBoxes)), fill = "transparent") +
+          #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay3 %>% filter(if_else(isBaseForm, aucBoundsRank <= nPreferredModelBoxes, aucBoundsRank <= nPreferredModelBoxes)), fill = "transparent") +
           labs(title = paste0(plotLetters[3], " ", aucsToDisplay3$folds[1], "×", aucsToDisplay3$repetitions[1], " ", crossValidationTitleSuffix3), x = NULL, y = NULL, color = NULL, fill = NULL) +
           scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE)
        
@@ -1042,13 +1046,13 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, aucs3 = NULL, aucs4 = NULL, genera
           aucsToDisplay4 = aucs4 %>% filter(nameAndFit %in% yAxisLimits)
           aucBank = aucBank + 
             ggplot() +
-            geom_tile(aes(x = species, y = nameAndFit, fill = aucOutOfRange), aucsToDisplay4) +
+            geom_tile(aes(x = species, y = nameAndFit, fill = aucBounds), aucsToDisplay4) +
             labs(fill = fillLabel) +
             scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
             ggnewscale::new_scale_fill() +
             geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay4) +
             scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-            #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay4 %>% filter(if_else(isBaseForm, aucOutOfRangeRank <= nPreferredModelBoxes, aucOutOfRangeRank <= nPreferredModelBoxes)), fill = "transparent") +
+            #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay4 %>% filter(if_else(isBaseForm, aucBoundsRank <= nPreferredModelBoxes, aucBoundsRank <= nPreferredModelBoxes)), fill = "transparent") +
             labs(title = paste0(plotLetters[4], " ", aucsToDisplay4$folds[1], "×", aucsToDisplay4$repetitions[1], " ", crossValidationTitleSuffix4), x = NULL, y = NULL, color = NULL, fill = NULL) +
             scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE)
         } 

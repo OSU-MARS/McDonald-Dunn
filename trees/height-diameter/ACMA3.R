@@ -711,7 +711,7 @@ if (acmaOptions$fitDbhMixed)
 
 
 ## collect model parameters
-if (acmaOptions$fitHeight & acmaOptions$fitHeightMixed & acmaOptions$fitDbh & acmaOptions$fitDbhMixed)
+if (acmaOptions$recalcResultCollections)
 {
   if (exists("acmaHeightFromDiameter") == FALSE)
   { 

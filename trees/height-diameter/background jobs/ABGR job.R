@@ -4,9 +4,9 @@
 jobStartTime = Sys.time()
 source("trees/height-diameter/setup.R")
 
-htDiaOptions$folds = 5
-htDiaOptions$repetitions = 100
-htDiaOptions$crossValidation = "randomByCruiseRecord" # blockedByStand, randomByCruiseRecord
+htDiaOptions$folds = 10
+htDiaOptions$repetitions = 50
+htDiaOptions$crossValidation = "blockedByStand" # blockedByStand, randomByCruiseRecord
 
 message(paste0(htDiaOptions$folds, "x", htDiaOptions$repetitions, " cross validation ", htDiaOptions$crossValidation, "..."))
 
@@ -14,6 +14,7 @@ abgrOptions = tibble(fitHeightPrimary = TRUE,
                      fitHeightMixed = TRUE,
                      fitDbhPrimary = TRUE,
                      fitDbhMixed = TRUE, 
+                     recalcResultCollections = TRUE,
                      recalcPreferredModels = FALSE)
 
 progressr::handlers(global = TRUE)
