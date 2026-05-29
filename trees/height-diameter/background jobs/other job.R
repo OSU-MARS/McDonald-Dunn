@@ -1,6 +1,7 @@
-# processor  cross validation   workers   runtime
-# 9950X      10x10              10        12 min
-#            5x200              8         23 + 46 + 38 + 59 = 2h46m
+# processor  cross validation   workers   runtime, hours
+# 9950X      10x50              8         ~4
+#            5x100              8         ~4
+#            2x250              8         ~4
 jobStartTime = Sys.time()
 source("trees/height-diameter/setup.R")
 
@@ -8,7 +9,7 @@ htDiaOptions$folds = 10
 htDiaOptions$repetitions = 50
 htDiaOptions$crossValidation = "blockedByStand" # blockedByStand, randomByCruiseRecord
 
-message(paste0(htDiaOptions$folds, "x", htDiaOptions$repetitions, " cross validation ", htDiaOptions$crossValidation, "..."))
+message(paste0("Other species ", htDiaOptions$folds, "x", htDiaOptions$repetitions, " cross validation ", htDiaOptions$crossValidation, "..."))
 
 otherOptions = tibble(fitHeight = TRUE,
                       fitHeightMixed = TRUE,

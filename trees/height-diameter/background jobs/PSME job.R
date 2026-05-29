@@ -1,6 +1,11 @@
 # processor  cross validation   workers   height runtime   DBH runtime
 # 9900X      10x10              10        9.2 min          2.5 + 2.9 min
 #            5x200               8        3:43 + 6:52      3:49 + 5:30
+#
+#                                         runtime, hours
+# 9950X      10x50               8        9.4
+#            5x100               8        8.6
+#            2x250               8        7.6
 jobStartTime = Sys.time()
 source("trees/height-diameter/setup.R")
 
@@ -8,7 +13,7 @@ htDiaOptions$folds = 10
 htDiaOptions$repetitions = 50
 htDiaOptions$crossValidation = "blockedByStand" # blockedByStand, randomByCruiseRecord
 
-message(paste0(htDiaOptions$folds, "x", htDiaOptions$repetitions, " cross validation ", htDiaOptions$crossValidation, "..."))
+message(paste0("Douglas-fir ", htDiaOptions$folds, "x", htDiaOptions$repetitions, " cross validation ", htDiaOptions$crossValidation, "..."))
 
 psmeOptions = tibble(fitHeightPrimary = TRUE,
                      fitHeightMixed = TRUE,

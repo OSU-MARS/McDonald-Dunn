@@ -133,7 +133,7 @@ create_fit_statistics = function(name, fittingMethod, fitSet = "primary", distin
 # 5                      57
 # 6                      85
 # 7                      331
-fit_gam = function(name, formula, data, family = gaussian(), crossValidation = htDiaOptions$crossValidation, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, random = NULL, randomTermIndex = NA_integer_, threads = 1, distinct = TRUE, tDegreesOfFreedom = 8)
+fit_gam = function(name, formula, speciesData, family = gaussian(), crossValidation = htDiaOptions$crossValidation, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, random = NULL, randomTermIndex = NA_integer_, threads = 1, distinct = TRUE, tDegreesOfFreedom = 8)
 {
   if (is.null(random) == FALSE)
   {
@@ -148,14 +148,6 @@ fit_gam = function(name, formula, data, family = gaussian(), crossValidation = h
   }
   
   responseVariable = get_response_variable(formula)
-  if (responseVariable == "height")
-  {
-    allFitWeights = data$dbhWeight
-  }
-  else
-  {
-    allFitWeights = data$heightWeight
-  }
   if (is.null(random))
   {
     fittingMethod = "gam"
@@ -176,38 +168,40 @@ fit_gam = function(name, formula, data, family = gaussian(), crossValidation = h
     return(notDistinctFitStats)
   }
   
-  message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using ", fittingMethod, "()..."))
-  progressBar = progressr::progressor(steps = folds * repetitions)
-  if ((folds == 1) & (repetitions == 1))
+  speciesDataClasses = class(speciesData)
+  if (speciesDataClasses[1] == "tbl_df")
   {
     startFit = Sys.time()
     if (responseVariable == "height") 
     { 
       if (is.null(random))
       {
-        allFitGam = gam(formula = formula, data = data, family = family, method = "REML", select = TRUE, weights = dbhWeight, nthreads = threads)
+        allFitGam = gam(formula = formula, data = speciesData, family = family, method = "REML", select = TRUE, weights = dbhWeight, nthreads = threads)
       } else {
-        allFitGam = gamm(formula = formula, data = data, random = random, family = family, method = "REML", weights = dbhWeight, verbosePQL = FALSE)
+        allFitGam = gamm(formula = formula, data = speciesData, random = random, family = family, method = "REML", weights = dbhWeight, verbosePQL = FALSE)
       }
     } else { 
       if (is.null(random))
       {
-        allFitGam = gam(formula = formula, data = data, family = family, method = "REML", select = TRUE, weights = heightWeight, nthreads = threads)
+        allFitGam = gam(formula = formula, data = speciesData, family = family, method = "REML", select = TRUE, weights = heightWeight, nthreads = threads)
       } else {
-        allFitGam = gamm(formula = formula, data = data, random = random, family = family, method = "REML", weights = heightWeight, verbosePQL = FALSE)
+        allFitGam = gamm(formula = formula, data = speciesData, random = random, family = family, method = "REML", weights = heightWeight, verbosePQL = FALSE)
       }
     }
     estimatedParameters = sum(allFitGam$edf)
     validationPrediction = fitted(allFitGam)
 
-    allFitStats = get_fit_statistics(name = name, fittingMethod = "gam", responseVariable = responseVariable, 
-                                     trainingData = data, trainingPrediction = fitted(allFitGam), estimatedParameters = estimatedParameters, 
-                                     validationData = data, validationPrediction = validationPrediction,
+    allFitStats = get_fit_statistics(name = name, fittingMethod = "gam", responseVariable = responseVariable, predictorVariables = predictorVariables,
+                                     startTime = startFit, fixedEffects = vector("list", length = 1), estimatedParameters = estimatedParameters, # fixedEffects not useful to set as GAM object is required for prediction and intercept, parametric guide term multiplier, and smooth coefficients all have to be used together
+                                     trainingData = speciesData, trainingPrediction = fitted(allFitGam), 
+                                     validationData = speciesData, validationPrediction = validationPrediction,
                                      distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
-    allFitStats$fitTimeInS = get_elapsed_time(startFit)
-    allFitStats$predictors[[1]] = predictorVariables
-    progressBar()
     return(get_fit_return_value(allFitGam, allFitStats, returnModel))
+  } else if ("vfold_cv" %in% speciesDataClasses) {
+    folds = attributes(speciesData)$v
+    repetitions = attributes(speciesData)$repeats
+  } else {
+    stop(paste0("Known classes (tbl_df and vfold_cv) not found among species data classes ", str_flatten_comma(speciesDataClasses), "."))
   }
 
   fit_gam_fold = function(dataFold)
@@ -265,22 +259,24 @@ fit_gam = function(name, formula, data, family = gaussian(), crossValidation = h
       }
     }
     
-    fitStatistics = get_fit_statistics(name = name, fittingMethod = fittingMethod, responseVariable = responseVariable, 
-                                       trainingData = trainingData, trainingPrediction = fitted(fittedGam), estimatedParameters = estimatedParameters, 
+    fitStatistics = get_fit_statistics(name = name, fittingMethod = fittingMethod, responseVariable = responseVariable, predictorVariables = predictorVariables,
+                                       startTime = startFit, fixedEffects = vector("list", length = 1), estimatedParameters = estimatedParameters, # fixedEffects not useful to set
+                                       trainingData = trainingData, trainingPrediction = fitted(fittedGam),
                                        validationData = validationData, validationPrediction = validationPrediction,
                                        distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
-    # fitStatistics$fixedEffects not very useful to set: GAM object is required for prediction and intercept, parametric guide term multiplier, and smooth coefficients all have to be used together
-    fitStatistics$fitTimeInS = get_elapsed_time(startFit)
-    fitStatistics$predictors[[1]] = predictorVariables
     progressBar()
     return(get_fit_return_value(fittedGam, fitStatistics, returnModel))
   }
   
-  splitsAndFits = get_cross_validation_folds(data, folds, repetitions) %>% mutate(fit = furrr::future_map(splits, fit_gam_fold, .options = furrrOptions))
-  return(get_cross_validation_return_value(splitsAndFits, returnModel))
+  progressr::with_progress({
+    message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using ", fittingMethod, "()..."))
+    progressBar = progressr::progressor(steps = folds * repetitions)
+    splitsAndFits = speciesData %>% mutate(fit = furrr::future_map(splits, fit_gam_fold, .options = furrrOptions))
+    return(get_cross_validation_return_value(splitsAndFits, returnModel))
+  })
 }
 
-fit_gsl_nls = function(name, formula, data, start, control = gsl_nls_control(maxiter = 100), folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
+fit_gsl_nls = function(name, formula, speciesData, start, control = gsl_nls_control(maxiter = 100), folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
 {
   responseVariable = get_response_variable(formula)
   if (distinct == FALSE)
@@ -295,27 +291,28 @@ fit_gsl_nls = function(name, formula, data, start, control = gsl_nls_control(max
     return(notDistinctFitStats)
   }
   
-  message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using gsl_nls()..."))
-  progressBar = progressr::progressor(steps = folds * repetitions)
-  startFit = Sys.time()
-  if ((folds == 1) & (repetitions == 1))
+  speciesDataClasses = class(speciesData)
+  if (speciesDataClasses[1] == "tbl_df")
   {
+    startFit = Sys.time()
     if (responseVariable == "height")
     {
       # gsl_nls() 1.4.1 documentation states weights should be a vector but this is incorrect, the name of column in data is required
-      allFitNonlinear = gsl_nls(fn = formula, data = data, start = start, weights = dbhWeight, control = control)
+      allFitNonlinear = gsl_nls(fn = formula, data = speciesData, start = start, weights = dbhWeight, control = control)
     } else {
-      allFitNonlinear = gsl_nls(fn = formula, data = data, start = start, weights = heightWeight, control = control)
+      allFitNonlinear = gsl_nls(fn = formula, data = speciesData, start = start, weights = heightWeight, control = control)
     }
-    allFitStats = get_fit_statistics(name = name, fittingMethod = "gsl_nls", responseVariable = responseVariable, 
-                                     trainingData = data, trainingPrediction = fitted(allFitNonlinear), estimatedParameters = length(coef(allFitNonlinear)), 
-                                     validationData = data, validationPrediction = fitted(allFitNonlinear),
+    allFitStats = get_fit_statistics(name = name, fittingMethod = "gsl_nls", responseVariable = responseVariable, predictorVariables = get_predictors_nonlinear(allFitNonlinear, formula),
+                                     startTime = startFit, fixedEffects = bind_rows(coef(allFitNonlinear)), estimatedParameters = length(coef(allFitNonlinear)),
+                                     trainingData = speciesData, trainingPrediction = fitted(allFitNonlinear),
+                                     validationData = speciesData, validationPrediction = fitted(allFitNonlinear),
                                      distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
-    allFitStats$fixedEffects[[1]] = bind_rows(coef(allFitNonlinear))
-    allFitStats$fitTimeInS = get_elapsed_time(startFit)
-    allFitStats$predictors[[1]] = get_predictors_nonlinear(allFitNonlinear, formula)
-    progressBar()
     return(get_fit_return_value(allFitNonlinear, allFitStats, returnModel))
+  } else if ("vfold_cv" %in% speciesDataClasses) {
+    folds = attributes(speciesData)$v
+    repetitions = attributes(speciesData)$repeats
+  } else {
+    stop(paste0("Known classes (tbl_df and vfold_cv) not found among species data classes ", str_flatten_comma(speciesDataClasses), "."))
   }
   
   fit_gsl_nls_fold = function(dataFold)
@@ -330,27 +327,31 @@ fit_gsl_nls = function(name, formula, data, start, control = gsl_nls_control(max
     }
     
     validationData = rsample::assessment(dataFold)
-    fitStatistics = get_fit_statistics(name = name, fittingMethod = "gsl_nls", responseVariable = responseVariable, 
-                                       trainingData = trainingData, trainingPrediction = fitted(nonlinearModel), estimatedParameters = length(coef(nonlinearModel)), 
+    fitStatistics = get_fit_statistics(name = name, fittingMethod = "gsl_nls", responseVariable = responseVariable, predictorVariables = get_predictors_nonlinear(nonlinearModel, formula),
+                                       startTime = startFit, fixedEffects = bind_rows(coef(nonlinearModel)), estimatedParameters = length(coef(nonlinearModel)),
+                                       trainingData = trainingData, trainingPrediction = fitted(nonlinearModel),
                                        validationData = validationData, validationPrediction = predict(nonlinearModel, validationData),
                                        distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
-    fitStatistics$fixedEffects[[1]] = bind_rows(coef(nonlinearModel))
-    fitStatistics$fitTimeInS = get_elapsed_time(startFit)
-    fitStatistics$predictors[[1]] = get_predictors_nonlinear(nonlinearModel, formula)
     progressBar()
     return(get_fit_return_value(nonlinearModel, fitStatistics, returnModel))
   }
 
-  return(tryCatch({ splitsAndFits = get_cross_validation_folds(data, folds, repetitions) %>% mutate(fit = furrr::future_map(splits, fit_gsl_nls_fold, .options = furrrOptions))
-                    return(get_cross_validation_return_value(splitsAndFits, returnModel)) },
-                  error = function(e) { 
-                    print(e)
-                    reset_future()
-                    create_fit_statistics(name, fittingMethod = "gsl_nls", distinct = distinct) 
-                  }))
+  progressr::with_progress({
+    message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using gsl_nls()..."))
+    progressBar = progressr::progressor(steps = folds * repetitions)
+    return(tryCatch({ 
+        splitsAndFits = speciesData %>% mutate(fit = furrr::future_map(splits, fit_gsl_nls_fold, .options = furrrOptions))
+        return(get_cross_validation_return_value(splitsAndFits, returnModel))
+      },
+      error = function(e) { 
+        print(e)
+        reset_future()
+        create_fit_statistics(name, fittingMethod = "gsl_nls", distinct = distinct) 
+        }))
+  })
 }
 
-fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
+fit_lm = function(name, formula, speciesData, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
 {
   responseVariable = get_response_variable(formula)
   predictorVariables = all.vars(rlang::f_rhs(formula)) # lm() formulas don't include coefficients
@@ -364,89 +365,57 @@ fit_lm = function(name, formula, data, folds = htDiaOptions$folds, repetitions =
     return(notDistinctFitStats)
   }
   
-  message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using lm()..."))
-  progressBar = progressr::progressor(steps = folds * repetitions)
-
-  # separate height and diameter all fit cases and cross validation setups since height prediction uses offset
-  if (responseVariable == "height")
+  speciesDataClasses = class(speciesData)
+  if (speciesDataClasses[1] == "tbl_df")
   {
-    if ((folds == 1) & (repetitions == 1))
+    startFit = Sys.time()
+    if (responseVariable == "height")
     {
-      startFit = Sys.time()
-      allFit = lm(formula = formula, data = data, weights = dbhWeight)
-      allFitStats = get_fit_statistics(name = name, fittingMethod = "lm", responseVariable = "height", 
-                                       trainingData = data, trainingPrediction = fitted(allFit), estimatedParameters = length(coef(allFit)), 
-                                       validationData = data, validationPrediction = fitted(allFit),
-                                       distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
-      allFitStats$fixedEffects[[1]] = bind_rows(coef(allFit))
-      allFitStats$fitTimeInS = get_elapsed_time(startFit)
-      allFitStats$predictors[[1]] = predictorVariables
-      progressBar()
-      return(get_fit_return_value(allFit, allFitStats, returnModel))
+      allFit = lm(formula = formula, data = speciesData, weights = dbhWeight)
+    } else {
+      allFit = lm(formula = formula, data = speciesData, weights = heightWeight)
     }
+    allFitStats = get_fit_statistics(name = name, fittingMethod = "lm", responseVariable = responseVariable, predictorVariables = predictorVariables,
+                                     startTime = startFit, fixedEffects = bind_rows(coef(allFit)), estimatedParameters = length(coef(allFit)),
+                                     trainingData = speciesData, trainingPrediction = fitted(allFit),
+                                     validationData = speciesData, validationPrediction = fitted(allFit),
+                                     distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
+    return(get_fit_return_value(allFit, allFitStats, returnModel))
+  } else if ("vfold_cv" %in% speciesDataClasses) {
+    folds = attributes(speciesData)$v
+    repetitions = attributes(speciesData)$repeats
+  } else {
+    stop(paste0("Known classes (tbl_df and vfold_cv) not found among species data classes ", str_flatten_comma(speciesDataClasses), "."))
+  }
     
-    fit_lm_fold = function(dataFold)
+  fit_lm_fold = function(dataFold)
+  {
+    startFit = Sys.time()
+    trainingData = rsample::analysis(dataFold)
+    if (responseVariable == "height")
     {
-      startFit = Sys.time()
-      trainingData = rsample::analysis(dataFold)
       linearModel = lm(formula = formula, data = trainingData, weights = dbhWeight)
-      validationData = rsample::assessment(dataFold)
-      fitStatistics = get_fit_statistics(name = name, fittingMethod = "lm", responseVariable = "height", 
-                                         trainingData = trainingData, trainingPrediction = fitted(linearModel), estimatedParameters = length(coef(linearModel)) + 1,
-                                         validationData = validationData, validationPrediction = predict(linearModel, validationData), 
-                                         distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
-      fitStatistics$fixedEffects[[1]] = bind_rows(coef(linearModel))
-      fitStatistics$fitTimeInS = get_elapsed_time(startFit)
-      fitStatistics$predictors[[1]] = predictorVariables
-      progressBar()
-      return(get_fit_return_value(linearModel, fitStatistics, returnModel))
-    }
-  }
-  else
-  {
-    if (responseVariable != "DBH")
-    {
-      stop("Expected response variable to be DBH.")
-    }
-    
-    if ((folds == 1) & (repetitions == 1))
-    {
-      startFit = Sys.time()
-      allFit = lm(formula = formula, data = data, weights = heightWeight)
-      allFitStats = get_fit_statistics(name = name, fittingMethod = "lm", responseVariable = "DBH", 
-                                       trainingData = data, trainingPrediction = fitted(allFit), estimatedParameters = length(coef(allFit)), 
-                                       validationData = data, validationPrediction = fitted(allFit), 
-                                       distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
-      allFitStats$fixedEffects[[1]] = bind_rows(coef(allFit))
-      allFitStats$fitTimeInS = get_elapsed_time(startFit)
-      allFitStats$predictors[[1]] = predictorVariables
-      progressBar()
-      return(get_fit_return_value(allFit, allFitStats, returnModel))
-    }
-    
-    fit_lm_fold = function(dataFold)
-    {
-      startFit = Sys.time()
-      trainingData = rsample::analysis(dataFold)
+    } else {
       linearModel = lm(formula = formula, data = trainingData, weights = heightWeight)
-      validationData = rsample::assessment(dataFold)
-      fitStatistics = get_fit_statistics(name = name, fittingMethod = "lm", responseVariable = "DBH", 
-                                         trainingData = trainingData, trainingPrediction = fitted(linearModel), estimatedParameters = length(coef(linearModel)), 
-                                         validationData = validationData, validationPrediction = predict(linearModel, validationData), 
-                                         distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
-      fitStatistics$fixedEffects[[1]] = bind_rows(coef(linearModel))
-      fitStatistics$fitTimeInS = get_elapsed_time(startFit)
-      fitStatistics$predictors[[1]] = predictorVariables
-      progressBar()
-      return(get_fit_return_value(linearModel, fitStatistics, returnModel))
     }
+    validationData = rsample::assessment(dataFold)
+    fitStatistics = get_fit_statistics(name = name, fittingMethod = "lm", responseVariable = responseVariable, predictorVariables = predictorVariables,
+                                       startTime = startFit, fixedEffects = bind_rows(coef(linearModel)), estimatedParameters = length(coef(linearModel)),
+                                       trainingData = trainingData, trainingPrediction = fitted(linearModel),
+                                       validationData = validationData, validationPrediction = predict(linearModel, validationData), 
+                                       distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom)
+    return(get_fit_return_value(linearModel, fitStatistics, returnModel))
   }
-  
-  splitsAndFits = get_cross_validation_folds(data, folds, repetitions) %>% mutate(fit = furrr::future_map(splits, fit_lm_fold, .options = furrrOptions))
-  return(get_cross_validation_return_value(splitsAndFits, returnModel))
+
+  progressr::with_progress({
+    message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using lm()..."))
+    progressBar = progressr::progressor(steps = folds * repetitions)
+    splitsAndFits = speciesData %>% mutate(fit = furrr::future_map(splits, fit_lm_fold, .options = furrrOptions))
+    return(get_cross_validation_return_value(splitsAndFits, returnModel))
+  })
 }
 
-fit_lme = function(name, data, fixedFormula, randomFormula, start, control = lmeControl(maxIter = 100), crossValidation = htDiaOptions$crossValidation, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
+fit_lme = function(name, speciesData, fixedFormula, randomFormula, start, control = lmeControl(maxIter = 100), crossValidation = htDiaOptions$crossValidation, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
 {
   responseVariable = get_response_variable(fixedFormula)
   predictorVariables = all.vars(rlang::f_rhs(fixedFormula)) # lme() formulas don't include coefficients
@@ -461,17 +430,15 @@ fit_lme = function(name, data, fixedFormula, randomFormula, start, control = lme
     return(notDistinctFitStats)
   }
   
-  message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using lme()..."))
-  progressBar = progressr::progressor(steps = folds * repetitions)
-  
-  startFit = Sys.time()
-  if ((folds == 1) & (repetitions == 1))
+  speciesDataClasses = class(speciesData)
+  if (speciesDataClasses[1] == "tbl_df")
   {
+    startFit = Sys.time()
     if (responseVariable == "height()")
     {
-      allFitLinear = do.call(lme, list(data = data, fixed = fixedFormula, random = randomFormula, weights = varFixed(~1/dbhWeight), control = control))
+      allFitLinear = do.call(lme, list(data = speciesData, fixed = fixedFormula, random = randomFormula, weights = varFixed(~1/dbhWeight), control = control))
     } else {
-      allFitLinear = do.call(lme, list(data = data, fixed = fixedFormula, random = randomFormula, weights = varFixed(~1/heightWeight), control = control))
+      allFitLinear = do.call(lme, list(data = speciesData, fixed = fixedFormula, random = randomFormula, weights = varFixed(~1/heightWeight), control = control))
     }
     
     validationPrediction = predict(allFitLinear, validationData, level = 0)
@@ -479,15 +446,19 @@ fit_lme = function(name, data, fixedFormula, randomFormula, start, control = lme
     {
       validationPrediction = validationPrediction + get_random_effects(allFitLinear, validationData, includePlotEffects = (responseVariable == "height"))
     }
-    allFitStats = get_fit_statistics(name = name, fittingMethod = "lme", responseVariable = responseVariable, 
-                                     trainingData = data, trainingPrediction = fitted(allFitLinear), estimatedParameters = length(fixed.effects(allFitLinear)) + length(random.effects(allFitLinear)), 
-                                     validationData = data, validationPrediction = validationPrediction,
+    allFitStats = get_fit_statistics(name = name, fittingMethod = "lme", responseVariable = responseVariable, predictorVariables = predictorVariables,
+                                     # use fixed.effects() as lme.coefficients() returns a data frame repeating fixed effects for every random effect level, increasing result .Rds sizes by an order of magnitude
+                                     # If needed, random effects can be persisted as a vector from random.effects().
+                                     startTime = startFit, fixedEffects = bind_rows(fixed.effects(allFitLinear)), estimatedParameters = length(fixed.effects(allFitLinear)) + length(random.effects(allFitLinear)), 
+                                     trainingData = speciesData, trainingPrediction = fitted(allFitLinear),
+                                     validationData = speciesData, validationPrediction = validationPrediction,
                                      distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom, randomEffect = "a0ra") # colnames(allFitLinear$coefficients$random$stand) = "(Intercept)"
-    allFitStats$fixedEffects[[1]] = bind_rows(fixed.effects(allFitLinear)) # see remarks on fixed.effects() below
-    allFitStats$fitTimeInS = get_elapsed_time(startFit)
-    allFitStats$predictors[[1]] = predictorVariables
-    progressBar()
     return(get_fit_return_value(allFitLinear, allFitStats, returnModel))
+  } else if ("vfold_cv" %in% speciesDataClasses) {
+    folds = attributes(speciesData)$v
+    repetitions = attributes(speciesData)$repeats
+  } else {
+    stop(paste0("Known classes (tbl_df and vfold_cv) not found among species data classes ", str_flatten_comma(speciesDataClasses), "."))
   }
   
   fit_lme_fold = function(dataFold)
@@ -507,31 +478,34 @@ fit_lme = function(name, data, fixedFormula, randomFormula, start, control = lme
     {
       validationPrediction = validationPrediction + get_random_effects(linearModel, validationData, includePlotEffects = (responseVariable == "height"))
     }
-    fitStatistics = get_fit_statistics(name = name, fittingMethod = "lme", responseVariable = responseVariable, 
-                                       trainingData = trainingData, trainingPrediction = fitted(linearModel), estimatedParameters = length(fixed.effects(linearModel)) + length(random.effects(linearModel)),
+    fitStatistics = get_fit_statistics(name = name, fittingMethod = "lme", responseVariable = responseVariable, predictorVariables = predictorVariables,
+                                       startTime = startFit, fixedEffects = bind_rows(fixed.effects(linearModel)), estimatedParameters = length(fixed.effects(linearModel)) + length(random.effects(linearModel)),
+                                       trainingData = trainingData, trainingPrediction = fitted(linearModel),
                                        validationData = validationData, validationPrediction = validationPrediction,
                                        distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom, randomEffect = "a0ra")
-    # lme.coefficients() returns a data frame repeating fixed effects for every random effect level, increasing result .Rds sizes by an order of magnitude
-    # If needed, random effects can be persisted as a vector from random.effects().
     fitStatistics$fixedEffects[[1]] = bind_rows(fixed.effects(linearModel))
-    fitStatistics$fitTimeInS = get_elapsed_time(startFit)
-    fitStatistics$predictors[[1]] = predictorVariables
     progressBar()
     return(get_fit_return_value(linearModel, fitStatistics, returnModel))
   }
   
-  # rather than require error handling by all callers, just return fit failed here
-  return(tryCatch({ splitsAndFits = get_cross_validation_folds(data, folds, repetitions) %>% mutate(fit = furrr::future_map(splits, fit_lme_fold, .options = furrrOptions))
-                    return(get_cross_validation_return_value(splitsAndFits, returnModel)) },
-         error = function(e) { 
-           print(e)
-           reset_future()
-           create_fit_statistics(name, fittingMethod = "lme", distinct = distinct) 
-         }))
+  progressr::with_progress({
+    message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using lme()..."))
+    progressBar = progressr::progressor(steps = folds * repetitions)
+    return(tryCatch({ 
+        splitsAndFits = speciesData %>% mutate(fit = furrr::future_map(splits, fit_lme_fold, .options = furrrOptions))
+        return(get_cross_validation_return_value(splitsAndFits, returnModel)) 
+      },
+      # rather than require error handling by all callers, just return fit failed here
+      error = function(e) { 
+        print(e)
+        reset_future()
+        create_fit_statistics(name, fittingMethod = "lme", distinct = distinct)
+      }))
+  })
 }
 
 # nlmeControl(opt) left at nlimb default per https://stats.stackexchange.com/questions/9535/when-should-i-not-use-rs-nlm-function-for-mle
-fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start, control = nlmeControl(maxIter = 100), crossValidation = htDiaOptions$crossValidation, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
+fit_nlme = function(name, modelFormula, speciesData, fixedFormula, randomFormula, start, control = nlmeControl(maxIter = 100), crossValidation = htDiaOptions$crossValidation, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE, tDegreesOfFreedom = 8)
 {
   responseVariable = get_response_variable(modelFormula)
   if (distinct == FALSE)
@@ -546,21 +520,19 @@ fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start
     return(notDistinctFitStats)
   }
   
-  message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using nlme()..."))
-  progressBar = progressr::progressor(steps = folds * repetitions)
-  
-  startFit = Sys.time()
-  if ((folds == 1) & (repetitions == 1))
+  speciesDataClasses = class(speciesData)
+  if (speciesDataClasses[1] == "tbl_df")
   {
+    startFit = Sys.time()
     if (responseVariable == "height()")
     {
       # https://stackoverflow.com/questions/11778773/using-predict-in-a-function-call-with-nlme-objects-and-a-formula
       # Debatable if varFixed() should include treeCount. While variance is independent of the count nlme()'s offers no separate
       # mechanism capturing the number of observations. This does not appear to be an issue with varFixed() but might affect cases
       # such as varPower() where variance fitting is done within nlme() rather than externally as performed here.
-      allFitNonlinear = do.call(nlme, list(model = modelFormula, data = data, fixed = fixedFormula, random = randomFormula, start = start, weights = varFixed(~1/dbhWeight), control = control))
+      allFitNonlinear = do.call(nlme, list(model = modelFormula, data = speciesData, fixed = fixedFormula, random = randomFormula, start = start, weights = varFixed(~1/dbhWeight), control = control))
     } else {
-      allFitNonlinear = do.call(nlme, list(model = modelFormula, data = data, fixed = fixedFormula, random = randomFormula, start = start, weights = varFixed(~1/heightWeight), control = control))
+      allFitNonlinear = do.call(nlme, list(model = modelFormula, data = speciesData, fixed = fixedFormula, random = randomFormula, start = start, weights = varFixed(~1/heightWeight), control = control))
     }
     
     validationPrediction = predict(allFitNonlinear, validationData, level = 0)
@@ -568,15 +540,19 @@ fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start
     {
       validationPrediction = validationPrediction + get_random_effects(allFitNonlinear, validationData, includePlotEffects = (responseVariable == "height"))
     }
-    allFitStats = get_fit_statistics(name = name, fittingMethod = "nlme", responseVariable = responseVariable, 
-                                     trainingData = data, trainingPrediction = fitted(allFitNonlinear), estimatedParameters = length(fixed.effects(allFitNonlinear)) + length(random.effects(allFitNonlinear)), 
-                                     validationData = data, validationPrediction = validationPrediction,
+    allFitStats = get_fit_statistics(name = name, fittingMethod = "nlme", responseVariable = responseVariable, predictorVariables = get_predictors_nonlinear(allFitNonlinear, modelFormula),
+                                     # nlme.coefficients() returns a data frame repeating fixed effects for every random effect level, increasing result .Rds sizes by an order of magnitude
+                                     # So use fixed.effects() instead. If needed, random effects can also be persisted as a vector from random.effects().
+                                     startTime = startFit, fixedEffects = bind_rows(fixed.effects(allFitNonlinear)), estimatedParameters = length(fixed.effects(allFitNonlinear)) + length(random.effects(allFitNonlinear)),
+                                     trainingData = speciesData, trainingPrediction = fitted(allFitNonlinear),
+                                     validationData = speciesData, validationPrediction = validationPrediction,
                                      distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom, randomEffect = colnames(allFitNonlinear$coefficients$random$stand))
-    allFitStats$fixedEffects[[1]] = bind_rows(fixed.effects(allFitNonlinear)) # see remarks on fixed.effects() below
-    allFitStats$fitTimeInS = get_elapsed_time(startFit)
-    allFitStats$predictors[[1]] = get_predictors_nonlinear(allFitNonlinear, modelFormula)
-    progressBar()
     return(get_fit_return_value(allFitNonlinear, allFitStats, returnModel))
+  } else if ("vfold_cv" %in% speciesDataClasses) {
+    folds = attributes(speciesData)$v
+    repetitions = attributes(speciesData)$repeats
+  } else {
+    stop(paste0("Known classes (tbl_df and vfold_cv) not found among species data classes ", str_flatten_comma(speciesDataClasses), "."))
   }
   
   fit_nlme_fold = function(dataFold)
@@ -596,37 +572,38 @@ fit_nlme = function(name, modelFormula, data, fixedFormula, randomFormula, start
     {
       validationPrediction = validationPrediction + get_random_effects(nonlinearModel, validationData, includePlotEffects = (responseVariable == "height"))
     }
-    fitStatistics = get_fit_statistics(name = name, fittingMethod = "nlme", responseVariable = responseVariable, 
-                                       trainingData = trainingData, trainingPrediction = fitted(nonlinearModel), estimatedParameters = length(fixed.effects(nonlinearModel)) + length(random.effects(nonlinearModel)),
+    fitStatistics = get_fit_statistics(name = name, fittingMethod = "nlme", responseVariable = responseVariable, predictorVariables = get_predictors_nonlinear(nonlinearModel, modelFormula),
+                                       startTime = startFit, fixedEffects = bind_rows(fixed.effects(nonlinearModel)), estimatedParameters = length(fixed.effects(nonlinearModel)) + length(random.effects(nonlinearModel)),
+                                       trainingData = trainingData, trainingPrediction = fitted(nonlinearModel),
                                        validationData = validationData, validationPrediction = validationPrediction,
                                        distinct = distinct, tDegreesOfFreedom = tDegreesOfFreedom, randomEffect = colnames(nonlinearModel$coefficients$random$stand))
-    # nlme.coefficients() returns a data frame repeating fixed effects for every random effect level, increasing result .Rds sizes by an order of magnitude
-    # If needed, random effects can be persisted as a vector from random.effects().
-    fitStatistics$fixedEffects[[1]] = bind_rows(fixed.effects(nonlinearModel))
-    fitStatistics$fitTimeInS = get_elapsed_time(startFit)
-    fitStatistics$predictors[[1]] = get_predictors_nonlinear(nonlinearModel, modelFormula)
     progressBar()
     return(get_fit_return_value(nonlinearModel, fitStatistics, returnModel))
   }
   
   # nlme is increasingly prone to step halving and iteration runaway as number of folds decreases
   # Rather than require error handling by all callers, just return fit failed here.
-  return(tryCatch({ splitsAndFits = get_cross_validation_folds(data, folds, repetitions) %>% mutate(fit = furrr::future_map(splits, fit_nlme_fold, .options = furrrOptions))
-                    return(get_cross_validation_return_value(splitsAndFits, returnModel)) },
-                  error = function(e) { 
-                    print(e)
-                    reset_future()
-                    create_fit_statistics(name, fittingMethod = "nlme", distinct = distinct) 
-                    }))
+  progressr::with_progress({
+    message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using nlme()..."))
+    progressBar = progressr::progressor(steps = folds * repetitions)
+    return(tryCatch({ 
+        splitsAndFits = speciesData %>% mutate(fit = furrr::future_map(splits, fit_nlme_fold, .options = furrrOptions))
+        return(get_cross_validation_return_value(splitsAndFits, returnModel)) 
+      },
+      error = function(e) { 
+        print(e)
+        reset_future()
+        create_fit_statistics(name, fittingMethod = "nlme", distinct = distinct)
+        }))
+    })
 }
 
-fit_ranger = function(name, variables, data, trees = htDiaOptions$rangerTrees, mtry, minNodeSize, sampleFraction, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE)
+fit_ranger = function(name, variables, speciesData, trees = htDiaOptions$rangerTrees, mtry, minNodeSize, sampleFraction, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, returnModel = folds * repetitions <= htDiaOptions$retainModelThreshold, distinct = TRUE)
 {
   responseVariable = variables[1]
   if (responseVariable == "height")
   {
-    allForest = ranger(height ~ ., data = data %>% select(all_of(variables)), num.trees = trees, mtry = mtry, splitrule = 'variance', min.node.size = minNodeSize, sample.fraction = sampleFraction,
-                       num.threads = htDiaOptions$rangerThreads)
+    # nothing to do
   } else {
     if (responseVariable != "dbh")
     {
@@ -636,29 +613,30 @@ fit_ranger = function(name, variables, data, trees = htDiaOptions$rangerTrees, m
     responseVariable = "DBH"
   }
   
-  message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using ranger()..."))
-  progressBar = progressr::progressor(steps = folds * repetitions)
-  
   predictorVariables = variables[2:length(variables)]
-  startFit = Sys.time()
-  if ((folds == 1) & (repetitions == 1))
+  speciesDataClasses = class(speciesData)
+  if (speciesDataClasses[1] == "tbl_df")
   {
+    startFit = Sys.time()
     if (responseVariable == "height")
     {
-      allForest = ranger(height ~ ., data = data %>% select(all_of(variables)), num.trees = trees, mtry = mtry, splitrule = 'variance', min.node.size = minNodeSize, sample.fraction = sampleFraction,
+      allForest = ranger(height ~ ., data = speciesData %>% select(all_of(variables)), num.trees = trees, mtry = mtry, splitrule = 'variance', min.node.size = minNodeSize, sample.fraction = sampleFraction,
                          num.threads = htDiaOptions$rangerThreads)
     } else {
-      allForest = ranger(dbh ~ ., data = data %>% select(all_of(variables)), num.trees = trees, mtry = mtry, splitrule = 'variance', min.node.size = minNodeSize, sample.fraction = sampleFraction,
+      allForest = ranger(dbh ~ ., data = speciesData %>% select(all_of(variables)), num.trees = trees, mtry = mtry, splitrule = 'variance', min.node.size = minNodeSize, sample.fraction = sampleFraction,
                          num.threads = htDiaOptions$rangerThreads)
     }
-    allForestStats = get_fit_statistics(name = name, fittingMethod = "ranger", responseVariable = responseVariable, 
-                                        trainingData = data, trainingPrediction = allForest$predictions, estimatedParameters = NA_real_, 
-                                        validationData = data, validationPrediction = allForest$predictions,
+    allForestStats = get_fit_statistics(name = name, fittingMethod = "ranger", responseVariable = responseVariable, predictorVariables = predictorVariables,
+                                        startTime = startFit, fixedEffects = vector("list", length = 1), estimatedParameters = NA_real_, # not particularly clear if or how to usefully report fixed effects for random forests
+                                        trainingData = speciesData, trainingPrediction = allForest$predictions,
+                                        validationData = speciesData, validationPrediction = allForest$predictions,
                                         distinct = distinct, tDegreesOfFreedom = NA_real_)
-    allForestStats$fitTimeInS = get_elapsed_time(startFit)
-    allForestStats$predictors[[1]] = predictorVariables
-    progressBar()
     return(get_fit_return_value(allForest, allForestStats, returnModel))
+  } else if ("vfold_cv" %in% speciesDataClasses) {
+    folds = attributes(speciesData)$v
+    repetitions = attributes(speciesData)$repeats
+  } else {
+    stop(paste0("Known classes (tbl_df and vfold_cv) not found among species data classes ", str_flatten_comma(speciesDataClasses), "."))
   }
   
   fit_ranger_fold = function(dataFold)
@@ -675,18 +653,22 @@ fit_ranger = function(name, variables, data, trees = htDiaOptions$rangerTrees, m
     }
 
     validationData = rsample::assessment(dataFold)
-    fitStatistics = get_fit_statistics(name = name, fittingMethod = "ranger", responseVariable = responseVariable, 
-                                       trainingData = trainingData, trainingPrediction = forest$predictions, estimatedParameters = NA_real_, 
+    fitStatistics = get_fit_statistics(name = name, fittingMethod = "ranger", responseVariable = responseVariable, predictorVariables = predictorVariables,
+                                       startTime = startFit, fixedEffects = vector("list", length = 1), estimatedParameters = NA_real_, # not particularly clear if or how to usefully report fixed effects for random forests
+                                       trainingData = trainingData, trainingPrediction = forest$predictions,
                                        validationData = validationData, validationPrediction = predict(forest, validationData)$predictions,
                                        distinct = distinct, tDegreesOfFreedom = NA_real_)
-    fitStatistics$fitTimeInS = get_elapsed_time(startFit)
-    fitStatistics$predictors[[1]] = predictorVariables
     progressBar()
     return(get_fit_return_value(forest, fitStatistics, returnModel))
   }
   
-  splitsAndFits = get_cross_validation_folds(data, folds, repetitions) %>% mutate(fit = purrr::map(splits, fit_ranger_fold))
-  return(get_cross_validation_return_value(splitsAndFits, returnModel))
+  progressr::with_progress({
+    message(paste0("Fitting ", name, " for ", folds, "x", repetitions, " ", responseVariable, " using ranger()..."))
+    progressBar = progressr::progressor(steps = folds * repetitions)
+    
+    splitsAndFits = speciesData %>% mutate(fit = purrr::map(splits, fit_ranger_fold))
+    return(get_cross_validation_return_value(splitsAndFits, returnModel))
+  })
 }
 
 get_cross_validation_data_suffix = function()
@@ -694,17 +676,19 @@ get_cross_validation_data_suffix = function()
   return(paste0(htDiaOptions$folds, "x", htDiaOptions$repetitions, if (htDiaOptions$crossValidation == "blockedByStand") { "" } else { " random" }))
 }
 
-get_cross_validation_folds = function(data, folds, repetitions)
+get_cross_validation_folds = function(data, crossValidation = htDiaOptions$crossValidation, folds = htDiaOptions$folds, repetitions = htDiaOptions$repetitions, crossValidationBalance = htDiaOptions$crossValidationBalance)
 {
-  if (htDiaOptions$crossValidation == "blockedByStand")
+  if (crossValidation == "blockedByStand")
   {
-    return(rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand, balance = htDiaOptions$crossValidationBalance))
+    crossValidationFolds = rsample::group_vfold_cv(data, v = folds, repeats = repetitions, group = stand, balance = crossValidationBalance)
+    attr(crossValidationFolds, "repeats") = repetitions # workaround https://github.com/tidymodels/rsample/issues/607
+    return(crossValidationFolds)
   } else {
-    if (htDiaOptions$crossValidation != "randomByCruiseRecord")
+    if (crossValidation != "randomByCruiseRecord")
     {
-      stop(paste0("Unknown cross validation method ", htDiaOptions$crossValidation, "."))
+      stop(paste0("Unknown cross validation method ", crossValidation, "."))
     }
-    return(return(rsample::vfold_cv(data, v = folds, repeats = repetitions)))
+    return(rsample::vfold_cv(data, v = folds, repeats = repetitions))
   }
 }
 
@@ -728,11 +712,6 @@ get_cross_validation_return_value = function(splitsAndFits, returnModel)
            relocate(repetition, fold))
 }
 
-get_elapsed_time = function(start)
-{
-  return(as.numeric(difftime(Sys.time(), start, units = "secs")))
-}
-
 get_fit_return_value = function(model, fitStatistics, returnModel)
 {
   if (returnModel)
@@ -744,7 +723,7 @@ get_fit_return_value = function(model, fitStatistics, returnModel)
   }
 }
 
-get_fit_statistics = function(name, fittingMethod, responseVariable, trainingData, trainingPrediction, estimatedParameters, validationData, validationPrediction, fitSet = "primary", isConverged = TRUE, distinct = TRUE, tDegreesOfFreedom = 8, randomEffect = NA_character_)
+get_fit_statistics = function(name, fittingMethod, responseVariable, predictorVariables, fixedEffects, trainingData, trainingPrediction, estimatedParameters, validationData, validationPrediction, startTime = Sys.time(), fitSet = "primary", isConverged = TRUE, distinct = TRUE, randomEffect = NA_character_, tDegreesOfFreedom = 8)
 {
   if (length(validationPrediction) != nrow(validationData))
   {
@@ -755,7 +734,10 @@ get_fit_statistics = function(name, fittingMethod, responseVariable, trainingDat
   fitStatistics$estimatedParameters = estimatedParameters
   fitStatistics$isConverged = isConverged
   fitStatistics$distinct = distinct
+  fitStatistics$fixedEffects[[1]] = fixedEffects
+  fitStatistics$predictors[[1]] = predictorVariables
   fitStatistics$randomEffect = randomEffect
+  fitStatistics$fitTimeInS = as.numeric(difftime(Sys.time(), startTime, units = "secs"))
 
   if (responseVariable == "DBH")
   {
@@ -951,11 +933,11 @@ get_response_variable = function(formula)
   return(responseVariable)
 }
 
-plot_auc_bank = function(aucs1, aucs2 = NULL, aucs3 = NULL, aucs4 = NULL, generalized = FALSE, fillLabel = "median AUC", xLimits = c("Douglas-fir", "grand fir", "bigleaf maple", "other species"), nPreferredModelBoxes = 2, legendHjustification = 1.8, plotRightMargin = 0, bounds = FALSE)
+plot_auc_bank = function(aucs1, aucs2 = NULL, aucs3 = NULL, aucs4 = NULL, generalized = FALSE, fillLabel = "median AUC", xLimits = c("Douglas-fir", "grand fir", "bigleaf maple", "other species"), nPreferredModelBoxes = 2, legendHjustification = 1.8, plotRightMargin = 0, modelEfficiency = FALSE, rightPlotSpacer = 0)
 {
-  if ((bounds == FALSE) & ((is.null(aucs3) == FALSE) | (is.null(aucs4) == FALSE)))
+  if ((modelEfficiency == FALSE) & ((is.null(aucs3) == FALSE) | (is.null(aucs4) == FALSE)))
   {
-    stop("aucs3 and 4 are only supported with bounds = TRUE.")
+    stop("aucs3 and 4 are only supported with modelEfficiency = TRUE.")
   }
   
   aucColorbarTheme = theme(legend.key.width = unit(6.5, "lines"), legend.title = element_text(size = 9, vjust = 0.85))
@@ -977,18 +959,19 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, aucs3 = NULL, aucs4 = NULL, genera
   
   # avoid ggplot warnings on axis limits suppressing display of data
   aucsToDisplay1 = aucs1 %>% filter(nameAndFit %in% yAxisLimits)
-  if (bounds)
+  if (modelEfficiency)
   {
     aucBank = ggplot() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = aucBounds), aucsToDisplay1) + 
+      geom_tile(aes(x = species, y = nameAndFit, fill = aucNse), aucsToDisplay1) +
       labs(fill = fillLabel) +
       scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
       ggnewscale::new_scale_fill() +
       geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
+      geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucNseRank <= nPreferredModelBoxes, aucNseRank <= nPreferredModelBoxes)), fill = "transparent") +
       scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-      #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucBoundsRank <= nPreferredModelBoxes, aucBoundsRank <= nPreferredModelBoxes)), fill = "transparent") +
       labs(title = paste0(plotLetters[1], " ", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1], " ", crossValidationTitleSuffix1), x = NULL, y = NULL, color = NULL, fill = NULL) +
       scale_y_discrete(limits = yAxisLimits, drop = FALSE)
+    subplots = 1
     
     if (is.null(aucs2) == FALSE)
     {
@@ -1000,17 +983,17 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, aucs3 = NULL, aucs4 = NULL, genera
       }
       
       aucsToDisplay2 = aucs2 %>% filter(nameAndFit %in% yAxisLimits)
-      aucBank = aucBank + 
-        ggplot() +
-          geom_tile(aes(x = species, y = nameAndFit, fill = aucBounds), aucsToDisplay2) +
-          labs(fill = fillLabel) +
-          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
-          ggnewscale::new_scale_fill() +
-          geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2) +
-          scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-          #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucBoundsRank <= nPreferredModelBoxes, aucBoundsRank <= nPreferredModelBoxes)), fill = "transparent") +
-          labs(title = paste0(plotLetters[2], " ", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1], " ", crossValidationTitleSuffix2), x = NULL, y = NULL, color = NULL, fill = NULL) +
-          scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE)
+      aucBank = aucBank + ggplot() +
+        geom_tile(aes(x = species, y = nameAndFit, fill = aucNse), aucsToDisplay2) +
+        labs(fill = fillLabel) +
+        scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
+        ggnewscale::new_scale_fill() +
+        geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2) +
+        geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucNseRank <= nPreferredModelBoxes, aucNseRank <= nPreferredModelBoxes)), fill = "transparent") +
+        scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+        labs(title = paste0(plotLetters[2], " ", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1], " ", crossValidationTitleSuffix2), x = NULL, y = NULL, color = NULL, fill = NULL) +
+        scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE)
+      subplots = 2
       
       if (is.null(aucs3) == FALSE)
       {
@@ -1022,18 +1005,18 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, aucs3 = NULL, aucs4 = NULL, genera
         }
         
         aucsToDisplay3 = aucs3 %>% filter(nameAndFit %in% yAxisLimits)
-        aucBank = aucBank + 
-          ggplot() +
-          geom_tile(aes(x = species, y = nameAndFit, fill = aucBounds), aucsToDisplay3) +
+        aucBank = aucBank + ggplot() +
+          geom_tile(aes(x = species, y = nameAndFit, fill = aucNse), aucsToDisplay3) +
           labs(fill = fillLabel) +
           scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
           ggnewscale::new_scale_fill() +
           geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay3) +
+          geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay3 %>% filter(if_else(isBaseForm, aucNseRank <= nPreferredModelBoxes, aucNseRank <= nPreferredModelBoxes)), fill = "transparent") +
           scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-          #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay3 %>% filter(if_else(isBaseForm, aucBoundsRank <= nPreferredModelBoxes, aucBoundsRank <= nPreferredModelBoxes)), fill = "transparent") +
           labs(title = paste0(plotLetters[3], " ", aucsToDisplay3$folds[1], "×", aucsToDisplay3$repetitions[1], " ", crossValidationTitleSuffix3), x = NULL, y = NULL, color = NULL, fill = NULL) +
           scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE)
-       
+        subplots = 3
+        
         if (is.null(aucs4) == FALSE)
         {
           if (aucs4$crossValidation[1] == "blockedByStand")
@@ -1044,18 +1027,18 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, aucs3 = NULL, aucs4 = NULL, genera
           }
           
           aucsToDisplay4 = aucs4 %>% filter(nameAndFit %in% yAxisLimits)
-          aucBank = aucBank + 
-            ggplot() +
-            geom_tile(aes(x = species, y = nameAndFit, fill = aucBounds), aucsToDisplay4) +
+          aucBank = aucBank + ggplot() +
+            geom_tile(aes(x = species, y = nameAndFit, fill = aucNse), aucsToDisplay4) +
             labs(fill = fillLabel) +
             scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
             ggnewscale::new_scale_fill() +
             geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay4) +
+            geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucNseRank <= nPreferredModelBoxes, aucNseRank <= nPreferredModelBoxes)), fill = "transparent") +
             scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-            #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay4 %>% filter(if_else(isBaseForm, aucBoundsRank <= nPreferredModelBoxes, aucBoundsRank <= nPreferredModelBoxes)), fill = "transparent") +
             labs(title = paste0(plotLetters[4], " ", aucsToDisplay4$folds[1], "×", aucsToDisplay4$repetitions[1], " ", crossValidationTitleSuffix4), x = NULL, y = NULL, color = NULL, fill = NULL) +
             scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE)
-        } 
+          subplots = 4
+        }
       } else if (is.null(aucs4) == FALSE) {
         stop("aucs4 is only supported if aucs3 is not null.")
       }
@@ -1064,49 +1047,49 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, aucs3 = NULL, aucs4 = NULL, genera
     }
   } else {
     aucBank = ggplot() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = aucMae), aucsToDisplay1) +
-      labs(fill = fillLabel) +
-      scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
-      ggnewscale::new_scale_fill() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
-      geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucMaeRank <= nPreferredModelBoxes, aucMaeRank <= nPreferredModelBoxes)), fill = "transparent") +
-      scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-      #labs(title = paste0("**", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1], " ", aucsToDisplay1$responseVariable[1], " cross validation", crossValidationTitleSuffix1 ,"**<br>", plotLetters[1], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-      labs(title = paste0("**", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1], " ", aucsToDisplay1$responseVariable[1], " cross validation", crossValidationTitleSuffix1, "**"), subtitle  = paste0(plotLetters[1], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-      scale_y_discrete(limits = yAxisLimits, drop = FALSE) +
-    ggplot() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = aucRmse), aucsToDisplay1) +
-      labs(fill = fillLabel) +
-      scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
-      ggnewscale::new_scale_fill() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
-      geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucRmseRank <= nPreferredModelBoxes, aucRmseRank <= nPreferredModelBoxes)), fill = "transparent") +
-      scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-      #labs(title = paste0("<br>", plotLetters[2], " RMSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-      labs(subtitle = paste0(plotLetters[2], " RMSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-      scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE) +
-    ggplot() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = aucDeltaAicN), aucsToDisplay1) +
-      labs(fill = fillLabel) +
-      scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
-      ggnewscale::new_scale_fill() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1 %>% mutate(distinct = if_else(fitting == "ranger", FALSE, distinct))) +
-      geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucDeltaAicNRank <= nPreferredModelBoxes, aucDeltaAicNRank <= nPreferredModelBoxes)), fill = "transparent") +
-      scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-      #labs(title = paste0("<br>", plotLetters[3], " ΔAICn"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-      labs(subtitle = paste0(plotLetters[3], " ΔAICn"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-      scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE) +
-    ggplot() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = aucNse), aucsToDisplay1) +
-      labs(fill = fillLabel) +
-      scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
-      ggnewscale::new_scale_fill() +
-      geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
-      geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucNseRank <= nPreferredModelBoxes, aucNseRank <= nPreferredModelBoxes)), fill = "transparent") +
-      scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-      #labs(title = paste0("<br>", plotLetters[4], " NSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-      labs(subtitle = paste0(plotLetters[4], " NSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-      scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE)
+        geom_tile(aes(x = species, y = nameAndFit, fill = aucBounds), aucsToDisplay1) + 
+        labs(fill = fillLabel) +
+        scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
+        ggnewscale::new_scale_fill() +
+        geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
+        scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+        #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucBoundsRank <= nPreferredModelBoxes, aucBoundsRank <= nPreferredModelBoxes)), fill = "transparent") +
+        #labs(title = paste0("**", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1], " ", aucsToDisplay1$responseVariable[1], " cross validation", crossValidationTitleSuffix1 ,"**<br>", plotLetters[1], " bounds"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+        labs(title = paste0("**", aucsToDisplay1$folds[1], "×", aucsToDisplay1$repetitions[1], " ", aucsToDisplay1$responseVariable[1], " cross validation", crossValidationTitleSuffix1, "**"), subtitle  = paste0(plotLetters[1], " bounds"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+        scale_y_discrete(limits = yAxisLimits, drop = FALSE) +
+      ggplot() +
+        geom_tile(aes(x = species, y = nameAndFit, fill = aucMae), aucsToDisplay1) +
+        labs(fill = fillLabel) +
+        scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
+        ggnewscale::new_scale_fill() +
+        geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
+        geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucMaeRank <= nPreferredModelBoxes, aucMaeRank <= nPreferredModelBoxes)), fill = "transparent") +
+        scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+        labs(subtitle = paste0(plotLetters[2], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+        scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE) +
+      ggplot() +
+        geom_tile(aes(x = species, y = nameAndFit, fill = aucRmse), aucsToDisplay1) +
+        labs(fill = fillLabel) +
+        scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
+        ggnewscale::new_scale_fill() +
+        geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1) +
+        geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucRmseRank <= nPreferredModelBoxes, aucRmseRank <= nPreferredModelBoxes)), fill = "transparent") +
+        scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+        #labs(title = paste0("<br>", plotLetters[3], " RMSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+        labs(subtitle = paste0(plotLetters[3], " RMSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+        scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE) +
+      ggplot() +
+        geom_tile(aes(x = species, y = nameAndFit, fill = aucDeltaAicN), aucsToDisplay1) +
+        labs(fill = fillLabel) +
+        scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
+        ggnewscale::new_scale_fill() +
+        geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay1 %>% mutate(distinct = if_else(fitting == "ranger", FALSE, distinct))) +
+        geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay1 %>% filter(if_else(isBaseForm, aucDeltaAicNRank <= nPreferredModelBoxes, aucDeltaAicNRank <= nPreferredModelBoxes)), fill = "transparent") +
+        scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+        #labs(title = paste0("<br>", plotLetters[4], " ΔAICn"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+        labs(subtitle = paste0(plotLetters[4], " ΔAICn"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+        scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE)
+    subplots = 4
   
     if (is.null(aucs2) == FALSE)
     {
@@ -1121,15 +1104,25 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, aucs3 = NULL, aucs4 = NULL, genera
       aucsToDisplay2 = aucs2 %>% filter(nameAndFit %in% yAxisLimits)
       aucBank = aucBank +
         ggplot() +
+          geom_tile(aes(x = species, y = nameAndFit, fill = aucBounds), aucsToDisplay2) +
+          labs(fill = fillLabel) +
+          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
+          ggnewscale::new_scale_fill() +
+          geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2) +
+          scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
+          #geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucBoundsRank <= nPreferredModelBoxes, aucBoundsRank <= nPreferredModelBoxes)), fill = "transparent") +
+          #labs(title = paste0("**", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1], " ", aucsToDisplay2$responseVariable[1], " cross validation", crossValidationTitleSuffix2, "**<br>", plotLetters[5], " bounds"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          labs(title = paste0("**", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1], " ", aucsToDisplay2$responseVariable[1], " cross validation", crossValidationTitleSuffix2, "**"), subtitle = paste0(plotLetters[5], " bounds"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE) +
+        ggplot() +
           geom_tile(aes(x = species, y = nameAndFit, fill = aucMae), aucsToDisplay2) +
           labs(fill = fillLabel) +
           scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
           ggnewscale::new_scale_fill() +
           geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2) +
           geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucMaeRank <= nPreferredModelBoxes, aucMaeRank <= nPreferredModelBoxes)), fill = "transparent") +
+          labs(subtitle = paste0(plotLetters[6], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
           scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-          #labs(title = paste0("**", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1], " ", aucsToDisplay2$responseVariable[1], " cross validation", crossValidationTitleSuffix2, "**<br>", plotLetters[5], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-          labs(title = paste0("**", aucsToDisplay2$folds[1], "×", aucsToDisplay2$repetitions[1], " ", aucsToDisplay2$responseVariable[1], " cross validation", crossValidationTitleSuffix2, "**"), subtitle = paste0(plotLetters[5], " MAE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
           scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE) +
         ggplot() +
           geom_tile(aes(x = species, y = nameAndFit, fill = aucRmse), aucsToDisplay2) +
@@ -1139,8 +1132,8 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, aucs3 = NULL, aucs4 = NULL, genera
           geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2) +
           geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucRmseRank <= nPreferredModelBoxes, aucRmseRank <= nPreferredModelBoxes)), fill = "transparent") +
           scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-          #labs(title = paste0("<br>", plotLetters[6], " RMSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-          labs(subtitle = paste0(plotLetters[6], " RMSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          #labs(title = paste0("<br>", plotLetters[7], " RMSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          labs(subtitle = paste0(plotLetters[7], " RMSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
           scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE) +
         ggplot() +
           geom_tile(aes(x = species, y = nameAndFit, fill = aucDeltaAicN), aucsToDisplay2) +
@@ -1150,26 +1143,23 @@ plot_auc_bank = function(aucs1, aucs2 = NULL, aucs3 = NULL, aucs4 = NULL, genera
           geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2 %>% mutate(distinct = if_else(fitting == "ranger", FALSE, distinct))) +
           geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucDeltaAicNRank <= nPreferredModelBoxes, aucDeltaAicNRank <= nPreferredModelBoxes)), fill = "transparent") +
           scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-          #labs(title = paste0("<br>", plotLetters[7], " ΔAICn"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-          labs(subtitle = paste0(plotLetters[7], " ΔAICn"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-          scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE) +
-        ggplot() +
-          geom_tile(aes(x = species, y = nameAndFit, fill = aucNse), aucsToDisplay2) +
-          labs(fill = fillLabel) +
-          scico::scale_fill_scico(palette = "bam", limits = c(0, 1), guide = guide_colorbar(order = 1, theme = aucColorbarTheme), na.value = "red2") +
-          ggnewscale::new_scale_fill() +
-          geom_tile(aes(x = species, y = nameAndFit, fill = distinct), aucsToDisplay2) +
-          geom_tile(aes(x = species, y = nameAndFit, color = as.factor(isBaseForm), linewidth = isBaseForm), aucsToDisplay2 %>% filter(if_else(isBaseForm, aucNseRank <= nPreferredModelBoxes, aucNseRank <= nPreferredModelBoxes)), fill = "transparent") +
-          scale_fill_manual(breaks = c(TRUE, FALSE, NA), labels = c("", "not distinct\nor AIC undefined", "fitting did not\nconverge"), values = c("transparent", "grey70", "red2"), na.value = "red2", guide = guide_legend(order = 2)) +
-          #labs(title = paste0("<br>", plotLetters[10], " NSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
-          labs(subtitle = paste0(plotLetters[10], " NSE"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          #labs(title = paste0("<br>", plotLetters[8], " ΔAICn"), x = NULL, y = NULL, color = NULL, fill = NULL) +
+          labs(subtitle = paste0(plotLetters[8], " ΔAICn"), x = NULL, y = NULL, color = NULL, fill = NULL) +
           scale_y_discrete(labels = NULL, limits = yAxisLimits, drop = FALSE)
+      subplots = 4
     }
+  }
+
+  subplotWidths = rep(1, subplots)
+  if (rightPlotSpacer > 0)
+  {
+    aucBank = aucBank + plot_spacer()
+    subplotWidths = c(subplotWidths, rightPlotSpacer)
   }
   
   aucBank = aucBank +
     plot_annotation(theme = theme(plot.margin =  margin())) +
-    plot_layout(nrow = 1, guides = "collect") &
+    plot_layout(nrow = 1, widths = subplotWidths, guides = "collect") &
       guides(color = guide_legend(override.aes = list(linewidth = 0.5)), linewidth = "none") &
       scale_color_manual(breaks = c(FALSE, TRUE), labels = c("preferred\ngeneralization", "preferred\nbase form"), values = c("dodgerblue", "dodgerblue")) &
       scale_linewidth_manual(breaks = c(FALSE, TRUE), values = c(0.3, 0.3)) &
@@ -1219,11 +1209,11 @@ predict_bootstrap_dbh = function(trees)
                  #
                  # Because DBH models have low bias DBH errors progressively average out of bootstrap stand basal area estimates (ABA) with
                  # increasing cruise intensity in a stand. Basal area taller also averages down as suppression increases.
-                 case_match(trees$species,
-                            "PSME" ~ trees$dbh + rnorm(n = nrow(trees), mean = 0, sd = sqrt(0.0117 * trees$dbh^1.606)),
-                            "ABGR" ~ trees$dbh + rnorm(n = nrow(trees), mean = 0, sd = sqrt(0.521 * trees$dbh^0.697)),
-                            "ACMA" ~ trees$dbh + rnorm(n = nrow(trees), mean = 0, sd = sqrt(0.0258 * trees$dbh^1.613)),
-                            .default = trees$dbh + rnorm(n = nrow(trees), mean = 0, sd = sqrt(0.000661 * trees$dbh^2.037))),
+                 recode_values(trees$species,
+                               "PSME" ~ trees$dbh + rnorm(n = nrow(trees), mean = 0, sd = sqrt(0.0117 * trees$dbh^1.606)),
+                               "ABGR" ~ trees$dbh + rnorm(n = nrow(trees), mean = 0, sd = sqrt(0.521 * trees$dbh^0.697)),
+                               "ACMA" ~ trees$dbh + rnorm(n = nrow(trees), mean = 0, sd = sqrt(0.0258 * trees$dbh^1.613)),
+                               default = trees$dbh + rnorm(n = nrow(trees), mean = 0, sd = sqrt(0.000661 * trees$dbh^2.037))),
                  # height measured: predict DBH from bootstrap models selected by 10x10 cross validation
                  # bootstrap DBH model selection on RMSE AUC basis
                  # species  cross validation  top model (highest AUC)    second model               third model
@@ -1239,13 +1229,13 @@ predict_bootstrap_dbh = function(trees)
                  # other    2x500             REML GAM physio            REML GAM physio mixed      REML GAM
                  #          5x200             REML GAM physio            REML GAM physio mixed      REML GAM
                  #          10x100            REML GAM physio            REML GAM physio mixed      REML GAM
-                 case_match(trees$species,
-                            "PSME" ~ 1.92785 * (trees$height - 1.37)^(0.84484) * exp((0.01328 - 0.00111 * trees$isPlantation) * (trees$height - 1.37)), # Ruark
-                            #"PSME" ~ (1.941428 - 0.088674 * cos(3.14159/180 * trees$aspect)) * (trees$height - 1.37)^(0.851545) * exp((0.008463 + 0.002658 * trees$relativeHeight) * (trees$height - 1.37)), # Ruark RelHt physio
-                            "ABGR" ~ 0.3416 + 1.6565 * (trees$height - 1.37), # linear
-                            #"ABGR" ~ (2.0238 + 0.4090 * trees$relativeHeight) * (trees$height - 1.37)^(0.8846), # power RelHt
-                            "ACMA" ~ predict(acmaDiameterFromHeightPreferred$randomForest, trees)$predictions,
-                            .default = predict(otherDiameterFromHeightPreferred$gamPhysio, trees))))
+                 recode_values(trees$species,
+                               "PSME" ~ 1.92785 * (trees$height - 1.37)^(0.84484) * exp((0.01328 - 0.00111 * trees$isPlantation) * (trees$height - 1.37)), # Ruark
+                               #"PSME" ~ (1.941428 - 0.088674 * cos(3.14159/180 * trees$aspect)) * (trees$height - 1.37)^(0.851545) * exp((0.008463 + 0.002658 * trees$relativeHeight) * (trees$height - 1.37)), # Ruark RelHt physio
+                               "ABGR" ~ 0.3416 + 1.6565 * (trees$height - 1.37), # linear
+                               #"ABGR" ~ (2.0238 + 0.4090 * trees$relativeHeight) * (trees$height - 1.37)^(0.8846), # power RelHt
+                               "ACMA" ~ predict(acmaDiameterFromHeightPreferred$randomForest, trees)$predictions,
+                               default = predict(otherDiameterFromHeightPreferred$gamPhysio, trees))))
 }
 
 # called to reset future's workers if one fails with an error
@@ -1415,7 +1405,7 @@ trees2022 = left_join(left_join(trees2022, stands2022 %>% rename(standArea = are
   arrange(desc(isLiveUnbroken), desc(height), .by_group = TRUE) %>%
   mutate(topHeight = sum(topHeightMask * topHeightTph * topHeight, na.rm = TRUE) / sum(topHeightMask * topHeightTph, na.rm = TRUE),
          relativeHeight = height / topHeight) %>% # NA off height measure trees but only needed on height measure trees
-  mutate(bootstrapDbh = predict_bootstrap_dbh(.[cur_group_rows(), ]), # a separate mutate() is required for . to have relativeHeight
+  mutate(bootstrapDbh = as.vector(predict_bootstrap_dbh(.[cur_group_rows(), ])), # a separate mutate() is required for . to have relativeHeight, as of dplyr 1.2.1 predict_bootstrap_dbh() returns a 1D matrix rather than a vector, requiring explict conversion as otherwise is.na(bootstrapDbh) fails below
          predictedBasalAreaPerHectare = treesPerHectare * pi/4 * (0.01 * if_else(is.na(bootstrapDbh), dbh, bootstrapDbh))^2, # m²/ha, based on diameter predicted from height whenever available (72.5% of trees)
          bootstrapStandBasalAreaPerHectare = sum(isLive * predictedBasalAreaPerHectare) / plotsInStand, # m²/ha
          basalAreaTaller = (cumsum(isLive * predictedBasalAreaPerHectare) - predictedBasalAreaPerHectare[1]) / plotsInStand,
@@ -1453,19 +1443,47 @@ trees2022 %<>% group_by(speciesModel) %>%
 psme2022 = trees2022 %>% filter(species == "PSME", is.na(dbh) == FALSE, is.na(height) == FALSE, height >= 1.37, isLiveUnbroken) %>%
   #mutate(dbhWeight = treeCount / (0.699 * dbh^0.863), heightWeight = treeCount / (0.221 * height^(1.983 - 0.103 * isPlantation))) # all data
   mutate(dbhWeight = treeCount / (0.632 * dbh^0.886), heightWeight = treeCount / (0.227 * height^(1.975 - 0.092 * isPlantation)), # mapped plots
-         heightMax = 75, dbhMax = 250, heightDiameterRatioMax = (1.37 + 2.819 * dbh^0.710) / (0.01 * dbh), heightDiameterRatioMin = (1.37 + 1.2 * dbh^0.60) / (0.01 * dbh))
+         heightMax = 75, dbhMax = 250, 
+         heightDiameterRatioMax = 92 + (13 - 0.0028 * dbh^2) / (0.01 * dbh),
+         heightDiameterRatioMin = 8 + 1.3 / (0.01 * dbh + 0.03) + (0 - 0.0000 * dbh^2) / (0.01 * dbh))
+         #heightDiameterRatioMax = (1.37 + 2.819 * dbh^0.710) / (0.01 * dbh), 
+         #heightDiameterRatioMin = (1.37 + 1.2 * dbh^0.60) / (0.01 * dbh))
 abgr2022 = trees2022 %>% filter(species == "ABGR", is.na(height) == FALSE, isLiveUnbroken) %>%
   #mutate(dbhWeight = treeCount / (0.645 * dbh^0.930), heightWeight = treeCount / (1.913 * height^1.159)) # all data
   mutate(dbhWeight = treeCount / (0.590 * dbh^0.961), heightWeight = treeCount / (1.811 * height^1.158), # mapped plots
-         heightMax = 75, dbhMax = 150, heightDiameterRatioMax = (1.37 + 0.181 * dbh^0.994) / (0.01 * dbh), heightDiameterRatioMin = (1.37 + 5.372 * dbh^0.554) / (0.01 * dbh))
+         heightMax = 75, dbhMax = 150, 
+         heightDiameterRatioMax = 109 + (10 - 0.0044 * dbh^2) / (0.01 * dbh),
+         heightDiameterRatioMin = 26 + 0.7 / (0.01 * dbh + 0.08) + (0 - 0.0001 * dbh^2) / (0.01 * dbh))
+         #heightDiameterRatioMax = (1.37 + 0.181 * dbh^0.994) / (0.01 * dbh), 
+         #heightDiameterRatioMin = (1.37 + 5.372 * dbh^0.554) / (0.01 * dbh))
 acma2022 = trees2022 %>% filter(species == "ACMA", is.na(dbh) == FALSE, is.na(height) == FALSE, isLiveUnbroken) %>%
   #mutate(dbhWeight = treeCount / ((1.783 - 0.201 * isPlantation) * dbh^0.754), heightWeight = treeCount / (4.291 * height^1.269)) # all data
   mutate(dbhWeight = treeCount / ((1.783 - 0.101 * isPlantation) * dbh^0.753), heightWeight = treeCount / (4.437 * height^1.267), # mapped plots
-         heightMax = 52, dbhMax = 160, heightDiameterRatioMax = (1.37 + 0.114 * dbh^0.75) / (0.01 * dbh), heightDiameterRatioMin = (1.37 + 5.007 * dbh^0.603) / (0.01 * dbh))
+         heightMax = 52, dbhMax = 160, 
+         heightDiameterRatioMax = 69 + (21 - 0.0042 * dbh^2) / (0.01 * dbh),
+         heightDiameterRatioMin = 1.2 + 1.3 / (0.01 * dbh + 0.04) + (0 - 0.0000 * dbh^2) / (0.01 * dbh))
+         #heightDiameterRatioMax = (1.37 + 0.114 * dbh^0.75) / (0.01 * dbh), 
+         #heightDiameterRatioMin = (1.37 + 5.007 * dbh^0.603) / (0.01 * dbh))
 other2022 = trees2022 %>% filter(speciesModel == "other", is.na(dbh) == FALSE, is.na(height) == FALSE, isLiveUnbroken) %>%
   # mutate(dbhWeight = treeCount / ((0.940 + 0.213 * isPlantation) * dbh^0.898), heightWeight = treeCount / (1.989 * height^1.552)) # all data
   mutate(dbhWeight = treeCount / ((0.915 + 0.229 * isPlantation) * dbh^0.906), heightWeight = treeCount / (2.047 * height^1.552),
-         heightMax = 50, dbhMax = 125, heightDiameterRatioMax = (1.37 + 0.835 * dbh^0.551) / (0.01 * dbh), heightDiameterRatioMin = (1.37 + 7.032 * dbh^0.436) / (0.01 * dbh))
+         heightMax = 50, dbhMax = 125, 
+         heightDiameterRatioMax = 73 + (15 - 0.0036 * dbh^2) / (0.01 * dbh),
+         heightDiameterRatioMin = 16 + 1.9 / (0.01 * dbh + 0.06) + (0 - 0.0006 * dbh^2) / (0.01 * dbh))
+         #heightDiameterRatioMax = (1.37 + 0.835 * dbh^0.551) / (0.01 * dbh), 
+         #heightDiameterRatioMin = (1.37 + 7.032 * dbh^0.436) / (0.01 * dbh))
+
+#ggplot() +
+#  geom_line(aes(x = dbh, y = heightDiameterRatioMax, color = "PSME"), psme2022) +
+#  geom_line(aes(x = dbh, y = heightDiameterRatioMax, color = "ABGR"), abgr2022) +
+#  geom_line(aes(x = dbh, y = heightDiameterRatioMax, color = "ACMA"), acma2022) +
+#  geom_line(aes(x = dbh, y = heightDiameterRatioMax, color = "other"), other2022) +
+#  geom_line(aes(x = dbh, y = heightDiameterRatioMin, color = "PSME"), psme2022) +
+#  geom_line(aes(x = dbh, y = heightDiameterRatioMin, color = "ABGR"), abgr2022) +
+#  geom_line(aes(x = dbh, y = heightDiameterRatioMin, color = "ACMA"), acma2022) +
+#  geom_line(aes(x = dbh, y = heightDiameterRatioMin, color = "other"), other2022) +
+#  coord_cartesian(ylim = c(0, 250)) +
+#  labs(x = "DBH, cm", y = "height-diameter ratio", color = NULL)
 
 
 ## weighting for heteroskedasticity
@@ -1789,52 +1807,92 @@ if (htDiaOptions$includeInvestigatory)
     labs(x = "stand origin, CE", y = "stand age, years", color = NULL, size = "stand\narea,\nha") +
     scale_color_manual(breaks = c(FALSE, TRUE), labels = c("natural regen", "plantation"), values = c("forestgreen", "blue"))
 
-  # data distribution and species limits on height-diameter ratios
+  # data distributions and species limits on height-diameter ratios
   # Keep species limits in sync with species setup (psme2022, abgr2022, acma2022, other2022). See also Figure 1 in results.R.
-  # With quantile power regression, height in m, an(d dbh in cm,
+  # With height in m and dbh in cm,
   #   h-d ratio = height/dbh = (a0 + a1 * dbh^b1)/(0.01 * dbh)
-  library(quantreg)
-  psmeLowerBound = nlrq(height ~ 1.37 + a1 * dbh^b1, psme2022, start = c(a1 = 0.1, b1 = 0.6), tau = 0.001)
-  psmeUpperBound = nlrq(height ~ 1.37 + a1 * dbh^b1, psme2022, start = c(a1 = 2.0, b1 = 0.7), tau = 0.999)
-  abgrLowerBound = nlrq(height ~ 1.37 + a1 * dbh^b1, abgr2022, start = c(a1 = 0.1, b1 = 0.8), tau = 0.001)
-  abgrUpperBound = nlrq(height ~ 1.37 + a1 * dbh^b1, abgr2022, start = c(a1 = 2.5, b1 = 0.5), tau = 0.999)
-  acmaLowerBound = nlrq(height ~ 1.37 + a1 * dbh^b1, acma2022, start = c(a1 = 0.01, b1 = 2), tau = 0.005)
-  acmaUpperBound = nlrq(height ~ 1.37 + a1 * dbh^b1, acma2022, start = c(a1 = 2.5, b1 = 0.5), tau = 0.999)
-  otherLowerBound = nlrq(height ~ 1.37 + a1 * dbh^b1, other2022, start = c(a1 = 1.0, b1 = 0.1), tau = 0.001)
-  otherUpperBound = nlrq(height ~ 1.37 + a1 * dbh^b1, other2022, start = c(a1 = 2.5, b1 = 0.5), tau = 0.999)
-  
   liveUnbrokenSampling2022 = trees2022 %>% filter(isLiveUnbroken, is.na(dbh) == FALSE, is.na(height) == FALSE) %>%
-    mutate(heightClass = round(height), dbhClass = 2.5 * round(dbh / 2.5)) %>%
-    group_by(speciesModel, heightClass, dbhClass) %>%
+    mutate(heightClass = round(height), dbhClass = 2.5 * round(dbh / 2.5),
+           heightDiameterRatio = height / (0.01 * dbh), heightDiameterClass = round(heightDiameterRatio)) %>%
+    group_by(speciesModel, heightDiameterClass, dbhClass) %>%
+    #group_by(speciesModel, heightClass, dbhClass) %>%
     summarize(treesMeasured = sum(treeCount), .groups = "drop")
   
   ggplot() +
-    geom_tile(aes(x = dbhClass, y = heightClass, fill = treesMeasured), liveUnbrokenSampling2022 %>% filter(speciesModel == "PSME")) +
-    geom_path(aes(x = seq(0, 250), y = 1.37 + 1.2 * seq(0, 250)^0.60), color = "grey80") + # height-diameter ratio lower bound
-    geom_path(aes(x = seq(0.1, 250), y = 1.37 + 2.819 * seq(0.1, 250)^0.710), color = "grey80") + # height-diameter ratio upper bound
-    coord_cartesian(xlim = c(0, 250), ylim = c(0, 75)) +
-    labs(x = "DBH, cm", y = "height, m", fill = "trees\nmeasured", title = paste(plotLetters[1], "Douglas-fir")) +
+    geom_tile(aes(x = dbhClass, y = heightDiameterClass, fill = treesMeasured), liveUnbrokenSampling2022 %>% filter(speciesModel == "PSME")) +
+    #geom_point(aes(x = dbh, y = height / (0.01 * dbh)), psme2022, alpha = 0.05, shape = 16) +
+    #geom_path(aes(x = dbh, y = (1.37 + 20 * dbh^0.28) / (0.01 * dbh)), tibble(dbh = seq(0.1, 250)), color = "grey80") + # height-diameter ratio upper bound
+    geom_path(aes(x = dbh, y = 92 + (13 - 0.0028 * dbh^2) / (0.01 * dbh)), tibble(dbh = seq(0.1, 250)), color = "grey80") + 
+    geom_path(aes(x = dbh, y = 8 + 1.3 / (0.01 * dbh + 0.03) + (0 - 0.0000 * dbh^2) / (0.01 * dbh)), tibble(dbh = seq(0.1, 250)), color = "grey80") + # height-diameter ratio lower bound
+    coord_cartesian(xlim = c(0, 250), ylim = c(0, 250)) +
+    labs(x = "DBH, cm", y = "height-diameter ratio", fill = "trees\nmeasured", title = paste(plotLetters[1], "Douglas-fir")) +
   ggplot() +
-    geom_tile(aes(x = dbhClass, y = heightClass, fill = treesMeasured), liveUnbrokenSampling2022 %>% filter(speciesModel == "ABGR")) +
-    geom_path(aes(x = seq(0, 150), y = 1.37 + 0.181 * seq(0, 150)^0.994), color = "grey80") +
-    geom_path(aes(x = seq(0.1, 150), y = 1.37 + 5.372 * seq(0.1, 150)^0.554), color = "grey80") +
-    coord_cartesian(xlim = c(0, 150), ylim = c(0, 75)) +
+    geom_tile(aes(x = dbhClass, y = heightDiameterClass, fill = treesMeasured), liveUnbrokenSampling2022 %>% filter(speciesModel == "ABGR")) +
+    #geom_point(aes(x = dbh, y = height / (0.01 * dbh)), abgr2022, alpha = 0.05, shape = 16) +
+    #geom_path(aes(x = dbh, y = (1.37 + 7 * dbh^0.50) / (0.01 * dbh)), tibble(dbh = seq(0.1, 150)), color = "grey80") +
+    geom_path(aes(x = dbh, y = 109 + (10 - 0.0044 * dbh^2) / (0.01 * dbh)), tibble(dbh = seq(0.1, 150)), color = "grey80") +
+    geom_path(aes(x = dbh, y = 26 + 0.7 / (0.01 * dbh + 0.08) + (0 - 0.0001 * dbh^2) / (0.01 * dbh)), tibble(dbh = seq(0.1, 150)), color = "grey80") +
+    coord_cartesian(xlim = c(0, 150), ylim = c(0, 250)) +
     labs(x = "DBH, cm", y = NULL, fill = "trees\nmeasured", title = paste(plotLetters[2], "grand fir")) +
   ggplot() +
-    geom_tile(aes(x = dbhClass, y = heightClass, fill = treesMeasured), liveUnbrokenSampling2022 %>% filter(speciesModel == "ACMA")) +
-    geom_path(aes(x = seq(0, 150), y = 1.37 + 0.114 * seq(0, 150)^0.75), color = "grey80") +
-    geom_path(aes(x = seq(0.1, 150), y = 1.37 + 5.007 * seq(0.1, 150)^0.603), color = "grey80") +
-    coord_cartesian(xlim = c(0, 150), ylim = c(0, 75)) +
+    geom_tile(aes(x = dbhClass, y = heightDiameterClass, fill = treesMeasured), liveUnbrokenSampling2022 %>% filter(speciesModel == "ACMA")) +
+    #geom_point(aes(x = dbh, y = height / (0.01 * dbh)), acma2022, alpha = 0.05, shape = 16) +
+    #geom_path(aes(x = dbh, y = (1.37 + 13 * dbh^0.30) / (0.01 * dbh)), tibble(dbh = seq(0.1, 150)), color = "grey80") +
+    geom_path(aes(x = dbh, y = 69 + (21 - 0.0042 * dbh^2) / (0.01 * dbh)), tibble(dbh = seq(0.1, 150)), color = "grey80") +
+    geom_path(aes(x = dbh, y = 1.2 + 1.3 / (0.01 * dbh + 0.04) + (0 - 0.0000 * dbh^2) / (0.01 * dbh)), tibble(dbh = seq(0.1, 150)), color = "grey80") +
+    coord_cartesian(xlim = c(0, 150), ylim = c(0, 250)) +
     labs(x = "DBH, cm", y = NULL, fill = "trees\nmeasured", title = paste(plotLetters[3], "bigleaf maple")) +
   ggplot() +
-    geom_tile(aes(x = dbhClass, y = heightClass, fill = treesMeasured), liveUnbrokenSampling2022 %>% filter(speciesModel == "other")) +
-    geom_path(aes(x = seq(0, 150), y = 1.37 + 0.835 * seq(0, 150)^0.551), color = "grey80") +
-    geom_path(aes(x = seq(0.1, 150), y = 1.37 + 7.032 * seq(0.1, 150)^0.436), color = "grey80") +
-    coord_cartesian(xlim = c(0, 150), ylim = c(0, 75)) +
+    geom_tile(aes(x = dbhClass, y = heightDiameterClass, fill = treesMeasured), liveUnbrokenSampling2022 %>% filter(speciesModel == "other")) +
+    #geom_point(aes(x = dbh, y = height / (0.01 * dbh)), other2022, alpha = 0.05, shape = 16) +
+    #geom_path(aes(x = dbh, y = (1.37 + 10 * dbh^0.36) / (0.01 * dbh)), tibble(dbh = seq(0.1, 150)), color = "grey80") +
+    geom_path(aes(x = dbh, y = 73 + (15 - 0.0036 * dbh^2) / (0.01 * dbh)), tibble(dbh = seq(0.1, 150)), color = "grey80") +
+    geom_path(aes(x = dbh, y = 16 + 1.9 / (0.01 * dbh + 0.06) + (0 - 0.0006 * dbh^2) / (0.01 * dbh)), tibble(dbh = seq(0.1, 150)), color = "grey80") +
+    coord_cartesian(xlim = c(0, 150), ylim = c(0, 250)) +
     labs(x = "DBH, cm", y = NULL, fill = "trees\nmeasured", title = paste(plotLetters[4], "other species")) +
   plot_annotation(theme = theme(plot.margin = margin())) +
   plot_layout(guides = "collect", widths = c(250, 150, 150, 150)) &
     scale_fill_viridis_c(trans = "log10", breaks = c(1, 3, 10, 30, 100, 200), labels = c(1, 3, 10, 30, 100, "200+"), limits = c(1, 200), na.value = "yellow")
+  
+  # quantile regression based starting points
+  # Not especially useful in practice, mainly due to model form limitations on the lower bounds and numerical instability at quantile = tau = c(0, 1).
+  # library(quantreg)
+  # psmeLowerBound = nlrq(height ~ 1.37 + a1 * dbh^b1, psme2022, start = c(a1 = 0.1, b1 = 0.6), tau = 0.001)
+  # psmeUpperBound = nlrq(height ~ 1.37 + a1 * dbh^b1, psme2022, start = c(a1 = 2.0, b1 = 0.7), tau = 0.999)
+  # abgrLowerBound = nlrq(height ~ 1.37 + a1 * dbh^b1, abgr2022, start = c(a1 = 0.1, b1 = 0.8), tau = 0.001)
+  # abgrUpperBound = nlrq(height ~ 1.37 + a1 * dbh^b1, abgr2022, start = c(a1 = 2.5, b1 = 0.5), tau = 0.999)
+  # acmaLowerBound = nlrq(height ~ 1.37 + a1 * dbh^b1, acma2022, start = c(a1 = 0.01, b1 = 2), tau = 0.005)
+  # acmaUpperBound = nlrq(height ~ 1.37 + a1 * dbh^b1, acma2022, start = c(a1 = 2.5, b1 = 0.5), tau = 0.999)
+  # otherLowerBound = nlrq(height ~ 1.37 + a1 * dbh^b1, other2022, start = c(a1 = 1.0, b1 = 0.1), tau = 0.001)
+  # otherUpperBound = nlrq(height ~ 1.37 + a1 * dbh^b1, other2022, start = c(a1 = 2.5, b1 = 0.5), tau = 0.999)
+  # 
+  # ggplot() +
+  #   geom_tile(aes(x = dbhClass, y = heightClass, fill = treesMeasured), liveUnbrokenSampling2022 %>% filter(speciesModel == "PSME")) +
+  #   geom_path(aes(x = seq(0, 250), y = 1.37 + 1.2 * seq(0, 250)^0.60), color = "grey80") + # height-diameter ratio lower bound
+  #   geom_path(aes(x = seq(0.1, 250), y = 1.37 + 2.819 * seq(0.1, 250)^0.710), color = "grey80") + # height-diameter ratio upper bound
+  #   coord_cartesian(xlim = c(0, 250), ylim = c(0, 75)) +
+  #   labs(x = "DBH, cm", y = "height, m", fill = "trees\nmeasured", title = paste(plotLetters[1], "Douglas-fir")) +
+  # ggplot() +
+  #   geom_tile(aes(x = dbhClass, y = heightClass, fill = treesMeasured), liveUnbrokenSampling2022 %>% filter(speciesModel == "ABGR")) +
+  #   geom_path(aes(x = seq(0, 150), y = 1.37 + 0.181 * seq(0, 150)^0.994), color = "grey80") +
+  #   geom_path(aes(x = seq(0.1, 150), y = 1.37 + 5.372 * seq(0.1, 150)^0.554), color = "grey80") +
+  #   coord_cartesian(xlim = c(0, 150), ylim = c(0, 75)) +
+  #   labs(x = "DBH, cm", y = NULL, fill = "trees\nmeasured", title = paste(plotLetters[2], "grand fir")) +
+  # ggplot() +
+  #   geom_tile(aes(x = dbhClass, y = heightClass, fill = treesMeasured), liveUnbrokenSampling2022 %>% filter(speciesModel == "ACMA")) +
+  #   geom_path(aes(x = seq(0, 150), y = 1.37 + 0.114 * seq(0, 150)^0.75), color = "grey80") +
+  #   geom_path(aes(x = seq(0.1, 150), y = 1.37 + 5.007 * seq(0.1, 150)^0.603), color = "grey80") +
+  #   coord_cartesian(xlim = c(0, 150), ylim = c(0, 75)) +
+  #   labs(x = "DBH, cm", y = NULL, fill = "trees\nmeasured", title = paste(plotLetters[3], "bigleaf maple")) +
+  # ggplot() +
+  #   geom_tile(aes(x = dbhClass, y = heightClass, fill = treesMeasured), liveUnbrokenSampling2022 %>% filter(speciesModel == "other")) +
+  #   geom_path(aes(x = seq(0, 150), y = 1.37 + 0.835 * seq(0, 150)^0.551), color = "grey80") +
+  #   geom_path(aes(x = seq(0.1, 150), y = 1.37 + 7.032 * seq(0.1, 150)^0.436), color = "grey80") +
+  #   coord_cartesian(xlim = c(0, 150), ylim = c(0, 75)) +
+  #   labs(x = "DBH, cm", y = NULL, fill = "trees\nmeasured", title = paste(plotLetters[4], "other species")) +
+  # plot_annotation(theme = theme(plot.margin = margin())) +
+  # plot_layout(guides = "collect", widths = c(250, 150, 150, 150)) &
+  #   scale_fill_viridis_c(trans = "log10", breaks = c(1, 3, 10, 30, 100, 200), labels = c(1, 3, 10, 30, 100, "200+"), limits = c(1, 200), na.value = "yellow")
 }
 
 

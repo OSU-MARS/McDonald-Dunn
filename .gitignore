@@ -9,6 +9,7 @@ Stand*/
 **/*.gpkg
 **/*.jpg
 **/*.jpeg
+**/*.las
 **/*.png
 **/*.qgz
 **/*.Rds
